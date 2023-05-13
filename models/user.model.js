@@ -8,6 +8,7 @@ const { CONFIG } = require("../config/config");
 module.exports = (sequelize, DataTypes) => {
   var Model = sequelize.define("users", {
     id                 : { type: DataTypes.INTEGER(11), autoIncrement: true, allowNull: false, primaryKey: true },
+    is_logged_in       : { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     uuid               : { type: DataTypes.STRING, allowNull: true, defaultValue: 0 },
     profile_pic        : { type: DataTypes.TEXT, allowNull: true },
     title              : { type: DataTypes.ENUM, defaultValue: "Ms", values: ["Ms", "Mrs", "Mr"] },

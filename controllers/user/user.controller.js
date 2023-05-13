@@ -233,6 +233,18 @@ const login = async function (req, res) {
     );
   }
   
+
+
+  // check concurrent login
+  if(userData.is_logged_in) {
+    console.log("already logged in ");
+    return ReE(res, 'You are already Logged In.', 422);
+  }
+  else {
+    userData.is_logged_in = true;
+    userData.save();
+  }
+
   let generate_otp = Math.floor(Math.random() * (9 * Math.pow(10, 6 - 1))) + Math.pow(10, 6 - 1);;
   userData.otp = generate_otp;
   userData.otp_expire = moment().add(2, 'minutes').format("YYYY-MM-DD HH:mm:ss");
@@ -271,6 +283,17 @@ const login = async function (req, res) {
   return ReS(res, { token: userData.getJWT(), user: userData.toWeb() });
 };
 module.exports.login = login;
+
+const logout = async (req, res)=> {
+  let err, userData;
+  // console.log("req received ",req.headers.authorization);
+  [err, userData] = await to(users.findOne({ where: { id: req.user.id } }));
+  userData.is_logged_in = false;
+  userData.save();
+
+  return ReS(res, { 'logout': 'successfull' });
+};
+module.exports.logout = logout;
 
 //upsertAcademics
 
