@@ -453,9 +453,9 @@ const logAssessment = async function (req, res) {
   if (_.isEmpty(req.params.assessment_type) || _.isUndefined(req.params.assessment_type)) {
     return ReE(res, "Assessment type required in params", 422);
   }
-  // if (_.isEmpty(payload.question_id) || _.isUndefined(payload.question_id)) {
-  //   return ReE(res, "Question id required in payload", 422);
-  // }
+  if (_.isEmpty(payload.answered_question) || _.isUndefined(payload.answered_question)) {
+    return ReE(res, "Answered Question JSON required in payload", 422);
+  }
   // if (_.isEmpty(payload.question_status) || _.isUndefined(payload.question_status)) {
   //   return ReE(res, "Question Status required in payload", 422);
   // }
@@ -465,11 +465,21 @@ const logAssessment = async function (req, res) {
   }
   try {
      //Log Payload
-     payload.user_id = req.user.id;
-     payload.question_status = req.body.question_status.toUpperCase();
-
-      console.log("insert payload ",payload);
-     [err, logAssessmentData] = await to(user_assessment_logs.create(payload));
+    payload.user_id = req.user.id;
+    payload.answered_question = JSON.stringify(payload.answered_question);
+    let upsert = { user_id: payload.user_id, assessment_type: payload.assessment_type, assessment_id: payload.assessment_id };
+    [err, logAssessmentData] = await to(user_assessment_logs.findOne({where: upsert}));
+    console.log('logAssessmentData', JSON.stringify(logAssessmentData));
+    if(logAssessmentData) {
+      logAssessmentData.answered_question = payload.answered_question;
+      logAssessmentData.elapsed_time = payload.elapsed_time;
+      logAssessmentData.save();
+    }
+    else {
+      [err, logAssessmentData] = await to(user_assessment_logs.create(payload));
+    }
+    //  [logAssessmentData, created] = await to(user_assessment_logs.upsert(payload, { fields: ['user_id','assessment_id', 'assessment_type'], returning: true }));
+    //  [err, logAssessmentData] = await to(user_assessment_logs.findOrCreate({ where: upsert, defaults: payload }));
      if (err) return ReE(res, err, 422);
      return ReS(res, { data: logAssessmentData }, 200);
   } catch (err) {
