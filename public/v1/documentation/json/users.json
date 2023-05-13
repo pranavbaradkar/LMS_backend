@@ -1,0 +1,250 @@
+{
+  "/users": {
+    "post": {
+      "tags": [
+        "user"
+      ],
+      "summary": "Create user",
+      "description": "Creates user that can now be used for authentication",
+      "operationId": "createUser",
+      "produces": [
+        "application/json"
+      ],
+      "parameters": [
+        {
+          "in": "body",
+          "name": "body",
+          "description": "Creates user",
+          "required": true,
+          "schema": {
+            "$ref": "#/definitions/CreateUser"
+          }
+        }
+      ],
+      "responses": {
+        "201": {
+          "description": "successful operation",
+          "schema": {
+            "$ref": "#/definitions/CreateUserResponse"
+          }
+        },
+        "422": {
+          "description": "Invalid operation",
+          "schema": {
+            "$ref": "#/definitions/ApiErrorResponse"
+          }
+        }
+      }
+    },
+    "get": {
+      "tags": [
+        "user"
+      ],
+      "summary": "Return user",
+      "description": "This can only be done by the logged in user.",
+      "produces": [
+        "application/json"
+      ],
+      "responses": {
+        "200": {
+          "description": "successful operation",
+          "schema": {
+            "$ref": "#/definitions/ReturnUserResponse"
+          }
+        },
+        "401": {
+          "description": "unauthorized",
+          "schema": {
+            "$ref": "#/definitions/ApiUnauthorizezdResponse"
+          }
+        }
+      },
+      "security": [
+        {
+          "api_key": []
+        }
+      ]
+    },
+    "put": {
+      "tags": [
+        "user"
+      ],
+      "summary": "Update user",
+      "description": "This can only be done by the logged in user.",
+      "parameters": [
+        {
+          "in": "body",
+          "name": "body",
+          "description": "Creates user",
+          "required": true,
+          "schema": {
+            "$ref": "#/definitions/UpdateUserBody"
+          }
+        }
+      ],
+      "produces": [
+        "application/json"
+      ],
+      "responses": {
+        "200": {
+          "description": "successful request",
+          "schema": {
+            "$ref": "#/definitions/ApiSuccessResponse"
+          }
+        },
+        "401": {
+          "description": "unauthorized",
+          "schema": {
+            "$ref": "#/definitions/ApiUnauthorizezdResponse"
+          }
+        }
+      },
+      "security": [
+        {
+          "api_key": []
+        }
+      ]
+    },
+    "delete": {
+      "tags": [
+        "user"
+      ],
+      "summary": "Soft delete user",
+      "description": "This can only be done by the logged in user.",
+      "produces": [
+        "application/json"
+      ],
+      "responses": {
+        "204": {
+          "description": "success",
+          "schema": {
+            "$ref": "#/definitions/ApiSuccessResponse"
+          }
+        },
+        "401": {
+          "description": "unauthorized",
+          "schema": {
+            "$ref": "#/definitions/ApiUnauthorizezdResponse"
+          }
+        },
+        "default": {
+          "description": "successful operation"
+        }
+      },
+      "security": [
+        {
+          "api_key": []
+        }
+      ]
+    }
+  },
+  "/users/hard": {
+    "delete": {
+      "tags": [
+        "user"
+      ],
+      "summary": "Hard delete user",
+      "description": "Remove user from database",
+      "produces": [
+        "application/json"
+      ],
+      "responses": {
+        "204": {
+          "description": "success",
+          "schema": {
+            "$ref": "#/definitions/ApiSuccessResponse"
+          }
+        },
+        "401": {
+          "description": "unauthorized",
+          "schema": {
+            "$ref": "#/definitions/ApiUnauthorizezdResponse"
+          }
+        },
+        "default": {
+          "description": "successful operation"
+        }
+      },
+      "security": [
+        {
+          "api_key": []
+        }
+      ]
+    }
+  },
+  "/users/restore": {
+    "put": {
+      "tags": [
+        "user"
+      ],
+      "summary": "Restore soft deleted user",
+      "description": "",
+      "produces": [
+        "application/json"
+      ],
+      "responses": {
+        "204": {
+          "description": "success",
+          "schema": {
+            "$ref": "#/definitions/ApiSuccessResponse"
+          }
+        },
+        "401": {
+          "description": "unauthorized",
+          "schema": {
+            "$ref": "#/definitions/ApiUnauthorizezdResponse"
+          }
+        },
+        "default": {
+          "description": "successful operation"
+        }
+      },
+      "security": [
+        {
+          "api_key": []
+        }
+      ]
+    }
+  },
+  "/login": {
+    "post": {
+      "tags": [
+        "user"
+      ],
+      "summary": "User Login",
+      "description": "Returns Bearer Token for JWT authentication",
+      "operationId": "createUsersWithArrayInput",
+      "produces": [
+        "application/json"
+      ],
+      "parameters": [
+        {
+          "in": "body",
+          "name": "body",
+          "description": "List of user object",
+          "required": true,
+          "schema": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/CreateUser"
+            }
+          }
+        }
+      ],
+      "responses": {
+        "204": {
+          "description": "success",
+          "schema": {
+            "$ref": "#/definitions/LoginUserResponse"
+          }
+        },
+        "422": {
+          "description": "error",
+          "schema": {
+            "$ref": "#/definitions/ApiErrorResponse"
+          }
+        }
+      }
+    }
+  }
+}

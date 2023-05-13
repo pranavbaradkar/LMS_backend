@@ -1,29 +1,31 @@
-# README #
+## Description
+This is an Restful API for Node.js and Mysql. Designed after PHP's beautiful Laravel. This is in the MVC format,
+except because it is an API there are no views, just models and controllers.
 
-This README would normally document whatever steps are necessary to get your application up and running.
 
-### What is this repository for? ###
+##### Routing         : Express
+##### ORM Database    : Sequelize
+##### Authentication  : Passport, JWT
 
-* Quick summary
-* Version
-* [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
+## Installation
 
-### How do I get set up? ###
+#### Download Code | Clone the Repo
 
-* Summary of set up
-* Configuration
-* Dependencies
-* Database configuration
-* How to run tests
-* Deployment instructions
+```
+git clone {repo_name}
+```
 
-### Contribution guidelines ###
+#### Install Node Modules
+```
+npm install
+```
 
-* Writing tests
-* Code review
-* Other guidelines
+#### Create .env File
+You will find a example.env file in the home directory. Paste the contents of that into a file named .env in the same directory. 
+Fill in the variables to fit your application
 
-### Who do I talk to? ###
 
-* Repo owner or admin
-* Other community or team contact
+#### generate migration 
+
+npx sequelize-cli migration:create --name modify_users_add_new_fields
+
