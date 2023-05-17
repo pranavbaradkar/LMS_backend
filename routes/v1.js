@@ -33,6 +33,7 @@ router.post("/auth/generate-otp", UserController.generateOtp);
 router.post("/auth/validate-otp", UserController.verifyOtp);
 
 router.post("/auth/login", UserController.login);
+router.get("/auth/logout",userPassport.authenticate("jwt", { session: false }), UserController.logout);
 router.get("/user", userPassport.authenticate("jwt", { session: false }), UserController.get);
 router.put("/user/update",userPassport.authenticate("jwt", { session: false }), UserController.update); 
 router.post("/user/otp/generate", userPassport.authenticate("jwt", { session: false }), UserController.generateUserOtp);
