@@ -115,7 +115,7 @@ const getScreeningTestDetails = async function (req, res) {
 module.exports.getScreeningTestDetails = getScreeningTestDetails;
 
 const getUserRecommendedAssessments = async function (req, res) {
-  let err, assessmentsData, teachingInterest, userAssessmentExist;
+  let err, assessmentsData, teachingInterest, userAssessmentExist, logAssessmentData;
   try {
 
     
@@ -314,6 +314,12 @@ const getUserRecommendedAssessments = async function (req, res) {
         ]
       }));
 
+      [err, logAssessmentData] = await to(user_assessment_logs.findOne({
+        where: { user_id: req.user.id, assessment_id: mapData.assessment.id },
+        attributes: [ 'id', 'assessment_id', 'elapsed_time', 'assessment_type', 'answered_question']
+      }));
+      logAssessmentData = logAssessmentData || [];
+
       let finalOutput = { ...mapData.assessment };
       assessments_test = assessments_test ? assessments_test.map(ed => {
         let object = {...ed.get({plain: true})};
@@ -332,6 +338,7 @@ const getUserRecommendedAssessments = async function (req, res) {
       }) : [];
       finalOutput.skills = [...skillsData.map(ele => { return ele.name }), ...subjectData.map(ele => { return ele.name })];
       finalOutput.tests = assessments_test;
+      finalOutput.assessment_log = logAssessmentData;
 
       if(finalOutput.user_assessments && finalOutput.user_assessments.screening_status) {
         finalOutput.screening_status = finalOutput.user_assessments.screening_status;
