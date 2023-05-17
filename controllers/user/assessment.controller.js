@@ -73,7 +73,7 @@ const getScreeningTestDetails = async function (req, res) {
           [
             {
               model: questions,
-              attributes:['id','question_type', 'statement', 'mime_type','hint','difficulty_level','complexity_level','knowledge_level','proficiency_level','blooms_taxonomy','skill_id','estimated_time','correct_answer_score','level_id','tags','subject_id'],
+              attributes:['id','question_type', 'statement', 'mime_type','hint','difficulty_level','complexity_level','knowledge_level','proficiency_level','blooms_taxonomy','skill_id','estimated_time','correct_answer_score','level_id','tags','subject_id', 's3_asset_urls'],
               include: [
                 { model: question_options },
                 { model: question_mtf_answers },
