@@ -1,5 +1,5 @@
 const model = require('../../models');
-const { assessments, assessment_questions, campaign_assessments, questions, question_options, custom_attributes, assessment_configurations, skills, levels, user_assessments, users, inventory_blocks, user_assessment_responses, subjects } = require("../../models");
+const { assessments, user_assessment_logs, assessment_questions, campaign_assessments, questions, question_options, custom_attributes, assessment_configurations, skills, levels, user_assessments, users, inventory_blocks, user_assessment_responses, subjects } = require("../../models");
 const { to, ReE, ReS, requestQueryObject, lowercaseKeyValue } = require('../../services/util.service');
 const validator = require('validator');
 const mailer = require("../../helpers/mailer"); 
@@ -902,9 +902,16 @@ const getUserAssessment = async function (req, res) {
         ]
       }));
 
+      [err, logAssessmentData] = await to(user_assessment_logs.findOne({
+        where: { user_id: req.user.id, assessment_id: assessmentData.id },
+        attributes: [ 'id', 'assessment_id', 'elapsed_time', 'assessment_type', 'answered_question']
+      }));
+      logAssessmentData = logAssessmentData || [];
+
       let finalOutput = {...assessmentData};
       finalOutput.skills = [...skillsData.map(ele => { return ele.name }), ...subjectData.map(ele => { return ele.name })];
       finalOutput.tests = assessments_test;
+      finalOutput.assessment_log = logAssessmentData;
 
 
       if(finalOutput.user_assessments && finalOutput.user_assessments.screening_status) {
