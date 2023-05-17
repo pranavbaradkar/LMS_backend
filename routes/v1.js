@@ -27,13 +27,13 @@ router.get("/", function(req, res, next) {
 router.get("/dash",userPassport.authenticate("jwt", { session: false }),HomeController.Dashboard);
 router.post("/account/verify", HomeController.accountVerify);
 
-
 // ********************* User ROUTES **************************
 router.post("/auth/generate-otp", UserController.generateOtp);
 router.post("/auth/validate-otp", UserController.verifyOtp);
 
 router.post("/auth/login", UserController.login);
 router.get("/auth/logout",userPassport.authenticate("jwt", { session: false }), UserController.logout);
+
 router.get("/user", userPassport.authenticate("jwt", { session: false }), UserController.get);
 router.put("/user/update",userPassport.authenticate("jwt", { session: false }), UserController.update); 
 router.post("/user/otp/generate", userPassport.authenticate("jwt", { session: false }), UserController.generateUserOtp);
@@ -80,9 +80,9 @@ router.post("/assessments/:assessment_id/:type/submit",userPassport.authenticate
 router.post("/users/assessments/status",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.statusUserAssessment);
 router.put("/users/assessments/:assessment_id/status",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.updateStatusUserAssessment);
 
+router.post("/users/log/assessments/:assessment_id/:assessment_type",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.logAssessment);
 router.post("/s3/put-object-url", HomeController.getUserSignedUrl);
 router.get("/result", UserAssessmentController.getAllAssessmentsResult);
-
 
 //********* API DOCUMENTATION **********  
 router.use("/docs/api.json",express.static(path.join(__dirname, "/../public/v1/documentation/api.json")));

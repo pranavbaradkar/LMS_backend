@@ -561,6 +561,16 @@ const verifyOtp = async function (req, res) {
     return ReE(res, "OTP is required to validate user.", 422);
   }
   try {
+    
+    // // check concurrent login
+    // if(userData.is_logged_in) {
+    //   console.log("already logged in ");
+    //   return ReE(res, 'You are already Logged In.', 422);
+    // } else {
+    //   userData.is_logged_in = true;
+    //   userData.save();
+    // }
+
     let existingOTP = null;
     if(payload.email) {
       existingOTP = otpCache.get(payload.email);
@@ -664,6 +674,9 @@ const verifyOtp = async function (req, res) {
       if(user_assessment_data_screening) {
         is_screening_test_taken = true
       }
+
+      userData.is_logged_in = true;
+      userData.save();
 
       return ReS(res, { 
         token: userData.getJWT(),  

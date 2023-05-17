@@ -1,5 +1,5 @@
 const model = require('../../models');
-const { user_assessments, assessments, assessment_questions,campaigns,campaign_assessments, assessment_configurations,levels, questions, question_options, question_mtf_answers, custom_attributes, professional_infos, user_assessment_responses, skills, users, user_teaching_interests, subjects } = require("../../models");
+const { user_assessment_logs, user_assessments, assessments, assessment_questions,campaigns,campaign_assessments, assessment_configurations,levels, questions, question_options, question_mtf_answers, custom_attributes, professional_infos, user_assessment_responses, skills, users, user_teaching_interests, subjects } = require("../../models");
 const { to, ReE, ReS, toSnakeCase, returnObjectEmpty } = require('../../services/util.service');
 const { getLiveCampaignAssessments } = require('../../services/campaign.service');
 const validator = require('validator');
@@ -73,7 +73,7 @@ const getScreeningTestDetails = async function (req, res) {
           [
             {
               model: questions,
-              attributes:['id','question_type', 'statement', 'mime_type','hint','difficulty_level','complexity_level','knowledge_level','proficiency_level','blooms_taxonomy','skill_id','estimated_time','correct_answer_score','answer','level_id','tags','subject_id'],
+              attributes:['id','question_type', 'statement', 'mime_type','hint','difficulty_level','complexity_level','knowledge_level','proficiency_level','blooms_taxonomy','skill_id','estimated_time','correct_answer_score','level_id','tags','subject_id'],
               include: [
                 { model: question_options },
                 { model: question_mtf_answers },
@@ -442,6 +442,51 @@ const testAnswersSubmit = async function (req, res) {
   }
 };
 module.exports.testAnswersSubmit = testAnswersSubmit;
+
+const logAssessment = async function (req, res) {
+  let err, logAssessmentData, responseData = {};
+  let payload = req.body;
+  payload.user_id = req.user.id;
+  if (_.isEmpty(req.params.assessment_id) || _.isUndefined(req.params.assessment_id)) {
+    return ReE(res, "Assessment id required in params", 422);
+  }
+  if (_.isEmpty(req.params.assessment_type) || _.isUndefined(req.params.assessment_type)) {
+    return ReE(res, "Assessment type required in params", 422);
+  }
+  if (_.isEmpty(payload.answered_question) || _.isUndefined(payload.answered_question)) {
+    return ReE(res, "Answered Question JSON required in payload", 422);
+  }
+  // if (_.isEmpty(payload.question_status) || _.isUndefined(payload.question_status)) {
+  //   return ReE(res, "Question Status required in payload", 422);
+  // }
+  if (req.params.assessment_type && req.params.assessment_id) {
+    payload.assessment_id = req.params.assessment_id;
+    payload.assessment_type = (req.params.assessment_type).toUpperCase();
+  }
+  try {
+     //Log Payload
+    payload.user_id = req.user.id;
+    payload.answered_question = JSON.stringify(payload.answered_question);
+    let upsert = { user_id: payload.user_id, assessment_type: payload.assessment_type, assessment_id: payload.assessment_id };
+    [err, logAssessmentData] = await to(user_assessment_logs.findOne({where: upsert}));
+    console.log('logAssessmentData', JSON.stringify(logAssessmentData));
+    if(logAssessmentData) {
+      logAssessmentData.answered_question = payload.answered_question;
+      logAssessmentData.elapsed_time = payload.elapsed_time;
+      logAssessmentData.save();
+    }
+    else {
+      [err, logAssessmentData] = await to(user_assessment_logs.create(payload));
+    }
+    //  [logAssessmentData, created] = await to(user_assessment_logs.upsert(payload, { fields: ['user_id','assessment_id', 'assessment_type'], returning: true }));
+    //  [err, logAssessmentData] = await to(user_assessment_logs.findOrCreate({ where: upsert, defaults: payload }));
+     if (err) return ReE(res, err, 422);
+     return ReS(res, { data: logAssessmentData }, 200);
+  } catch (err) {
+    return ReE(res, err, 422);
+  }
+};
+module.exports.logAssessment = logAssessment;
 
 const statusUserAssessment = async function (req, res) {
   let err, user_assessment_data_exist;

@@ -813,12 +813,11 @@ const userAssessmentsResult = async function (req, res) {
   // });
 
 
-    assessmentResult.forEach(async ele => {
-    
-      ele.user_assessment_responses.map(async k => {
-        let request = await axios.post(`${process.env.BASE_URL}/api/v1/admin/result/user_assessments/${req.query.type.toUpperCase()}`, k);
-      });
+  assessmentResult.forEach(async ele => {
+    ele.user_assessment_responses.map(async k => {
+      let request = await axios.post(`${process.env.BASE_URL}/api/v1/admin/result/user_assessments/${req.query.type.toUpperCase()}`, k);
     });
+  });
   return ReS(res, { data: assessmentResult }, 200);
 }
 module.exports.userAssessmentsResult = userAssessmentsResult
