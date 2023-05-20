@@ -5,6 +5,7 @@ module.exports = (sequelize, DataTypes) => {
   var Model = sequelize.define('levels', {
     id                : { type: DataTypes.INTEGER(11), allowNull: false, autoIncrement: true, primaryKey: true },
     name              : { type: DataTypes.STRING, allowNull: false },
+    icon              : { type: DataTypes.TEXT, allowNull: true, defaultValue: null},
     school_id         : { type: DataTypes.INTEGER(11), allowNull: true },
     level_description : { type: DataTypes.TEXT, allowNull: false },
     board_id          : { type: DataTypes.INTEGER(11), allowNull: true },
