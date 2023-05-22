@@ -1,4 +1,4 @@
-const { users, academics, professional_infos, user_communications, user_assessments, user_teaching_interests } = require("../../models");
+const { users, academics, professional_infos, user_communications, user_assessments, user_teaching_interests,levels,schools, boards, subjects } = require("../../models");
 const authService = require("../../services/auth.service");
 const { to, ReE, ReS, toSnakeCase, sendSMS, isBlank, validatePhoneNo } = require("../../services/util.service");
 var moment = require("moment");
@@ -382,6 +382,39 @@ const getUserTeachingInterest = async function (req, res) {
 };
 module.exports.getUserTeachingInterest = getUserTeachingInterest;
 // end 
+
+// get user teaching interest with names
+const getUserTeachingInterestNames = async function (req, res) {
+  let err, response, levelData, schoolData, boardData, subjectData;
+  let payload = req.body;
+  try {
+    //user assign
+    payload.user_id = req.user.id;
+
+    [err, response] = await to(user_teaching_interests.findOne({ where: { user_id: payload.user_id }, raw:true }));
+    if (err) return ReE(res, err, 422);
+
+    // console.log("the ids obj ", interestIds);
+    [err, levelData] = await to(levels.findAll({ where: {id: response.level_ids }, attributes: ['id','name'] }));
+    [err, schoolData] = await to(schools.findAll({ where: {id: response.school_ids }, attributes: ['id','name'] }));
+    [err, boardData] = await to(boards.findAll({ where: {id: response.board_ids }, attributes: ['id','name'] }));
+    [err, subjectData] = await to(subjects.findAll({ where: {id: response.subject_ids }, attributes: ['id','name'] }));
+    
+    let finalOutput = {};
+    finalOutput.id = response.id;
+    finalOutput.user_id = response.user_id;
+    finalOutput.levels = levelData;
+    finalOutput.schools = schoolData;
+    finalOutput.boards = boardData;
+    finalOutput.subjects = subjectData;
+    
+
+    return ReS(res, { data: finalOutput }, 200);
+  } catch (err) {
+    return ReE(res, err, 422);
+  }
+};
+module.exports.getUserTeachingInterestNames = getUserTeachingInterestNames;
 
 const createBulkAcademics = async function (req, res) {
   let err, academicsData;

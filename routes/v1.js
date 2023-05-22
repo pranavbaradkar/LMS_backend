@@ -59,6 +59,7 @@ router.delete("/users/professional-infos/:professional_info_id",userPassport.aut
 // ********************* User Professional Info **************************
 router.post("/users/teaching-interests",userPassport.authenticate("jwt", { session: false }), UserController.createUserTeachingInterest);
 router.get("/users/teaching-interests",userPassport.authenticate("jwt", { session: false }), UserController.getUserTeachingInterest);
+router.get("/users/teaching-interests-names",userPassport.authenticate("jwt", { session: false }), UserController.getUserTeachingInterestNames);
 
 
 
