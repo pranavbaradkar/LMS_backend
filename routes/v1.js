@@ -75,6 +75,7 @@ router.post("/users/communications", userPassport.authenticate("jwt", { session:
 // ********************* Assessment **************************
 router.get("/assessments/:assessment_id",userPassport.authenticate("jwt", { session: false }), AssessmentController.getUserAssessment);
 router.get("/assessments/:assessment_id/:type/questions-list",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.getScreeningTestDetails);
+router.get("/assessments/:assessment_id/:type/question",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.userAssessmentQuestion);
 router.post("/assessments/:assessment_id/:type/submit",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.testAnswersSubmit);
 
 // **************************** User Assessment ***********************
