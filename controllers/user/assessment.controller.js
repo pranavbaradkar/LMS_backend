@@ -1,5 +1,5 @@
 const model = require('../../models');
-const { question_pools, user_assessment_logs, user_assessments, assessments, assessment_questions,campaigns,campaign_assessments, assessment_configurations,levels, questions, question_options, question_mtf_answers, custom_attributes, professional_infos, user_assessment_responses, skills, users, user_teaching_interests, subjects } = require("../../models");
+const { user_assessment_slots, question_pools, user_assessment_logs, user_assessments, assessments, assessment_questions,campaigns,campaign_assessments, assessment_configurations,levels, questions, question_options, question_mtf_answers, custom_attributes, professional_infos, user_assessment_responses, skills, users, user_teaching_interests, subjects } = require("../../models");
 const { to, ReE, ReS, toSnakeCase, returnObjectEmpty } = require('../../services/util.service');
 const { getLiveCampaignAssessments } = require('../../services/campaign.service');
 const validator = require('validator');
@@ -33,7 +33,25 @@ campaigns.hasMany(campaign_assessments, { foreignKey: "campaign_id" });
 
 assessment_configurations.belongsTo(levels, { foreignKey: 'level_id' });
 
+const userAssessmentSlot = async function(req, res) {
+  let err, userAssessmentSlotData;
+  let payload = req.body;
+  if (_.isEmpty(req.params.assessment_id) || _.isUndefined(req.params.assessment_id)) {
+    return ReE(res, "Assessment id required in params", 422);
+  }
+  try {
+    payload.user_id = req.user.id;
+    payload.assessment_id = req.params.assessment_id;
+    [err, userAssessmentSlotData] = await to(user_assessment_slots.create(payload));
 
+    if (err) return ReE(res, err, 422);
+    return ReS(res, { data: userAssessmentSlotData }, 200);  
+  } catch (err) {
+    return ReE(res, err, 422);
+  }
+
+}
+module.exports.userAssessmentSlot = userAssessmentSlot;
 
 const getScreeningTestDetails = async function (req, res) {
   let err, assessmentsData, typeData;

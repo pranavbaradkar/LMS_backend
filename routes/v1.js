@@ -79,6 +79,7 @@ router.get("/assessments/:assessment_id/:type/question",userPassport.authenticat
 router.post("/assessments/:assessment_id/:type/submit",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.testAnswersSubmit);
 
 // **************************** User Assessment ***********************
+router.post("/users/assessment_slot/:assessment_id",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.userAssessmentSlot);
 router.post("/users/assessments/status",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.statusUserAssessment);
 router.put("/users/assessments/:assessment_id/status",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.updateStatusUserAssessment);
 
