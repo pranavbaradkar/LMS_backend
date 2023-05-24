@@ -1,5 +1,5 @@
 const model = require('../../models');
-const { user_assessment_logs, user_assessments, assessments, assessment_questions,campaigns,campaign_assessments, assessment_configurations,levels, questions, question_options, question_mtf_answers, custom_attributes, professional_infos, user_assessment_responses, skills, users, user_teaching_interests, subjects } = require("../../models");
+const { question_pools, user_assessment_logs, user_assessments, assessments, assessment_questions,campaigns,campaign_assessments, assessment_configurations,levels, questions, question_options, question_mtf_answers, custom_attributes, professional_infos, user_assessment_responses, skills, users, user_teaching_interests, subjects } = require("../../models");
 const { to, ReE, ReS, toSnakeCase, returnObjectEmpty } = require('../../services/util.service');
 const { getLiveCampaignAssessments } = require('../../services/campaign.service');
 const validator = require('validator');
@@ -105,7 +105,7 @@ const getScreeningTestDetails = async function (req, res) {
         return obj;
       });
 
-
+      if(req.internal) return skills_data_final;
       return ReS(res, { data: skills_data_final }, 200);
     }
   } catch (err) {
@@ -333,7 +333,7 @@ const getUserRecommendedAssessments = async function (req, res) {
           }
           return obj;
         });
-        console
+        
         return object;
       }) : [];
       finalOutput.skills = [...skillsData.map(ele => { return ele.name }), ...subjectData.map(ele => { return ele.name })];
@@ -748,3 +748,57 @@ function toTitleCase(str) {
     }
   );
 }
+
+const userAssessmentQuestion = async function(req, res) {
+  let err, questionData, random;
+  if (_.isEmpty(req.params.assessment_id) || _.isUndefined(req.params.assessment_id)) {
+    return ReE(res, "Assessment id required in params", 422);
+  }
+  if (_.isEmpty(req.params.type) || _.isUndefined(req.params.type)) {
+    return ReE(res, "Assessment type required in params", 422);
+  }
+  try {
+
+    [err, questionData] = await to(question_pools.findAll({ 
+      where: { 
+        user_id: req.user.id, 
+        assessment_id: req.params.assessment_id, 
+        assessment_type: req.params.type.toUpperCase(),
+        question_status: { [Op.not]: 'COMPLETED' }
+      }
+    }));
+    console.log("Found question data ",questionData);
+    if(questionData.length > 0) {
+      // TODO: pick question and send respnse
+      random = _.random((questionData.length-1));
+      return ReS(res, { data: questionData[random] }, 200);
+    }
+
+    // call api to get the question list
+    req.internal = true;
+    let questionList = await getScreeningTestDetails(req, res);
+    console.log(questionList);
+
+    let payload = [];
+    questionList.forEach((obj, index) => {
+      let data = {};
+      data.user_id = req.user.id;
+      data.assessment_id = req.params.assessment_id;
+      data.assessment_type = req.params.type.toUpperCase();
+      data.question = obj;
+      data.question_status = 'PENDING';
+      payload.push(data);
+    });
+    if(payload.length < 0) return ReE(res, 'No question to insert to pool', 422);
+
+    // create new pool
+    [err, questionData] = await to(question_pools.bulkCreate(payload));
+    if(err) return ReE(res, err, 404);
+
+    random = _.random((questionData.length-1));
+    return ReS(res, { data: questionData[random] }, 200);
+  } catch (err) {
+    return ReE(res, err, 422);
+  }
+}
+module.exports.userAssessmentQuestion = userAssessmentQuestion;
