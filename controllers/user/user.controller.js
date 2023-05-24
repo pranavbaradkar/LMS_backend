@@ -1,4 +1,4 @@
-const { users, academics, professional_infos, user_communications, user_assessments, user_teaching_interests,levels,schools, boards, subjects } = require("../../models");
+const { users, countries, states, districts, talukas, academics, professional_infos, user_communications, user_assessments, user_teaching_interests,levels,schools, boards, subjects } = require("../../models");
 const authService = require("../../services/auth.service");
 const { to, ReE, ReS, toSnakeCase, sendSMS, isBlank, validatePhoneNo } = require("../../services/util.service");
 var moment = require("moment");
@@ -14,6 +14,11 @@ const otpCache = new NodeCache( { stdTTL: 10000, checkperiod: 10000 } );
 var Sequelize = require("sequelize");
 const { response } = require("express");
 const Op = Sequelize.Op;
+
+users.belongsTo(countries, {foreignKey: 'country_id'});
+users.belongsTo(states, {foreignKey: 'state_id'});
+users.belongsTo(districts, {foreignKey: 'district_id'});
+users.belongsTo(talukas, {foreignKey: 'taluka_id'});
 
 const get = async function (req, res) {
   let user = req.user;
@@ -77,10 +82,10 @@ const get = async function (req, res) {
 module.exports.get = get;
 
 const update = async function (req, res) {
-  let err, user, data;
+  let err, user, data, userData;
   user = req.user;
   data = req.body;
-  
+
   let dob_data = moment(data.dob, "YYYY-MM-DD");
   dob_data.set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
   data.dob = dob_data.format("YYYY-MM-DD");
@@ -103,12 +108,23 @@ const update = async function (req, res) {
   user.set(data);
   [err, user] = await to(user.save());
 
+  // fetch user again and apply association
+  [err, userData] = await to(users.findOne({
+    where: { id: user.id },
+    include: [
+      { model: countries, as: 'country', attributes:['id', 'country_name']},
+      { model: states, as: 'state', attributes:['id', 'state_name']},
+      { model: districts, as: 'district', attributes:['id', 'district_name']},
+      { model: talukas, as: 'taluka', attributes:['id', 'taluka_name']},
+    ]
+  }));
+  
   if (err) {
     if (err.message == "Validation error")
       err = "The email address or phone number is already in use";
-    return ReE(res, err);
+    return ReE(res, err, 422);
   }
-  return ReS(res, { data: user }, 200);
+  return ReS(res, { data: userData }, 200);
 };
 module.exports.update = update;
 
