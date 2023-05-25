@@ -14,6 +14,11 @@ const path = require("path");
 var Passport = require('passport').Passport,
 userPassport = new Passport();
 
+
+const multer = require('multer');
+const upload = multer();
+const fs = require('fs');
+
 require("./../middleware/passport")(userPassport);
 
 /* GET home page. */
@@ -85,6 +90,7 @@ router.put("/users/assessments/:assessment_id/status",userPassport.authenticate(
 
 router.post("/users/log/assessments/:assessment_id/:assessment_type",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.logAssessment);
 router.post("/s3/put-object-url", HomeController.getUserSignedUrl);
+router.post("/s3/video/:user_id",upload.any(), HomeController.uploadVideo);
 router.get("/result", UserAssessmentController.getAllAssessmentsResult);
 
 //********* API DOCUMENTATION **********  

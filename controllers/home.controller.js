@@ -1,4 +1,4 @@
-const { to, ReE, ReS, getSignedUrl } = require('../services/util.service');
+const { to, ReE, ReS, getSignedUrl,  uploadVideoOnS3} = require('../services/util.service');
 const { users } = require("../models");
 var _ = require('underscore');
 
@@ -69,4 +69,16 @@ const getUserSignedUrl = async function (req, res) {
   return ReS(res, { data: url });
 }
 module.exports.getUserSignedUrl = getUserSignedUrl;
+
+
+
+const uploadVideo = async function (req, res) {
+  let payload = req.body;
+  let userId = req.params.user_id;
+  const file = req.files;
+  console.log(file);
+  url = await uploadVideoOnS3(`${userId}`, `video_${new Date().getTime()}.mp4`, req.files[0].mimetype, req.files[0].buffer);
+  return ReS(res, { data: url });
+}
+module.exports.uploadVideo = uploadVideo;
 
