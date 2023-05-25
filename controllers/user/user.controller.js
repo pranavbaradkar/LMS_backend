@@ -548,6 +548,7 @@ const generateOtp = async function (req, res) {
         success = otpCache.set(payload.mobile, payload.otp, 300 );
       } else {
         let data = await sendSMS(payload.mobile, payload.otp);
+        success = otpCache.set(payload.mobile, payload.otp, 300 );
         console.log(data);
       }
     }
