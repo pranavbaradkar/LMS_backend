@@ -33,19 +33,37 @@ campaigns.hasMany(campaign_assessments, { foreignKey: "campaign_id" });
 
 assessment_configurations.belongsTo(levels, { foreignKey: 'level_id' });
 
+const getUserAssessmentSlot = async (req,res) => {
+  let err, userAssessmentSlotData;
+  try {
+    [err, userAssessmentSlotData] = await to(user_assessment_slots.findOne({where: {user_id: req.user.id}}));
+    if (err) return ReE(res, err, 422);
+
+    return ReS(res, { data: userAssessmentSlotData }, 200);
+  } catch (err) {
+    return ReE(res, err, 422);
+  }
+};
+module.exports.getUserAssessmentSlot = getUserAssessmentSlot;
+
 const userAssessmentSlot = async function(req, res) {
   let err, userAssessmentSlotData;
   let payload = req.body;
   try {
     payload.user_id = req.user.id;
-    [err, userAssessmentSlotData] = await to(user_assessment_slots.create(payload));
+    [err, updated] = await to(user_assessment_slots.update(payload, {where: {user_id: req.user.id }}));
+    if(!updated[0]) {
+      [err, userAssessmentSlotData] = await to(user_assessment_slots.create(payload));
+    }
+    else {
+      [err, userAssessmentSlotData] = await to(user_assessment_slots.findOne({where: {user_id: req.user.id}}));
+    }
 
     if (err) return ReE(res, err, 422);
     return ReS(res, { data: userAssessmentSlotData }, 200);
   } catch (err) {
     return ReE(res, err, 422);
   }
-
 }
 module.exports.userAssessmentSlot = userAssessmentSlot;
 
