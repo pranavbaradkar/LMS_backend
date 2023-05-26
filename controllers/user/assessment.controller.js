@@ -816,3 +816,17 @@ const userAssessmentQuestion = async function(req, res) {
   }
 }
 module.exports.userAssessmentQuestion = userAssessmentQuestion;
+
+const getAssessmentsFinalResult = async function(req, res) {
+  let err, resultData;
+  try {
+    [err, resultData] = await to(user_assessments.findAll({
+      where: { user_id: req.user.id, screening_status: { [Op.in]: ['PASSED', 'FAILED']} }
+    }));
+    if(err) return ReE(res, err, 422);
+    return ReS(res, { data: resultData }, 200);
+  } catch (err) {
+    return ReE(res, err, 422);
+  }
+}
+module.exports.getAssessmentsFinalResult = getAssessmentsFinalResult;

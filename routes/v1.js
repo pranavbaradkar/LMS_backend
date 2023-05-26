@@ -92,6 +92,7 @@ router.post("/users/log/assessments/:assessment_id/:assessment_type",userPasspor
 router.post("/s3/put-object-url", HomeController.getUserSignedUrl);
 router.post("/s3/video/:user_id",upload.any(), HomeController.uploadVideo);
 router.get("/result", UserAssessmentController.getAllAssessmentsResult);
+router.get("/all/assessments/result", userPassport.authenticate("jwt", { session: false }), UserAssessmentController.getAssessmentsFinalResult);
 
 //********* API DOCUMENTATION **********  
 router.use("/docs/api.json",express.static(path.join(__dirname, "/../public/v1/documentation/api.json")));
