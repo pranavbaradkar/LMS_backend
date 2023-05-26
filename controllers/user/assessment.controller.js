@@ -36,16 +36,12 @@ assessment_configurations.belongsTo(levels, { foreignKey: 'level_id' });
 const userAssessmentSlot = async function(req, res) {
   let err, userAssessmentSlotData;
   let payload = req.body;
-  if (_.isEmpty(req.params.assessment_id) || _.isUndefined(req.params.assessment_id)) {
-    return ReE(res, "Assessment id required in params", 422);
-  }
   try {
     payload.user_id = req.user.id;
-    payload.assessment_id = req.params.assessment_id;
     [err, userAssessmentSlotData] = await to(user_assessment_slots.create(payload));
 
     if (err) return ReE(res, err, 422);
-    return ReS(res, { data: userAssessmentSlotData }, 200);  
+    return ReS(res, { data: userAssessmentSlotData }, 200);
   } catch (err) {
     return ReE(res, err, 422);
   }
