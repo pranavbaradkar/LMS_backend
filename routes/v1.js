@@ -89,11 +89,16 @@ router.get("/users/assessment_slot",userPassport.authenticate("jwt", { session: 
 
 
 router.get("/users/mains/slots", userPassport.authenticate("jwt", { session: false }), UserAssessmentController.getMainsSlot);
+router.post("/users/s3/video", [userPassport.authenticate("jwt", { session: false }), upload.any()], UserAssessmentController.uploadVideoPacd);
+
 
 router.post("/users/assessments/status",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.statusUserAssessment);
 router.put("/users/assessments/:assessment_id/status",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.updateStatusUserAssessment);
 
 router.post("/users/log/assessments/:assessment_id/:assessment_type",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.logAssessment);
+
+
+
 router.post("/s3/put-object-url", HomeController.getUserSignedUrl);
 router.post("/s3/video/:user_id",upload.any(), HomeController.uploadVideo);
 router.get("/result", UserAssessmentController.getAllAssessmentsResult);

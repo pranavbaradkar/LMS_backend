@@ -243,11 +243,18 @@ module.exports.getSignedUrl = async (path, fileName, contentType) => {
     return uploadURL;
 }
 
-module.exports.uploadVideoOnS3 = async (path, fileName, contentType, videoBlobStream) => {
+module.exports.uploadVideoOnS3 = async (path, fileName, contentType, videoBlobStream, type = false) => {
    
     const key = fileName;
+    let httpUrl = "stramvideo";
+    let finalPath =  `stramvideo/${path}`;
+    if(type) {
+        finalPath  =  `${process.env.BUCKET}/${path}`
+        httpUrl = process.env.BUCKET;
+    }
+
     const s3Params = {
-        Bucket: `stramvideo/${path}`,
+        Bucket: finalPath,
         Key: key,
         Body: videoBlobStream,
         ContentType: contentType
@@ -259,7 +266,7 @@ module.exports.uploadVideoOnS3 = async (path, fileName, contentType, videoBlobSt
                 reject(err)
             } else {
                 const returnData = {
-                    signed_request: url
+                    url: `https://${httpUrl}.s3.amazonaws.com/${path}/${key}`
                 };
                 resolve(returnData)
             }

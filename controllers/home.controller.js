@@ -42,22 +42,22 @@ const getUserSignedUrl = async function (req, res) {
   console.log(payload);
   let url = null;
 
-  let error = null;
-  let required = ["context", "file_name", "mime_type", "business_type", "file_type"];
-  let diff = _.difference(required, Object.keys(payload));
-  if (diff.length > 0) {
-    error = `${diff.join(',')} field${diff.length > 1 ? 's' : ''} ${diff.length > 1 ? 'are' : 'is'} required`;
-  }
-  if (error != null) {
-    return ReE(res, error, 422);
-  }
-  if(payload.business_type == 'b2b' && (payload.business_name == undefined || payload.business_name == '')) {
-    return ReE(res, "business name is required for b2b", 422 );
-  }
-  let businessName = payload.business_name == undefined ? '/vibgyor' : `/${payload.business_name}`;
-  if(payload.business_type == 'b2c') {
-    businessName = '';
-  }
+    let error = null;
+    let required = ["context", "file_name", "mime_type", "business_type", "file_type"];
+    let diff = _.difference(required, Object.keys(payload));
+    if (diff.length > 0) {
+      error = `${diff.join(',')} field${diff.length > 1 ? 's' : ''} ${diff.length > 1 ? 'are' : 'is'} required`;
+    }
+    if (error != null) {
+      return ReE(res, error, 422);
+    }
+    if(payload.business_type == 'b2b' && (payload.business_name == undefined || payload.business_name == '')) {
+      return ReE(res, "business name is required for b2b", 422 );
+    }
+    let businessName = payload.business_name == undefined ? '/vibgyor' : `/${payload.business_name}`;
+    if(payload.business_type == 'b2c') {
+      businessName = '';
+    }
   
   let path = `${payload.context}/${payload.business_type}${businessName}/${payload.uuid}/${payload.file_type}`
   if(payload.context == "question-bank") {
@@ -77,8 +77,11 @@ const uploadVideo = async function (req, res) {
   let userId = req.params.user_id;
   const file = req.files;
   console.log(file);
+
+
   url = await uploadVideoOnS3(`${userId}`, `video_${new Date().getTime()}.mp4`, req.files[0].mimetype, req.files[0].buffer);
   return ReS(res, { data: url });
 }
 module.exports.uploadVideo = uploadVideo;
+
 

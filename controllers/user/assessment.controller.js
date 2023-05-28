@@ -1,6 +1,6 @@
 const model = require('../../models');
 const { user_assessment_slots, question_pools, user_assessment_logs, user_assessments, assessments, assessment_questions,campaigns,campaign_assessments, assessment_configurations,levels, questions, question_options, question_mtf_answers, custom_attributes, professional_infos, user_assessment_responses, skills, users, user_teaching_interests, subjects } = require("../../models");
-const { to, ReE, ReS, toSnakeCase, returnObjectEmpty } = require('../../services/util.service');
+const { to, ReE, ReS, toSnakeCase, returnObjectEmpty, uploadVideoOnS3 } = require('../../services/util.service');
 const { getLiveCampaignAssessments } = require('../../services/campaign.service');
 const validator = require('validator');
 var moment = require("moment");
@@ -878,3 +878,14 @@ const getMainsSlot = async function(req, res) {
   }
 }
 module.exports.getMainsSlot = getMainsSlot;
+
+
+
+const uploadVideoPacd = async function (req, res) {
+  let userId = req.params.user_id;
+  let payload = req.body;
+  let path = `${payload.context}/${payload.business_type}/${payload.post_type}/${req.user.uuid}/${payload.file_type}`
+  url = await uploadVideoOnS3(path, `video_${new Date().getTime()}.mp4`, req.files[0].mimetype, req.files[0].buffer, true);
+  return ReS(res, { data: url });
+}
+module.exports.uploadVideoPacd = uploadVideoPacd;
