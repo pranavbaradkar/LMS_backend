@@ -889,3 +889,20 @@ const uploadVideoPacd = async function (req, res) {
   return ReS(res, { data: url });
 }
 module.exports.uploadVideoPacd = uploadVideoPacd;
+
+const getAssessmentResultScreenData = (req, res) => {
+  let err, resultData;
+  try {
+  //   labels: ["IQ/EQ", "Pedagogy", "English", "Psychometry", "Subject", "Computer"],
+  // data: [20, 35, 50, 60, 100, 45, 120]
+    resultData = {};
+    resultData.labels = ["IQ/EQ", "Pedagogy", "English", "Psychometry", "Subject", "Computer"];
+    resultData.data = [20, 35, 50, 60, 100, 45, 120];
+    resultData.dataScore = { 'scored': 45, 'total_score': 60 };
+    resultData.percentage = 85;
+    return ReS(res, {data: resultData }, 200);
+  } catch (err) {
+    return ReE(res,err,442);
+  }
+}
+module.exports.getAssessmentResultScreenData = getAssessmentResultScreenData;
