@@ -153,16 +153,18 @@ const getUserRecommendedAssessments = async function (req, res) {
     
     // live campaign assessmnets list
     let liveAssessmentList = await getLiveCampaignAssessments();
-    console.log(liveAssessmentList);
+    
+    [err, userAssessmentExist] = await to(user_assessments.findOne({ where: { user_id: req.user.id, screening_status: { [Op.in]: ['STARTED', 'INPROGRESS', 'FINISHED', 'PASSED', 'FAILED']} }, raw: true }));
 
-    [err, userAssessmentExist] = await to(user_assessments.findOne({ where: { user_id: req.user.id, screening_status: { [Op.in]: ['STARTED', 'INPROGRESS', 'FINISHED', 'PASSED']} }, raw: true }));
+    console.log("tetstst", userAssessmentExist);
+
     if(userAssessmentExist) {
       req.query.debug = userAssessmentExist.assessment_id;
     }
 
     let assessmentData = assessmentCache.get(`user-${req.user.id}`);
     //console.log("assessmentData", assessmentData);
-    if(assessmentData) {
+    if(assessmentData && req.query && req.query.debug == undefined) {
       req.query.debug = assessmentData;
     }
 
@@ -848,3 +850,31 @@ const getAssessmentsFinalResult = async function(req, res) {
   }
 }
 module.exports.getAssessmentsFinalResult = getAssessmentsFinalResult;
+
+const getMainsSlot = async function(req, res) {
+  let err, resultData;
+  try {
+
+    var startDate = moment(); 
+    var endDate  = moment().add(1, 'months');
+    
+    var diff = endDate.diff(startDate, 'days');
+    let slotDay = [];
+    let timeing =  ["10:00 am","12:00 pm","01:00 am","03:00 am","06:00 am"];
+    for(i = 0; i < diff; i++) {
+      var isDay  = moment().add(i, 'day').isoWeekday();
+      if(isDay == 6 || isDay == 7) {
+        var day = moment().add(i, 'day').format("Do MMM, YY");
+        let dayData = {
+          day: day,
+          timeing: timeing
+        };
+        slotDay.push(dayData);
+      }
+    }
+    return ReS(res, { data: slotDay }, 200);
+  } catch (err) {
+    return ReE(res, err, 422);
+  }
+}
+module.exports.getMainsSlot = getMainsSlot;
