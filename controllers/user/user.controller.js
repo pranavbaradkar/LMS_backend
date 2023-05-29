@@ -104,6 +104,18 @@ const update = async function (req, res) {
       return ReE(res, "User already exist with phone number.", 422);
     }
   }
+  if(data.country_name && data.country_name !== '' && data.country_id == '') {
+    [err, countryData] = await to(countries.findOne({where: {country_name: data.country_name}}));
+    data.country_id = countryData.id;
+  }
+  if(data.state_name && data.state_name !== '' && data.state_id == '') {
+    [err, stateData] = await to(states.findOne({where: {state_name: data.state_name}}));
+    data.state_id = stateData.id;
+  }
+  if(data.district_name && data.district_name !== '' && data.district_id == '') {
+    [err, districtData] = await to(states.findOne({where: {district_name: data.district_name}}));
+    data.district_id = districtData.id;
+  }
   
   user.set(data);
   [err, user] = await to(user.save());
