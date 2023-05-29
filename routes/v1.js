@@ -97,6 +97,8 @@ router.put("/users/assessments/:assessment_id/status",userPassport.authenticate(
 
 router.post("/users/log/assessments/:assessment_id/:assessment_type",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.logAssessment);
 
+router.get("/lobank/questions/:assessment_id",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.getQuestionSet);
+router.post("/lobank/questions/:assessment_id",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.answerQuestionSet);
 
 
 router.post("/s3/put-object-url", HomeController.getUserSignedUrl);

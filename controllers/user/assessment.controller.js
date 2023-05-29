@@ -12,7 +12,8 @@ const path = require("path");
 const axios = require('axios');
 const mailer = require("../../helpers/mailer"); 
 const { Op } = require("sequelize");
-
+const { createClient } = require('redis');
+const client = createClient();
 
 const NodeCache = require( "node-cache" );
 const assessmentCache = new NodeCache( { stdTTL: 0, checkperiod: ((3600*24)*7) } );
@@ -904,3 +905,331 @@ const getAssessmentResultScreenData = (req, res) => {
   }
 }
 module.exports.getAssessmentResultScreenData = getAssessmentResultScreenData;
+
+const insertQuestions = async (req, res) => {
+  let err, insertData;
+  try {
+    // TODO use bulkInsert
+    [err, insertData] = await to(lo.create({ lo_text: '2Physics:Heat:Grade 2' } ));
+    [err, topicData] = await to(topic.create({ topic_name: "Heat water" }));
+    await loData.addTopic(topicData);
+    return ReS(res, {data: insertData}, 200);
+  }
+  catch(err) {
+    return ReE(res, err, 422);
+  }
+}
+module.exports.insertQuestions = insertQuestions;
+
+const getQuestionMeta = () => {
+  let grades = ['Grade_1', 'Grade_2', 'Grade_3'];
+  let blooms = ['UNDERSTAND', 'APPLY', 'ANALYSE'];
+  let cLevels = ['P1', 'P2', 'P3'];
+  
+  return [grades, blooms, cLevels];
+}
+
+const createQuestionGrid = async (questionList) => {
+  let grades, blooms, cLevels;
+  [grades, blooms, cLevels] = getQuestionMeta();
+
+  // let qSet = {};
+  let gradeSet = {};
+  grades.forEach((grade,gi)=>{
+    gradeSet[grade] = {};
+    cLevels.forEach((cl) => {
+      gradeSet[grade][cl]={};
+      // qSet[cl] = {};
+      blooms.forEach((bt) => {
+        gradeSet[grade][cl][bt]=[];
+        let subjects = [
+          questionList.filter(ele => ele.complexity_level==cl && ele.blooms_taxonomy==bt ),
+          { 'score': randomIntFromInterval(0,3), 'direction': getRandomXYDirection(), "steps":[]}];
+        // qSet[cl][bt] = [];
+        // qSet[cl][bt].push(...subjects);
+        gradeSet[grade][cl][bt].push(...subjects);
+      });
+    });
+  });
+
+  console.log("the Grades Set is ",gradeSet);
+  return gradeSet;
+};
+
+const getRandomElement = function(array) {
+  const randomIndex = Math.floor(Math.random() * array.length);
+  return array[randomIndex];
+}
+
+const getQuestionList = async function() {
+  let err, questionData;
+  try {
+    // for (let i = 80; i < 120; i++) {
+    //   // const element = array[i];
+    //   let cl = getRandomElement(['P1', 'P2', 'P3']);
+    //   let bt = getRandomElement(['UNDERSTAND', 'APPLY', 'ANALYZE']);
+    //   // let idd = getRandomElement([1,2,3,4,5,6,7,8,9,10]);
+    //   [err, questionData] = await questions.update({
+    //     complexity_level: cl,
+    //     blooms_taxonomy: bt
+    //   },{ 
+    //   where:{ id: { [Op.in]: [i] }
+    //   }});
+    // }    
+    [err, questionData] = await to(questions.findAll({
+      // {where: { id: {[Op.in] : req.query.ids.split(',')} } }
+      where:{blooms_taxonomy: { [Op.in]: ['UNDERSTAND', 'APPLY', 'ANALYZE']}},
+      order: [['blooms_taxonomy','ASC'],['complexity_level', 'ASC']],
+      attributes: ['id','complexity_level', 'blooms_taxonomy'],
+      raw: true
+    }));
+    // add question identifier if it has been asked to user before
+    questionData.forEach((row) => {
+      row.asked_already=0;
+      row.is_answered = 0;
+      row.users_answer = '';
+    });
+
+    return questionData;
+  } catch (err) {
+    return ReE(res,err,422);
+  }
+
+}
+module.exports.getQuestionList = getQuestionList;
+
+// pass assessment_id and user_id to generate question set 
+// get new question on subsequent calls.
+const getQuestionSet = async function(req, res) {
+  let err, questionGrid, grades, blooms, cLevels;
+  let user_id = req.user.id;
+  let assessment_id = req.params.assessment_id;
+
+  let questionGridKey = `${user_id}-${assessment_id}-set`;
+  let gridPosKey = `${user_id}-${assessment_id}-key`;
+  let gridPos = {x:0, y:0, z:1, count: 1}; // [x,y,z,count]
+
+  try {
+    await client.connect();
+    client.on('error', (err) => { return ReE(res, ['Redis Client Error',err], 422)});
+
+    gridPos = await client.get(gridPosKey);
+    questionGrid = await client.get(questionGridKey);
+    
+    // if questionGrid does not exist
+    if(!questionGrid) {
+      // create new
+      let questionList = await getQuestionList();
+      questionGrid = await createQuestionGrid(questionList);
+      //save to redis
+      await client.set(questionGridKey, JSON.stringify(questionGrid));
+      await client.set(gridPosKey, JSON.stringify(gridPos));
+    }
+    else {
+      questionGrid  = JSON.parse(questionGrid);
+      gridPos       = JSON.parse(gridPos);
+    }
+
+    await client.disconnect();
+
+    [grades, blooms, cLevels] = getQuestionMeta();
+    let grade = grades[gridPos.z];
+    let cLevel = cLevels[gridPos.y];
+    let bloom = blooms[gridPos.x];
+    
+    // console.log(`${grade} ${cLevel} ${bloom}`, questionGrid);
+    // filter question by gridPos 
+    filteredQuestionSet = questionGrid[grade][cLevel][bloom];
+
+    return ReS(res, {data: filteredQuestionSet }, 200);
+
+  
+    // await client.set('questionSet', JSON.stringify(questionGrid));
+    // qSet = await client.get('questionSet');
+    // console.log("quesiton set", qSet);
+    // qSet = JSON.parse(qSet);
+    
+    // entry point
+    let x = 0;
+    let y = 0;
+    let z = 1;
+    let count = 1;
+    
+    // custom direction sets to test
+    // qSet[grades[z]].p1.Understand[1].score = 1;
+
+    // [pos, ansSet] = calculatePosition(qSet, grades, tags, blooms, x, y, z, count);
+    [pos, ansSet, x, y, z, count] = calculatePosition(questionGrid, grades, tags, blooms, x, y, z, count);
+    // [pos, ansSet, x, y, z, count] = calculatePosition(ansSet, grades, tags, blooms, x, y, z, count);
+    
+    return ReS(res, {data: [ 
+      {position: pos}, 
+      {grades: grades}, 
+      {tags: tags}, 
+      {blooms: blooms}, 
+      questionGrid] }, 200);
+  }
+  catch(err) {
+    return ReE(res, err, 422);
+  }
+}
+module.exports.getQuestionSet = getQuestionSet;
+
+// answer the question set 
+/*
+1) set the answers by coordinates from user.
+2) calculate score 
+3) Based on calculation change the position on grid.
+4) update redis 
+*/
+const answerQuestionSet = async (req, res) => {
+  let err, questionGrid, grades, blooms, cLevels, gridPos;
+  let payload = req.body;
+  let user_id = req.user.id;
+  let assessment_id = req.params.assessment_id;
+
+  let questionGridKey = `${user_id}-${assessment_id}-set`;
+  let gridPosKey = `${user_id}-${assessment_id}-key`;
+
+  try {
+    await client.connect();
+    
+    gridPos = await client.get(gridPosKey);
+    questionGrid = await client.get(questionGridKey);
+    
+    questionGrid  = JSON.parse(questionGrid);
+    gridPos       = JSON.parse(gridPos);
+    
+    console.log("grid pos ",gridPos);
+    client.on('error', (err) => { return ReE(res, ['Redis Client Error',err], 422)});
+    [grades, blooms, cLevels] = getQuestionMeta();
+    let grade = grades[gridPos.z];
+    let cLevel = cLevels[gridPos.y];
+    let bloom = blooms[gridPos.x];
+
+    console.log("The grid pos in redis ",gridPos);
+
+    filteredQuestionSet = questionGrid[grade][cLevel][bloom];
+
+    //TODO: calculate scores here 
+    filteredQuestionSet[1].score      =3;
+    filteredQuestionSet[1].steps       = ['promoted to next grid'];
+    filteredQuestionSet[1].direction  = getRandomXYDirection();
+    payload.data.forEach(obj => {
+      filteredQuestionSet[0]
+      .filter(q => q.id == obj.id)
+      .map(q => {
+        q.is_answered = obj.is_answered;
+        q.users_answer = obj.users_answer;
+      });
+    });
+    
+    // TODO: set coordinates for next question
+
+    [ansSet, x, y, z, q_no] = await calculatePosition(questionGrid, gridPos.x, gridPos.y, gridPos.z, q_no);
+    
+
+    let gridPos = {x:x, y:y, z:z, count: q_no}; // [x,y,z,count]
+    await client.set(gridPosKey, JSON.stringify(gridPos));
+    // console.log("original set ",questionGrid[grade][cLevel][bloom]);
+    // save updated data to redis
+    // await client.set(questionGridKey, JSON.stringify(questionGrid));
+
+    
+    await client.disconnect();
+    
+    return ReS(res, {data: filteredQuestionSet }, 200);
+  } catch (err) {
+    return ReE(res, err, 422);
+  }
+}
+module.exports.answerQuestionSet = answerQuestionSet;
+
+
+// TODO: remove recursive call 
+const calculatePosition = async (ansSet, x, y, z, q_no)=> {
+  let grades,cLevel, blooms;
+
+  [grades, cLevel, blooms] = getQuestionMeta();
+  let grade = grades[z];
+  let tag = cLevel[y];
+  let bloom = blooms[x];
+  
+  // console.log("the array ",ansSet[grade][tag][bloom]);
+  // return false;
+  let cell = ansSet[grade][tag][bloom][1];
+  
+  let score = cell.score;
+  let direction = cell.direction;
+  
+  console.log(`${q_no} processing for pos [${x}, ${y}] ${z}:${grades[z]} score ${score}`);
+
+  // Boundry condition (change direction on reaching boundary)
+  // for top row [0,0] [1,0] [2,0]
+  if(y==0 && direction =='y' && score<2 ) { direction = 'x'; }
+  // for bottom row [0,2] [1,2] [2,2]
+  if(y==2 && direction =='y' && score > 1) { direction = 'x'; }
+  // for left row [0,0] [0,1] [0,2]
+  if(x==0 && direction =='x' && score<2 ) { direction = 'y'; }
+  // for right row [2,0] [2,1] [2,2]
+  if(x==2 && direction =='x' && score > 1) { direction = 'y'; }
+
+  // todo: x,y should not be greater than bloom.length and cLevel.length respectively
+  let path = `step ${q_no}) score:${score} direction:${direction}  [${x},${y},${z}] => `;
+
+  [x,y,z,changed] = handleCornerGradeCases(x,y,z,score);
+  if(changed) { 
+    path += ` [changed Grade to ${grades[z]} ] `; 
+    path += ` new cordinates [${x},${y},${z}] ${grades[z]} ${cLevel[y]} ${blooms[x]} `;
+  }
+  else { 
+    if(score==3) {
+      x<=1 ? x++: x; y<=1 ? y++: y;
+      path += `[${x},${y},${z}] promoted to ${grades[z]} ${cLevel[y]} ${blooms[x]}`;
+    }
+    else if(score == 2)  {
+      if(direction=='x') x<=1 ? x++: x; else y<=1 ? y++: y;
+      path += `[${x},${y},${z}] promoted to ${grades[z]} ${cLevel[y]} ${blooms[x]}`;
+    }
+    else if(score == 0 || score == 1) {
+      if(direction=='x') x--; else y--;
+      path += `[${x},${y},${z}] demoted to ${grades[z]} ${cLevel[y]} ${blooms[x]}`;
+    }
+  }
+
+  q_no++;
+  // todo: remove hack (score changes automatically here to mimic real world)
+  // cell.score = randomIntFromInterval(0,3);
+  // path += ' score changed to '+cell.score;
+  cell.steps.push(path);
+  // pos = {cordinates:[x,y,z], text: `${grades[z]} ${cLevel[y]} ${blooms[x]}` };
+  return [ansSet, x, y, z, q_no];
+};
+
+const handleCornerGradeCases = (x,y,z, score) => {
+  let changed = 0;
+  // change grade promoting
+  // user user keeps on failing OR if user keeps on scoring full marks
+  if(x==0 && y==0 && z==0 && score < 2 ) { console.log('Extreme lower ends reached'); changed++; }
+  else if(x==2 && y==2 && z==2 && score > 1) { console.log("extreme high end reached"); changed++; }
+  else if(x==2 && y==2 && score > 1) {
+    x=0; y=0; z++;
+    console.log("promoting grade to ", grades[z]);
+    changed++;
+  }
+  // change grade demoting
+  else if(x==0 && y==0 && score < 2) {
+    x=2; y=2; z--;
+    console.log("demoting grade to ", grades[z]);
+    changed++;
+  }
+
+  return [x,y,z, changed];
+}
+
+const randomIntFromInterval = (min, max) => { // min and max included 
+  return Math.floor(Math.random() * (max - min + 1) + min)
+}
+const getRandomXYDirection = ()=>{
+  return randomIntFromInterval(0,1) ? 'x' : 'y';
+};
