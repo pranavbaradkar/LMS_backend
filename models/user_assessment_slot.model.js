@@ -7,6 +7,8 @@ module.exports = (sequelize, DataTypes) => {
     user_id                   : { type: DataTypes.INTEGER, allowNull: false },
     slot                      : { type: DataTypes.DATE, allowNull: false },
     video_link                : { type: DataTypes.STRING, allowNull: true },
+    padv_video_link           : { type: DataTypes.STRING, allowNull: true },
+    demo_link                 : { type: DataTypes.STRING, allowNull: true },
     created_at                : { type: DataTypes.DATE, allowNull: true, defaultValue: null },
     updated_at                : { type: DataTypes.DATE, allowNull: true, defaultValue: null },
     deleted_at                : { type: DataTypes.DATE, allowNull: true, defaultValue: null }
