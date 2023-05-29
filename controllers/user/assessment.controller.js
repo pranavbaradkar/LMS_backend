@@ -952,7 +952,7 @@ const createQuestionGrid = async (questionList) => {
     });
   });
 
-  console.log("the Grades Set is ",gradeSet);
+  // console.log("the Grades Set is ",gradeSet);
   return gradeSet;
 };
 
@@ -1007,12 +1007,12 @@ const getQuestionSet = async function(req, res) {
 
   let questionGridKey = `${user_id}-${assessment_id}-set`;
   let gridPosKey = `${user_id}-${assessment_id}-key`;
-  let gridPos = {x:0, y:0, z:1, count: 1}; // [x,y,z,count]
+  let current_position = {x:0, y:0, z:1, count: 1}; // [x,y,z,question_no_count]
 
   try {
     await client.connect();
-    client.on('error', (err) => { return ReE(res, ['Redis Client Error',err], 422)});
-
+    client.on('error', (err) => { client.disconnect(); return ReE(res, ['Redis Client Error',err], 422)});
+    
     gridPos = await client.get(gridPosKey);
     questionGrid = await client.get(questionGridKey);
     
@@ -1023,51 +1023,24 @@ const getQuestionSet = async function(req, res) {
       questionGrid = await createQuestionGrid(questionList);
       //save to redis
       await client.set(questionGridKey, JSON.stringify(questionGrid));
-      await client.set(gridPosKey, JSON.stringify(gridPos));
     }
-    else {
-      questionGrid  = JSON.parse(questionGrid);
-      gridPos       = JSON.parse(gridPos);
-    }
-
+    if(!gridPos) {await client.set(gridPosKey, JSON.stringify(gridPos));}
     await client.disconnect();
 
+    questionGrid  = await JSON.parse(questionGrid);
+    gridPos       = await JSON.parse(gridPos) || current_position;
+
+    // console.log("the grid positions ",gridPos);
     [grades, blooms, cLevels] = getQuestionMeta();
     let grade = grades[gridPos.z];
     let cLevel = cLevels[gridPos.y];
     let bloom = blooms[gridPos.x];
     
-    // console.log(`${grade} ${cLevel} ${bloom}`, questionGrid);
+    // console.log(`grade:${grade} clevel:${cLevel} bloom:${bloom}`);
     // filter question by gridPos 
     filteredQuestionSet = questionGrid[grade][cLevel][bloom];
 
-    return ReS(res, {data: filteredQuestionSet }, 200);
-
-  
-    // await client.set('questionSet', JSON.stringify(questionGrid));
-    // qSet = await client.get('questionSet');
-    // console.log("quesiton set", qSet);
-    // qSet = JSON.parse(qSet);
-    
-    // entry point
-    let x = 0;
-    let y = 0;
-    let z = 1;
-    let count = 1;
-    
-    // custom direction sets to test
-    // qSet[grades[z]].p1.Understand[1].score = 1;
-
-    // [pos, ansSet] = calculatePosition(qSet, grades, tags, blooms, x, y, z, count);
-    [pos, ansSet, x, y, z, count] = calculatePosition(questionGrid, grades, tags, blooms, x, y, z, count);
-    // [pos, ansSet, x, y, z, count] = calculatePosition(ansSet, grades, tags, blooms, x, y, z, count);
-    
-    return ReS(res, {data: [ 
-      {position: pos}, 
-      {grades: grades}, 
-      {tags: tags}, 
-      {blooms: blooms}, 
-      questionGrid] }, 200);
+    return ReS(res, {data: { question_set:filteredQuestionSet, grid_position: gridPos} }, 200);
   }
   catch(err) {
     return ReE(res, err, 422);
@@ -1090,30 +1063,34 @@ const answerQuestionSet = async (req, res) => {
 
   let questionGridKey = `${user_id}-${assessment_id}-set`;
   let gridPosKey = `${user_id}-${assessment_id}-key`;
-
   try {
     await client.connect();
-    
-    gridPos = await client.get(gridPosKey);
-    questionGrid = await client.get(questionGridKey);
+    client.on('error', (err) => { return ReE(res, ['Redis Client Error',err], 422)});
+
+    let gPos      = "";
+    questionGrid  = await client.get(questionGridKey);
+    gPos          = await client.get(gridPosKey);
     
     questionGrid  = JSON.parse(questionGrid);
-    gridPos       = JSON.parse(gridPos);
+    gPos          = JSON.parse(gPos);
     
-    console.log("grid pos ",gridPos);
-    client.on('error', (err) => { return ReE(res, ['Redis Client Error',err], 422)});
-    [grades, blooms, cLevels] = getQuestionMeta();
-    let grade = grades[gridPos.z];
-    let cLevel = cLevels[gridPos.y];
-    let bloom = blooms[gridPos.x];
+    // console.log("Redis grid position ", payload.grid_position);
+    // console.log("Redis gpos ", gPos);
+    if(gPos !== payload.grid_position) {
+      gPos = payload.grid_position;
+    }
 
-    console.log("The grid pos in redis ",gridPos);
+    [grades, blooms, cLevels] = getQuestionMeta();
+    let grade   = grades[gPos.z];
+    let cLevel  = cLevels[gPos.y];
+    let bloom   = blooms[gPos.x];
+    let q_no    = gPos.count;
 
     filteredQuestionSet = questionGrid[grade][cLevel][bloom];
 
     //TODO: calculate scores here 
     filteredQuestionSet[1].score      =3;
-    filteredQuestionSet[1].steps       = ['promoted to next grid'];
+    // filteredQuestionSet[1].steps      = [];//[`STEP-${q_no}) [${gPos.x},${gPos.y},${gPos.z},${gPos.count}]`];
     filteredQuestionSet[1].direction  = getRandomXYDirection();
     payload.data.forEach(obj => {
       filteredQuestionSet[0]
@@ -1124,21 +1101,19 @@ const answerQuestionSet = async (req, res) => {
       });
     });
     
-    // TODO: set coordinates for next question
-
-    [ansSet, x, y, z, q_no] = await calculatePosition(questionGrid, gridPos.x, gridPos.y, gridPos.z, q_no);
+    //Set coordinates for next question
+    // console.log("question grid ",questionGrid);
+    [ansSet, x, y, z, q_no] = await calculatePosition(questionGrid, gPos.x, gPos.y, gPos.z, q_no);
     
 
-    let gridPos = {x:x, y:y, z:z, count: q_no}; // [x,y,z,count]
-    await client.set(gridPosKey, JSON.stringify(gridPos));
-    // console.log("original set ",questionGrid[grade][cLevel][bloom]);
+    let newPos = {x:x, y:y, z:z, count: q_no}; // [x,y,z,count]
     // save updated data to redis
-    // await client.set(questionGridKey, JSON.stringify(questionGrid));
-
+    await client.set(gridPosKey, JSON.stringify(newPos));
+    await client.set(questionGridKey, JSON.stringify(ansSet));
     
     await client.disconnect();
     
-    return ReS(res, {data: filteredQuestionSet }, 200);
+    return ReS(res, {data: {question_set:filteredQuestionSet, grid_position: gPos, new_grid_position: newPos} }, 200);
   } catch (err) {
     return ReE(res, err, 422);
   }
@@ -1148,16 +1123,17 @@ module.exports.answerQuestionSet = answerQuestionSet;
 
 // TODO: remove recursive call 
 const calculatePosition = async (ansSet, x, y, z, q_no)=> {
-  let grades,cLevel, blooms;
+  let grades,cLevels, blooms, grade,cLevel, bloom;
 
-  [grades, cLevel, blooms] = getQuestionMeta();
-  let grade = grades[z];
-  let tag = cLevel[y];
-  let bloom = blooms[x];
+  [grades, blooms, cLevels] = getQuestionMeta();
+  grade = grades[z];
+  cLevel = cLevels[y];
+  bloom = blooms[x];
   
-  // console.log("the array ",ansSet[grade][tag][bloom]);
+  // console.log(`grade: ${grade} level: ${cLevel} bloom: ${bloom}`);
+  // console.log("the array ",ansSet[grade][cLevel]);
   // return false;
-  let cell = ansSet[grade][tag][bloom][1];
+  let cell = ansSet[grade][cLevel][bloom][1];
   
   let score = cell.score;
   let direction = cell.direction;
@@ -1180,20 +1156,20 @@ const calculatePosition = async (ansSet, x, y, z, q_no)=> {
   [x,y,z,changed] = handleCornerGradeCases(x,y,z,score);
   if(changed) { 
     path += ` [changed Grade to ${grades[z]} ] `; 
-    path += ` new cordinates [${x},${y},${z}] ${grades[z]} ${cLevel[y]} ${blooms[x]} `;
+    path += ` new cordinates [${x},${y},${z}] ${grade} ${cLevel} ${bloom} `;
   }
   else { 
     if(score==3) {
       x<=1 ? x++: x; y<=1 ? y++: y;
-      path += `[${x},${y},${z}] promoted to ${grades[z]} ${cLevel[y]} ${blooms[x]}`;
+      path += `[${x},${y},${z}] promoted to ${grades[z]} ${cLevels[y]} ${blooms[x]}`;
     }
     else if(score == 2)  {
       if(direction=='x') x<=1 ? x++: x; else y<=1 ? y++: y;
-      path += `[${x},${y},${z}] promoted to ${grades[z]} ${cLevel[y]} ${blooms[x]}`;
+      path += `[${x},${y},${z}] promoted to ${grades[z]} ${cLevels[y]} ${blooms[x]}`;
     }
     else if(score == 0 || score == 1) {
       if(direction=='x') x--; else y--;
-      path += `[${x},${y},${z}] demoted to ${grades[z]} ${cLevel[y]} ${blooms[x]}`;
+      path += `[${x},${y},${z}] demoted to ${grades[z]} ${cLevels[y]} ${blooms[x]}`;
     }
   }
 
