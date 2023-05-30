@@ -980,14 +980,19 @@ const getQuestionList = async function() {
       // {where: { id: {[Op.in] : req.query.ids.split(',')} } }
       where:{blooms_taxonomy: { [Op.in]: ['UNDERSTAND', 'APPLY', 'ANALYZE']}},
       order: [['blooms_taxonomy','ASC'],['complexity_level', 'ASC']],
-      attributes: ['id','complexity_level', 'blooms_taxonomy'],
-      raw: true
+      include: { model: question_options , attributes: ['option_key', 'option_value', 'option_type']},
+      // attributes: ['id','complexity_level', 'blooms_taxonomy'],
+      attributes: {exclude:["answer_explanation", "hint", "correct_answer", "answer", "deleted_at", "created_at", "updated_at"]},
+      // raw:true, nest: true
     }));
     // add question identifier if it has been asked to user before
-    questionData.forEach((row) => {
-      row.asked_already=0;
-      row.is_answered = 0;
-      row.users_answer = '';
+    questionData = questionData.map((row) => {
+      let obj = {...row.get({plain: true})};
+      // console.log("The row obj ",obj);
+      obj.asked_already=0;
+      obj.is_answered = 0;
+      obj.users_answer = '';
+      return obj;
     });
 
     return questionData;
@@ -1016,19 +1021,19 @@ const getQuestionSet = async function(req, res) {
     gridPos = await client.get(gridPosKey);
     questionGrid = await client.get(questionGridKey);
     
-    // if questionGrid does not exist
-    if(!questionGrid) {
-      // create new
+    if(questionGrid && gridPos) {
+      questionGrid  = await JSON.parse(questionGrid);
+      gridPos       = await JSON.parse(gridPos) || current_position;
+    }
+    else {
       let questionList = await getQuestionList();
       questionGrid = await createQuestionGrid(questionList);
-      //save to redis
+      gridPos = current_position;
       await client.set(questionGridKey, JSON.stringify(questionGrid));
+      await client.set(gridPosKey, JSON.stringify(gridPos));
     }
-    if(!gridPos) {await client.set(gridPosKey, JSON.stringify(gridPos));}
-    await client.disconnect();
 
-    questionGrid  = await JSON.parse(questionGrid);
-    gridPos       = await JSON.parse(gridPos) || current_position;
+    await client.disconnect();
 
     // console.log("the grid positions ",gridPos);
     [grades, blooms, cLevels] = getQuestionMeta();
@@ -1040,7 +1045,7 @@ const getQuestionSet = async function(req, res) {
     // filter question by gridPos 
     filteredQuestionSet = questionGrid[grade][cLevel][bloom];
 
-    return ReS(res, {data: { question_set:filteredQuestionSet, grid_position: gridPos} }, 200);
+    return ReS(res, {data: { current_question_set:filteredQuestionSet, current_position: gridPos, all_questions:questionGrid} }, 200);
   }
   catch(err) {
     return ReE(res, err, 422);
@@ -1076,8 +1081,8 @@ const answerQuestionSet = async (req, res) => {
     
     // console.log("Redis grid position ", payload.grid_position);
     // console.log("Redis gpos ", gPos);
-    if(gPos !== payload.grid_position) {
-      gPos = payload.grid_position;
+    if(gPos !== payload.current_position) {
+      gPos = payload.current_position;
     }
 
     [grades, blooms, cLevels] = getQuestionMeta();
@@ -1113,7 +1118,7 @@ const answerQuestionSet = async (req, res) => {
     
     await client.disconnect();
     
-    return ReS(res, {data: {question_set:filteredQuestionSet, grid_position: gPos, new_grid_position: newPos} }, 200);
+    return ReS(res, {data: {current_question_set:filteredQuestionSet, current_position: gPos, next_position: newPos} }, 200);
   } catch (err) {
     return ReE(res, err, 422);
   }
