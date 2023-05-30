@@ -1,4 +1,4 @@
-const { users, countries, states, districts, talukas, academics, professional_infos, user_communications, user_assessments, user_teaching_interests,levels,schools, boards, subjects } = require("../../models");
+const { users, countries, states, districts, cities, talukas, academics, professional_infos, user_communications, user_assessments, user_teaching_interests,levels,schools, boards, subjects } = require("../../models");
 const authService = require("../../services/auth.service");
 const { to, ReE, ReS, toSnakeCase, sendSMS, isBlank, validatePhoneNo } = require("../../services/util.service");
 var moment = require("moment");
@@ -82,9 +82,18 @@ const get = async function (req, res) {
 module.exports.get = get;
 
 const update = async function (req, res) {
-  let err, user, data, userData;
-  user = req.user;
+    let err, user, data, userData;
+    user = req.user;
   data = req.body;
+
+    // remove blank, -1, null contining keys from data
+  data = Object.keys(data).filter(e=> { 
+    // console.log("ele ",e, obj[e]); 
+    if (data[e] === -1 || data[e] === "" || data[e] === null) {
+      return false;
+    }
+    else return true;
+  }).reduce((a, key) => ({ ...a, [key]: data[key] }), {});
 
   let dob_data = moment(data.dob, "YYYY-MM-DD");
   dob_data.set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
@@ -104,39 +113,78 @@ const update = async function (req, res) {
       return ReE(res, "User already exist with phone number.", 422);
     }
   }
-  if(data.country_name && data.country_name !== '' && data.country_id == '') {
-    [err, countryData] = await to(countries.findOne({where: {country_name: data.country_name}}));
-    data.country_id = countryData.id;
+
+  if(data.country_name || data.country_id) {
+    let whereCondition = {};
+    if(data.country_name && data.country_name.trim() !=='') { whereCondition.country_name = data.country_name; }
+    if(data.country_id && data.country_id !=='' ) { whereCondition.id = data.country_id; }
+    [err, countryData] = await to(countries.findOne({
+      where: whereCondition
+    }));
+    if(countryData) { 
+      data.country_id = countryData.id; 
+      data.country_name = countryData.country_name;
+    }
   }
-  if(data.state_name && data.state_name !== '' && data.state_id == '') {
-    [err, stateData] = await to(states.findOne({where: {state_name: data.state_name}}));
-    data.state_id = stateData.id;
+  if(data.state_name || data.state_id) {
+    let whereCondition = {};
+    if(data.state_name && data.state_name.trim() !=='') { whereCondition.state_name = data.state_name; }
+    if(data.state_id && data.state_id !=='' ) { whereCondition.id = data.state_id; }
+    [err, stateData] = await to(states.findOne({
+      where: whereCondition
+    }));
+    if(stateData) { 
+      data.state_id = stateData.id; 
+      data.state_name = stateData.state_name;
+    }
   }
-  if(data.district_name && data.district_name !== '' && data.district_id == '') {
-    [err, districtData] = await to(states.findOne({where: {district_name: data.district_name}}));
-    data.district_id = districtData.id;
+
+  if(data.district_name || data.district_id) {
+    let whereCondition = {};
+    if(data.district_name && data.district_name.trim() !=='') { whereCondition.district_name = data.district_name; }
+    if(data.district_id && data.district_id !=='' ) { whereCondition.id = data.district_id; }
+    [err, districtData] = await to(districts.findOne({
+      where: whereCondition
+    }));
+    if(districtData) { 
+      data.district_id = districtData.id; 
+      data.district_name = districtData.district_name;
+    }
+  }
+
+  if(data.city_name || data.city_id) {
+    let whereCondition = {};
+    if(data.city_name && data.city_name.trim() !=='') { whereCondition.city_name = data.city_name; }
+    if(data.city_id && data.city_id !=='' ) { whereCondition.id = data.city_id; }
+    [err, cityData] = await to(cities.findOne({
+      where: whereCondition
+    }));
+    if(cityData) { 
+      data.city_id = cityData.id; 
+      data.city_name = cityData.city_name;
+    }
   }
   
   user.set(data);
   [err, user] = await to(user.save());
 
-  // fetch user again and apply association
-  [err, userData] = await to(users.findOne({
-    where: { id: user.id },
-    include: [
-      { model: countries, as: 'country', attributes:['id', 'country_name']},
-      { model: states, as: 'state', attributes:['id', 'state_name']},
-      { model: districts, as: 'district', attributes:['id', 'district_name']},
-      { model: talukas, as: 'taluka', attributes:['id', 'taluka_name']},
-    ]
-  }));
+  // // fetch user again and apply association
+  // [err, userData] = await to(users.findOne({
+  //   where: { id: user.id },
+  //   // include: [
+  //   //   { model: countries, as: 'country', attributes:['id', 'country_name']},
+  //   //   { model: states, as: 'state', attributes:['id', 'state_name']},
+  //   //   { model: districts, as: 'district', attributes:['id', 'district_name']},
+  //   //   { model: talukas, as: 'taluka', attributes:['id', 'taluka_name']},
+  //   // ]
+  // }));
   
   if (err) {
     if (err.message == "Validation error")
       err = "The email address or phone number is already in use";
     return ReE(res, err, 422);
   }
-  return ReS(res, { data: userData }, 200);
+  return ReS(res, { data: user }, 200);
 };
 module.exports.update = update;
 
