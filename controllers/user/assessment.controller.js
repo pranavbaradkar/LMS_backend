@@ -13,7 +13,10 @@ const axios = require('axios');
 const mailer = require("../../helpers/mailer"); 
 const { Op } = require("sequelize");
 const { createClient } = require('redis');
-const client = createClient();
+const client = createClient({
+  host: process.env.REDIS_HOST,
+  port: process.env.REDIS_PORT,
+});
 
 const NodeCache = require( "node-cache" );
 const assessmentCache = new NodeCache( { stdTTL: 0, checkperiod: ((3600*24)*7) } );
@@ -1022,10 +1025,12 @@ const getQuestionSet = async function(req, res) {
     questionGrid = await client.get(questionGridKey);
     
     if(questionGrid && gridPos) {
+      // console.log("======================== Elasticache");
       questionGrid  = await JSON.parse(questionGrid);
       gridPos       = await JSON.parse(gridPos) || current_position;
     }
     else {
+      // console.log("=======================DB Call ");
       let questionList = await getQuestionList();
       questionGrid = await createQuestionGrid(questionList);
       gridPos = current_position;
