@@ -7,8 +7,20 @@ module.exports = (sequelize, DataTypes) => {
     user_id                     : { type: DataTypes.INTEGER(11), allowNull: false },
     institution                 : { type: DataTypes.TEXT, allowNull: false },
     programme                   : { type: DataTypes.TEXT, allowNull: false },
-    start_date                  : { type: DataTypes.DATE, allowNull: true, defaultValue: null },
-    end_date                    : { type: DataTypes.DATE, allowNull: true, defaultValue: null },
+    start_date                  : { type: DataTypes.DATE, allowNull: true, defaultValue: null,
+                                    get() {
+                                      const startDate = this.getDataValue('start_date');
+                                      if(!startDate) { return "";}
+                                      let d = new Date(startDate);
+                                      return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+                                    } },
+    end_date                    : { type: DataTypes.DATE, allowNull: true, defaultValue: null, 
+                                    get() {
+                                      const endDate = this.getDataValue('end_date');
+                                      if(!endDate) { return "";}
+                                      let d = new Date(endDate);
+                                      return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+                                    } },
     field_of_study              : { type: DataTypes.TEXT, allowNull: false },
     extra_carricular_activities : { type: DataTypes.TEXT, allowNull: true },
     grade_score                 : { type: DataTypes.FLOAT, allowNull: true },

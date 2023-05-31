@@ -526,6 +526,7 @@ const createBulkAcademics = async function (req, res) {
   
   try {
     //user assign
+    [err, academicsDeleted] = await to(academics.destroy({ where: { user_id: req.user.id }, force: true }));
     [err, academicsData] = await to(academics.bulkCreate(payload));
     if (err) return ReE(res, err, 422);
     return ReS(res, { data: academicsData }, 200);
@@ -544,11 +545,8 @@ const getAllUserAcademics = async function (req, res) {
   try {
     [err, academicsData] = await to(academics.findAll({ where: { user_id: req.user.id } }));
     if (err) return ReE(res, err, 422);
-    if (academicsData && academicsData.length > 0) {
-      return ReS(res, { data: academicsData }, 200);
-    } else {
-      return ReE(res, "No academics data found", 404);
-    }
+    
+    return ReS(res, { data: academicsData }, 200); 
   } catch (err) {
     return ReE(res, err, 422);
   }
@@ -903,9 +901,19 @@ const createBulkProfessionalInfos = async function (req, res) {
     return ReE(res, professonalError.join(", "), 422);
   }
 
+
   payload = payload.map(ele => {
     for (const val in ele) {
       ele[val] = !isBlank(ele[val]) ? ele[val] : null;
+      
+      //date format code
+      if(val == "end_date") { 
+        if(ele[val] !== "") {
+          let endDateTime = moment(ele[val], ["DD/MM/YYYY", "YYYY-MM-DD"]);
+          ele[val] = endDateTime.format("YYYY-MM-DD");
+        }
+        else { ele[val] = null;}
+      }
     }
 
     let obj  = {...ele};
@@ -915,6 +923,7 @@ const createBulkProfessionalInfos = async function (req, res) {
 
   try {
     //user assign
+    [err, professional_infos_bulk] = await to(professional_infos.destroy({ where: { user_id: req.user.id }, force: true }));
     [err, professional_infos_bulk] = await to(professional_infos.bulkCreate(payload));
     if (err) return ReE(res, err, 422);
     return ReS(res, { data: professional_infos_bulk }, 200);
@@ -931,11 +940,7 @@ const getAllProfessionalInfos = async function (req, res) {
   try {
     [err, professionalInfosData] = await to(professional_infos.findAll({ where: { user_id: req.user.id } }));
     if (err) return ReE(res, err, 422);
-    if (professionalInfosData && professionalInfosData.length > 0) {
-      return ReS(res, { data: professionalInfosData }, 200);
-    } else {
-      return ReE(res, "No professional infos data found", 404);
-    }
+    return ReS(res, { data: professionalInfosData }, 200);
   } catch (err) {
     return ReE(res, err, 422);
   }

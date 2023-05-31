@@ -13,7 +13,11 @@ const axios = require('axios');
 const mailer = require("../../helpers/mailer"); 
 const { Op } = require("sequelize");
 const { createClient } = require('redis');
-const client = createClient();
+const Redis   = require('ioredis');
+const redis = new Redis({
+  host: process.env.REDIS_HOST,
+  port: process.env.REDIS_PORT,
+});
 
 const NodeCache = require( "node-cache" );
 const assessmentCache = new NodeCache( { stdTTL: 0, checkperiod: ((3600*24)*7) } );
@@ -1026,25 +1030,40 @@ const getQuestionSet = async function(req, res) {
   let current_position = {x:0, y:0, z:1, count: 1}; // [x,y,z,question_no_count]
 
   try {
-    await client.connect();
-    client.on('error', (err) => { client.disconnect(); return ReE(res, ['Redis Client Error',err], 422)});
-    
-    gridPos = await client.get(gridPosKey);
-    questionGrid = await client.get(questionGridKey);
+
+    // ioredis supports the node.js callback style
+    gridPos = await redis.get(gridPosKey, (err, result) => {
+      if (err) {
+        console.error("could not get grid positon ",err);
+      } else {
+        console.log("reids result ",result); // Prints "value"
+        return result;
+      }
+    });
+    questionGrid = await redis.get(questionGridKey, (err, result) => {
+      if (err) {
+        console.error("could not get grid data ",err);
+      } else {
+        console.log("reids grid data received"); // Prints "value"
+        return result;
+      }
+    });
     
     if(questionGrid && gridPos) {
+      // console.log("======================== Elasticache");
       questionGrid  = await JSON.parse(questionGrid);
       gridPos       = await JSON.parse(gridPos) || current_position;
     }
     else {
+      // console.log("=======================DB Call ");
       let questionList = await getQuestionList();
       questionGrid = await createQuestionGrid(questionList);
       gridPos = current_position;
-      await client.set(questionGridKey, JSON.stringify(questionGrid));
-      await client.set(gridPosKey, JSON.stringify(gridPos));
+      await redis.set(questionGridKey, JSON.stringify(questionGrid));
+      await redis.set(gridPosKey, JSON.stringify(gridPos));
+
     }
 
-    await client.disconnect();
 
     // console.log("the grid positions ",gridPos);
     [grades, blooms, cLevels] = getQuestionMeta();
@@ -1080,12 +1099,23 @@ const answerQuestionSet = async (req, res) => {
   let questionGridKey = `${user_id}-${assessment_id}-set`;
   let gridPosKey = `${user_id}-${assessment_id}-key`;
   try {
-    await client.connect();
-    client.on('error', (err) => { return ReE(res, ['Redis Client Error',err], 422)});
-
-    let gPos      = "";
-    questionGrid  = await client.get(questionGridKey);
-    gPos          = await client.get(gridPosKey);
+    let gPos = "";
+    gPos = await redis.get(gridPosKey, (err, result) => {
+      if (err) {
+        console.error("could not get grid positon ",err);
+      } else {
+        console.log("reids result ",result); // Prints "value"
+        return result;
+      }
+    });
+    questionGrid = await redis.get(questionGridKey, (err, result) => {
+      if (err) {
+        console.error("could not get grid data ",err);
+      } else {
+        console.log("reids grid data ",result); // Prints "value"
+        return result;
+      }
+    });
     
     questionGrid  = JSON.parse(questionGrid);
     gPos          = JSON.parse(gPos);
@@ -1120,14 +1150,11 @@ const answerQuestionSet = async (req, res) => {
     //Set coordinates for next question
     // console.log("question grid ",questionGrid);
     [ansSet, x, y, z, q_no] = await calculatePosition(questionGrid, gPos.x, gPos.y, gPos.z, q_no);
-    
 
     let newPos = {x:x, y:y, z:z, count: q_no}; // [x,y,z,count]
-    // save updated data to redis
-    await client.set(gridPosKey, JSON.stringify(newPos));
-    await client.set(questionGridKey, JSON.stringify(ansSet));
-    
-    await client.disconnect();
+
+    await redis.set(questionGridKey, JSON.stringify(ansSet));
+    await redis.set(gridPosKey, JSON.stringify(newPos));
     
     return ReS(res, {data: {current_question_set:filteredQuestionSet, current_position: gPos, next_position: newPos} }, 200);
   } catch (err) {
