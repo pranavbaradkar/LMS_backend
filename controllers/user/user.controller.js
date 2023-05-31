@@ -901,16 +901,18 @@ const createBulkProfessionalInfos = async function (req, res) {
     return ReE(res, professonalError.join(", "), 422);
   }
 
+
   payload = payload.map(ele => {
     for (const val in ele) {
       ele[val] = !isBlank(ele[val]) ? ele[val] : null;
-
+      
       //date format code
-      if(val == "end_date" &&  !isBlank(ele['end_date'])) {
-        let endDateTime = moment(ele['end_date'], ["DD/MM/YYYY", "YYYY-MM-DD"]);
-        ele['end_date'] = endDateTime.format("YYYY-MM-DD");
-      } else {
-        ele['end_date'] = null;
+      if(val == "end_date") { 
+        if(ele[val] !== "") {
+          let endDateTime = moment(ele[val], ["DD/MM/YYYY", "YYYY-MM-DD"]);
+          ele[val] = endDateTime.format("YYYY-MM-DD");
+        }
+        else { ele[val] = null;}
       }
     }
 
