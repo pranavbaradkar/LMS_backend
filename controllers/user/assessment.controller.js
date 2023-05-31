@@ -149,6 +149,7 @@ module.exports.getScreeningTestDetails = getScreeningTestDetails;
 
 const getUserRecommendedAssessments = async function (req, res) {
   let err, assessmentsData, teachingInterest, userAssessmentExist, logAssessmentData;
+  let type = req.query.type.toUpperCase();
   try {
 
     
@@ -199,7 +200,7 @@ const getUserRecommendedAssessments = async function (req, res) {
     if(req.query && req.query.debug == undefined) {
       where.push({ 
         level_id: { [Sequelize.Op.in]: levelIds }, 
-        assessment_type: 'SCREENING',
+        assessment_type: type,
         assessment_id: {
           [Op.in]: liveAssessmentList
         }
@@ -254,7 +255,7 @@ const getUserRecommendedAssessments = async function (req, res) {
       [err, assessments_screening] = await to(assessment_configurations.findAll({
         where: {
           [Op.and]: {
-            assessment_type: 'SCREENING'
+            assessment_type: type
           },
           level_id: { [Sequelize.Op.in]: levelIds },
           assessment_id: {
@@ -375,9 +376,13 @@ const getUserRecommendedAssessments = async function (req, res) {
       finalOutput.tests = assessments_test;
       finalOutput.assessment_log = logAssessmentData;
 
-      if(finalOutput.user_assessments && finalOutput.user_assessments.screening_status) {
-        finalOutput.screening_status = finalOutput.user_assessments.screening_status;
-        finalOutput.mains_status = finalOutput.user_assessments.mains_status;
+      if(finalOutput.user_assessments && finalOutput.user_assessments.type == type) {
+        if(type == 'SCREENING') {
+          finalOutput.screening_status = finalOutput.user_assessments.status;
+        } 
+        if(type == 'MAINS') {
+          finalOutput.mains_status = finalOutput.user_assessments.mains_status;
+        }
         delete finalOutput.user_assessments;
       } else {
         finalOutput.screening_status = "PENDING";
@@ -402,7 +407,15 @@ module.exports.getUserRecommendedAssessments = getUserRecommendedAssessments;
 const getUserAssessments = async function (req, res) {
   let err, assessmentsData;
   let liveAssessmentList = await getLiveCampaignAssessments();
-
+  let include = [];
+  if(req.query.type) {
+    include.push({
+      model: assessment_configurations,
+      where: {
+        assessment_type: req.query.type
+      }
+    })
+  }
   try {
     [err, assessmentsData] = await to(assessments.findAll({
       where: {
@@ -410,6 +423,7 @@ const getUserAssessments = async function (req, res) {
           [Op.in]: liveAssessmentList
         }
       },
+      include: include,
       order: [
         [Sequelize.fn('RANDOM')]
       ]
@@ -538,11 +552,8 @@ const statusUserAssessment = async function (req, res) {
     [err, assessment_data] = await to(assessments.findOne({ where: { id: payload.assessment_id } }));
     if (assessment_data !== null) {
       let wherePayload = { assessment_id: payload.assessment_id, user_id : req.user.id };
-      if(payload.screening_status) {
-        wherePayload.screening_status = payload.screening_status;
-      } else {
-        wherePayload.mains_status = payload.mains_status;
-      }
+      wherePayload.status = payload.status;
+      wherePayload.type = payload.type;
       [err, user_assessment_data_exist] = await to(user_assessments.findOne({ where: wherePayload }));
       if(user_assessment_data_exist == null) {
         [err, user_assessment_data] = await to(user_assessments.create(payload));

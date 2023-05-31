@@ -914,13 +914,11 @@ const getUserAssessment = async function (req, res) {
       finalOutput.assessment_log = logAssessmentData;
 
 
-      if(finalOutput.user_assessments && finalOutput.user_assessments.screening_status) {
-        finalOutput.screening_status = finalOutput.user_assessments.screening_status;
-        finalOutput.mains_status = finalOutput.user_assessments.mains_status;
+      if(finalOutput.user_assessments && finalOutput.user_assessments.status) {
+        finalOutput.status = finalOutput.user_assessments.status;
+        finalOutput.type = finalOutput.user_assessments.type;
         delete finalOutput.user_assessments;
       } else {
-        finalOutput.screening_status = "PENDING";
-        finalOutput.mains_status = "PENDING";
         delete finalOutput.user_assessments;
       }
 
