@@ -41,7 +41,7 @@ module.exports = (sequelize, DataTypes) => {
     taluka_name        : { type: DataTypes.STRING, allowNull: true, defaultValue: "" },
     status             : { type: DataTypes.ENUM("PENDING", "ACTIVE", "INACTIVE", "BLOCK"), allowNull: false, defaultValue: "ACTIVE" },
     address            : { type: DataTypes.STRING, allowNull: true, defaultValue: "" },
-    pincode            : { type: DataTypes.INTEGER, allowNull: true, defaultValue: 0, validate: { len: { args: [6, 6], msg: "pin code must 6 digit." }, isNumeric: { msg: "not a valid pin code." } } },
+    pincode            : { type: DataTypes.INTEGER, allowNull: true, defaultValue: 0, validate: { len: { args: [0, 6], msg: "pin code must 6 digit." }, isNumeric: { msg: "not a valid pin code." } } },
     is_deleted         : { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     invite_code        : { type: DataTypes.STRING, allowNull: true, defaultValue: "" },
     invited_at         : { type: DataTypes.DATE, allowNull: true },

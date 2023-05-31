@@ -743,6 +743,14 @@ const verifyOtp = async function (req, res) {
         let uuiD = await authService.getUUID();
         userPayload.uuid = uuiD;
         [err, userData] = await to(users.create(userPayload));
+        if(err) {
+          return ReE(
+            res,
+            err,
+            422
+          );
+        }
+
       } else {
         let academicData = null;
         let professionalInfosData = null;
