@@ -74,6 +74,7 @@ router.get("/users/recommended-assessment",userPassport.authenticate("jwt", { se
 router.get("/users/assessments",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.getUserAssessments);
 
 router.post("/users/communications", userPassport.authenticate("jwt", { session: false }), UserController.userCommunications);
+router.get("/users/communications", userPassport.authenticate("jwt", { session: false }), UserController.getUserCommunications);
 
 
 

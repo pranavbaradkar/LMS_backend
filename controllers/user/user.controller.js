@@ -1032,3 +1032,13 @@ const userCommunications = async function (req, res) {
 }
 module.exports.userCommunications = userCommunications;
 
+const getUserCommunications = async (req, res) => {
+  let err, communicationsData;
+  try {
+    [err, communicationsData] = await to(user_communications.findAll({where: { user_id: req.user.id }}));
+    return ReS(res, {data: communicationsData}, 200);
+  } catch (err) {
+    return ReE(res, err, 422)
+  }
+}
+module.exports.getUserCommunications =getUserCommunications;
