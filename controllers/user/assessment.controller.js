@@ -992,21 +992,28 @@ const getQuestionList = async function() {
     //   }});
     // }    
     [err, questionData] = await to(questions.findAll({
-      // {where: { id: {[Op.in] : req.query.ids.split(',')} } }
       where:{blooms_taxonomy: { [Op.in]: ['UNDERSTAND', 'APPLY', 'ANALYZE']}},
       order: [['blooms_taxonomy','ASC'],['complexity_level', 'ASC']],
-      include: { model: question_options , attributes: ['option_key', 'option_value', 'option_type']},
-      // attributes: ['id','complexity_level', 'blooms_taxonomy'],
-      attributes: {exclude:["answer_explanation", "hint", "correct_answer", "answer", "deleted_at", "created_at", "updated_at"]},
-      // raw:true, nest: true
+      include: { model: question_options , attributes: ['option_key', 'option_value', 'option_type']}, // uncomment
+      attributes: {exclude:["answer_explanation", "hint", "correct_answer", "answer", "deleted_at", "created_at", "updated_at"]}, // uncomment
+      // attributes: ['id','complexity_level', 'blooms_taxonomy'], // delete
     }));
     // add question identifier if it has been asked to user before
+    let pool_c = 1; c=1;
+    let poolName = ''; 
     questionData = questionData.map((row) => {
       let obj = {...row.get({plain: true})};
+      if(poolName != obj.complexity_level+obj.blooms_taxonomy) { 
+        c = 1; pool_c=1;
+        poolName = obj.complexity_level+obj.blooms_taxonomy;
+      }
       // console.log("The row obj ",obj);
-      obj.asked_already=0;
+      // console.log("The row count  ",c, );
       obj.is_answered = 0;
       obj.users_answer = '';
+      obj.pool = pool_c;
+      if(c%3==0) { pool_c++;}
+      c++;
       return obj;
     });
 
@@ -1020,14 +1027,17 @@ module.exports.getQuestionList = getQuestionList;
 
 // pass assessment_id and user_id to generate question set 
 // get new question on subsequent calls.
+// TODO: pool will be updated when user reaches the same grid_position;
+// TEMP: currently updating pool on every request
 const getQuestionSet = async function(req, res) {
   let err, questionGrid, grades, blooms, cLevels;
   let user_id = req.user.id;
   let assessment_id = req.params.assessment_id;
+  let no_of_question = 3;
 
-  let questionGridKey = `${user_id}-${assessment_id}-set`;
-  let gridPosKey = `${user_id}-${assessment_id}-key`;
-  let current_position = {x:0, y:0, z:1, count: 1}; // [x,y,z,question_no_count]
+  let questionGridKey = `${user_id}-${assessment_id}-qset`;
+  let gridPosKey = `${user_id}-${assessment_id}-meta`;
+  let current_position = {x:0, y:0, z:1, grid_count: 1, pool:1}; // [x,y,z,question_no_count]
 
   try {
 
@@ -1059,9 +1069,8 @@ const getQuestionSet = async function(req, res) {
       let questionList = await getQuestionList();
       questionGrid = await createQuestionGrid(questionList);
       gridPos = current_position;
-      await redis.set(questionGridKey, JSON.stringify(questionGrid));
       await redis.set(gridPosKey, JSON.stringify(gridPos));
-
+      await redis.set(questionGridKey, JSON.stringify(questionGrid));
     }
 
 
@@ -1072,9 +1081,12 @@ const getQuestionSet = async function(req, res) {
     let bloom = blooms[gridPos.x];
     
     // console.log(`grade:${grade} clevel:${cLevel} bloom:${bloom}`);
-    // filter question by gridPos 
-    filteredQuestionSet = questionGrid[grade][cLevel][bloom];
+    // filter question by gridPos.pool 
+    
+    filteredQuestionSet = questionGrid[grade][cLevel][bloom][0].filter(e => e.pool == gridPos.pool);
 
+    gridPos.pool++;
+    await redis.set(gridPosKey, JSON.stringify(gridPos));
     return ReS(res, {data: { current_question_set:filteredQuestionSet, current_position: gridPos, all_questions:questionGrid} }, 200);
   }
   catch(err) {
@@ -1096,8 +1108,8 @@ const answerQuestionSet = async (req, res) => {
   let user_id = req.user.id;
   let assessment_id = req.params.assessment_id;
 
-  let questionGridKey = `${user_id}-${assessment_id}-set`;
-  let gridPosKey = `${user_id}-${assessment_id}-key`;
+  let questionGridKey = `${user_id}-${assessment_id}-qset`;
+  let gridPosKey = `${user_id}-${assessment_id}-meta`;
   try {
     let gPos = "";
     gPos = await redis.get(gridPosKey, (err, result) => {
@@ -1130,7 +1142,8 @@ const answerQuestionSet = async (req, res) => {
     let grade   = grades[gPos.z];
     let cLevel  = cLevels[gPos.y];
     let bloom   = blooms[gPos.x];
-    let q_no    = gPos.count;
+    let q_no    = gPos.grid_count;
+    let pool    = gPos.pool;
 
     filteredQuestionSet = questionGrid[grade][cLevel][bloom];
 
@@ -1151,7 +1164,7 @@ const answerQuestionSet = async (req, res) => {
     // console.log("question grid ",questionGrid);
     [ansSet, x, y, z, q_no] = await calculatePosition(questionGrid, gPos.x, gPos.y, gPos.z, q_no);
 
-    let newPos = {x:x, y:y, z:z, count: q_no}; // [x,y,z,count]
+    let newPos = {x:x, y:y, z:z, grid_count: q_no, pool: pool}; // [x,y,z,count]
 
     await redis.set(questionGridKey, JSON.stringify(ansSet));
     await redis.set(gridPosKey, JSON.stringify(newPos));
