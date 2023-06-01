@@ -839,7 +839,7 @@ let recursiveInventorySearch = async function (index, schoolInventory, type, blo
 // ************************************************** USER SIDE API **************************************************
 
 const getUserAssessment = async function (req, res) {
-  let err, assessmentData, assessmentQuestionData;
+  let err, assessmentData, assessmentQuestionData, userAssessmentData, screening_status, mains_status;
   console.log(req.user.id);
   if (req.params && req.params.assessment_id == undefined) {
     return ReE(res, { message: "Assessment id params is missing" }, 422);
@@ -856,7 +856,8 @@ const getUserAssessment = async function (req, res) {
       raw: true }));
     if (err) return ReE(res, err, 422);
     
-   
+    screening_status = (assessmentData.user_assessments && assessmentData.user_assessments.screening_status) ? assessmentData.user_assessments.screening_status : '';
+    mains_status = (assessmentData.user_assessments && assessmentData.user_assessments.mains_status) ? assessmentData.user_assessments.mains_status : '';
 
     if (assessmentData != null) {
 
@@ -912,6 +913,8 @@ const getUserAssessment = async function (req, res) {
       finalOutput.skills = [...skillsData.map(ele => { return ele.name }), ...subjectData.map(ele => { return ele.name })];
       finalOutput.tests = assessments_test;
       finalOutput.assessment_log = logAssessmentData;
+      finalOutput.screening_status = screening_status;
+      finalOutput.mains_status = mains_status;
 
 
       if(finalOutput.user_assessments && finalOutput.user_assessments.status) {
