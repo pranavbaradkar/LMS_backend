@@ -921,6 +921,24 @@ const getAssessmentResultScreenData = (req, res) => {
 }
 module.exports.getAssessmentResultScreenData = getAssessmentResultScreenData;
 
+const getAssessmentAnalytics = (req, res) => {
+  let err, resultData;
+  if (req.params && req.params.assessment_id == undefined) {
+    return ReE(res, { message: "assessment_id params is missing" }, 422);
+  }
+  try {
+    resultData = {};
+    resultData.labels = ["IQ/EQ", "Pedagogy", "English", "Psychometry", "Subject", "Computer"];
+    resultData.data = [20, 35, 50, 60, 100, 45];
+    resultData.dataScore = { 'scored': 45, 'total_score': 60 };
+    resultData.percentage = 85;
+    return ReS(res, {data: resultData }, 200);
+  } catch (err) {
+    return ReE(res,err,442);
+  }
+}
+module.exports.getAssessmentAnalytics = getAssessmentAnalytics;
+
 const insertQuestions = async (req, res) => {
   let err, insertData;
   try {
