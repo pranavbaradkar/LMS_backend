@@ -68,6 +68,7 @@ router.delete("/questions/:question_id", adminPassport.authenticate("jwt", { ses
 router.post("/questions/filter/:type",adminPassport.authenticate("jwt", { session: false }), QuestionController.getFilterQuestion);
 router.post("/questions/import",adminPassport.authenticate("jwt", { session: false }), QuestionController.questionImport);
 router.delete("/bulk/questions", adminPassport.authenticate("jwt", { session: false }), QuestionController.deleteBulkQuestion); 
+router.post("/lo_bank/import",adminPassport.authenticate("jwt", { session: false }), QuestionController.loBankImport);
 
 // ********************* Roles ROUTES **************************
 router.post("/roles",adminPassport.authenticate("jwt", { session: false }), RoleController.createRole); 
