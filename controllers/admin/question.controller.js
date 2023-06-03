@@ -815,13 +815,13 @@ const addToLoQuestion = async (req, res, excelObj) => {
   [err, qOptionsData] = await to(lo_question_options.bulkCreate(questionOptionsPayload));
   if(err) return ReE(res, err, 422);
 
-  //   // insert to older db using axios post
-  //   let promise = [];
-  //   console.log("the last question payload for older question table", questionPayload[1]);
-  //   questionPayload.forEach( async (element) => {
-  //     let request = await axios.post(`${process.env.BASE_URL}/api/v1/admin/bypass/questions`, element);
-  //   promise.push(request)
-  // });
+    // insert to older db using axios post
+    let promise = [];
+    console.log("the last question payload for older question table", questionPayload[1]);
+    questionPayload.forEach( async (element) => {
+      let request = await axios.post(`${process.env.BASE_URL}/api/v1/admin/bypass/questions`, element);
+    promise.push(request)
+  });
   // console.log("the returned result from axios ",request);
 
   return {
