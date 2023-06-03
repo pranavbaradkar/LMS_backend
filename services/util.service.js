@@ -291,6 +291,7 @@ module.exports.lowercaseKeyValue = function(obj) {
   }
 
 module.exports.cleanLoText = (text) => {
+    if(!text || text == '') { return text; }
     const lastFullStopIndex = text.lastIndexOf(".");
     if (lastFullStopIndex !== -1) {
         text = text.slice(0, lastFullStopIndex) + text.slice(lastFullStopIndex + 1);
