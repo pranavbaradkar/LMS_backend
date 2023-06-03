@@ -901,7 +901,7 @@ const uploadVideoPacd = async function (req, res) {
   let userId = req.params.user_id;
   let payload = req.body;
   let path = `${payload.context}/${payload.business_type}/${payload.post_type}/${req.user.uuid}/${payload.file_type}`
-  url = await uploadVideoOnS3(path, `video_${new Date().getTime()}.mp4`, req.files[0].mimetype, req.files[0].buffer, true);
+  url = await uploadVideoOnS3(path, `video_${new Date().getTime()}.webm`, req.files[0].mimetype, req.files[0].buffer, true);
   return ReS(res, { data: url });
 }
 module.exports.uploadVideoPacd = uploadVideoPacd;
@@ -1289,7 +1289,7 @@ const uploadVideoLiveStreaming = async function (req, res) {
   let assessment_id = req.params.assessment_id;
   let payload = req.body;
   let path = `livestream/${assessment_id}/${user_id}`
-  url = await uploadVideoOnS3(path, `video_${new Date().getTime()}.mp4`, req.files[0].mimetype, req.files[0].buffer, false);
+  url = await uploadVideoOnS3(path, `video_${new Date().getTime()}.webm`, req.files[0].mimetype, req.files[0].buffer, false);
   return ReS(res, { data: url });
 }
 module.exports.uploadVideoLiveStreaming = uploadVideoLiveStreaming;
