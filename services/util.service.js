@@ -297,5 +297,5 @@ module.exports.cleanLoText = (text) => {
         text = text.slice(0, lastFullStopIndex) + text.slice(lastFullStopIndex + 1);
     // console.log(textWithoutLastFullStop);
     }
-    return text.replaceAll('"','');
+    return text;//.replaceAll('"','');
 }
