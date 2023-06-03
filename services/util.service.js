@@ -289,3 +289,12 @@ module.exports.lowercaseKeyValue = function(obj) {
       return accumulator;
     }, {});
   }
+
+module.exports.cleanLoText = (text) => {
+    const lastFullStopIndex = text.lastIndexOf(".");
+    if (lastFullStopIndex !== -1) {
+        text = text.slice(0, lastFullStopIndex) + text.slice(lastFullStopIndex + 1);
+    // console.log(textWithoutLastFullStop);
+    }
+    return text.replaceAll('"','');
+}
