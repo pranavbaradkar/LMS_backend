@@ -755,8 +755,4 @@ const addToLoQuestion = async (req, res, excelObj) => {
     questions: questionData,
     question_options: qOptionsData
   };
-<<<<<<< HEAD
-}
-=======
 } 
->>>>>>> lob_squash
