@@ -737,6 +737,12 @@ const addToLoQuestion = async (req, res, excelObj) => {
       console.log("processing question insert on line ",row_no);
       // console.log("single row (correct_ans",row[20],") (difficulty", row[23], ") [COMPLEXITY LEVEL:", row[24],"]");
       let correct_answer = String(row[20]).replace(/[^a-zA-Z0-9]/g,'');
+      let correctAnsArray = [];
+      // type is mcq
+      isMultipleType = qTypeMap[row[12]]=='MULTIPLE_CHOICE';
+      if(isMultipleType) {
+        correctAnsArray = correct_answer.split(",");
+      }
       for(i=65;i<69;i++){
         j = i - 49;
         let key_code = String.fromCharCode(i);
@@ -745,7 +751,8 @@ const addToLoQuestion = async (req, res, excelObj) => {
           option_value: row[j],
           option_type: 'TEXT'
         };
-        if(correct_answer == key_code) {opt.correct_answer = key_code; }
+        if(isMultipleType && correctAnsArray.includes(key_code)) { opt.correct_answer = key_code; opt.is_correct = true; }
+        if(correct_answer == key_code) {opt.correct_answer = key_code; opt.is_correct = true;}
         qOptions.push(opt);
        }
        questionPayload.push({
@@ -782,7 +789,13 @@ const addToLoQuestion = async (req, res, excelObj) => {
     e++;
     let excel = excelObj[e];
     let obj = {...qrow.get({plain: true})};
-    let correct_answer = String(excel[20]).replace(/[^a-zA-Z0-9]/g,'');
+    let correct_answer = String(excel[20]).replace(/[^a-zA-Z0-9,]/g,'');
+    let correctAnsArray = [];
+      // type is mcq
+      isMultipleType = qTypeMap[excel[12]]=='MULTIPLE_CHOICE';
+      if(isMultipleType) {
+        correctAnsArray = correct_answer.split(",");
+      }
       for(i=65;i<69;i++){
         j = i - 49;
         let key_code = String.fromCharCode(i);
@@ -793,7 +806,8 @@ const addToLoQuestion = async (req, res, excelObj) => {
             option_type: 'TEXT',
             lo_question_id: obj.id
           };
-          if(correct_answer == key_code) {opt.correct_answer = key_code; }
+          if(isMultipleType && correctAnsArray.includes(key_code)) { opt.correct_answer = key_code; opt.is_correct = true; }
+          if(correct_answer == key_code) {opt.correct_answer = key_code; opt.is_correct = true;}
           questionOptionsPayload.push(opt);
         }
        } // end for
@@ -801,13 +815,13 @@ const addToLoQuestion = async (req, res, excelObj) => {
   [err, qOptionsData] = await to(lo_question_options.bulkCreate(questionOptionsPayload));
   if(err) return ReE(res, err, 422);
 
-    // insert to older db using axios post
-    let promise = [];
-    console.log("the last question payload for older question table", questionPayload[1]);
-    questionPayload.forEach( async (element) => {
-      let request = await axios.post(`${process.env.BASE_URL}/api/v1/admin/bypass/questions`, element);
-    promise.push(request)
-  });
+  //   // insert to older db using axios post
+  //   let promise = [];
+  //   console.log("the last question payload for older question table", questionPayload[1]);
+  //   questionPayload.forEach( async (element) => {
+  //     let request = await axios.post(`${process.env.BASE_URL}/api/v1/admin/bypass/questions`, element);
+  //   promise.push(request)
+  // });
   // console.log("the returned result from axios ",request);
 
   return {
