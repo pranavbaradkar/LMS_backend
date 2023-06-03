@@ -74,6 +74,7 @@ router.get("/users/recommended-assessment",userPassport.authenticate("jwt", { se
 router.get("/users/assessments",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.getUserAssessments);
 
 router.post("/users/communications", userPassport.authenticate("jwt", { session: false }), UserController.userCommunications);
+router.get("/users/communications", userPassport.authenticate("jwt", { session: false }), UserController.getUserCommunications);
 
 
 
@@ -107,6 +108,7 @@ router.post("/s3/video/:user_id",upload.any(), HomeController.uploadVideo);
 router.get("/result", UserAssessmentController.getAllAssessmentsResult);
 router.get("/all/assessments/result", userPassport.authenticate("jwt", { session: false }), UserAssessmentController.getAssessmentsFinalResult);
 router.get("/assessments/result/screen", userPassport.authenticate("jwt", { session: false }), UserAssessmentController.getAssessmentResultScreenData);
+router.get("/assessments/:assessment_id/result/analytics", userPassport.authenticate("jwt", { session: false }), UserAssessmentController.getAssessmentAnalytics);
 
 //********* API DOCUMENTATION **********  
 router.use("/docs/api.json",express.static(path.join(__dirname, "/../public/v1/documentation/api.json")));
