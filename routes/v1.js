@@ -90,6 +90,7 @@ router.get("/users/assessment_slot",userPassport.authenticate("jwt", { session: 
 
 router.get("/users/mains/slots", userPassport.authenticate("jwt", { session: false }), UserAssessmentController.getMainsSlot);
 router.post("/users/s3/video", [userPassport.authenticate("jwt", { session: false }), upload.any()], UserAssessmentController.uploadVideoPacd);
+router.post("/assessments/:assessment_id/s3/video", [userPassport.authenticate("jwt", { session: false }), upload.any()], UserAssessmentController.uploadVideoLiveStreaming);
 
 
 router.post("/users/assessments/status",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.statusUserAssessment);

@@ -325,10 +325,6 @@ const getAssessmentConfiguration = async function (req, res) {
 module.exports.getAssessmentConfiguration = getAssessmentConfiguration;
 
 // questions 
-
-
-
-
 const getAssessmentConfigurationQuestions = async function (req, res) {
   let err, assessment_configurations_data, skills_data;
   let payload = req.body;
