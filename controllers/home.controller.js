@@ -79,7 +79,7 @@ const uploadVideo = async function (req, res) {
   console.log(file);
 
 
-  url = await uploadVideoOnS3(`${userId}`, `video_${new Date().getTime()}.webm`, req.files[0].mimetype, req.files[0].buffer);
+  url = await uploadVideoOnS3(`${userId}`, `video_${new Date().getTime()}.mp4`, req.files[0].mimetype, req.files[0].buffer);
   return ReS(res, { data: url });
 }
 module.exports.uploadVideo = uploadVideo;
