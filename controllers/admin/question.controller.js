@@ -582,9 +582,9 @@ const addToLoBank = async (req, res, excelObj) => {
 
       // populate unique lo here
       for(i=7;i<12;i++) {
-        if(single_row[i]) {
-          let txt = single_row[i].replace(/[^a-zA-Z0-9]/g,'').toLowerCase();
-          uniqueLo[txt] = { lo_text: cleanLoText(single_row[i]) };
+        if(single_row[i] && single_row[i]!="") {
+          let uniqueKey = single_row[i].replace(/[^a-zA-Z0-9]/g,'').toLowerCase();
+          uniqueLo[uniqueKey] = { lo_text: cleanLoText(single_row[i]) };
         }
       }
     }
@@ -755,4 +755,4 @@ const addToLoQuestion = async (req, res, excelObj) => {
     questions: questionData,
     question_options: qOptionsData
   };
-}
+} 
