@@ -73,13 +73,13 @@ module.exports.getUserSignedUrl = getUserSignedUrl;
 
 
 const uploadVideo = async function (req, res) {
-  let payload = req.body;
   let userId = req.params.user_id;
+  let assessment_id = req.params.assessment_id;
   const file = req.files;
-  console.log(file);
 
+  let path = `live_stream/${assessment_id}/${userId}`
 
-  url = await uploadVideoOnS3(`${userId}`, `video_${new Date().getTime()}.mp4`, req.files[0].mimetype, req.files[0].buffer);
+  url = await uploadVideoOnS3(`${path}`, `video_${new Date().getTime()}.mp4`, req.files[0].mimetype, req.files[0].buffer);
   return ReS(res, { data: url });
 }
 module.exports.uploadVideo = uploadVideo;
