@@ -909,10 +909,14 @@ const getUserAssessment = async function (req, res) {
       finalOutput.skills = [...skillsData.map(ele => { return ele.name }), ...subjectData.map(ele => { return ele.name })];
       finalOutput.tests = assessments_test;
       finalOutput.assessment_log = logAssessmentData;
-      finalOutput.screening_status = screening_status;
-      finalOutput.mains_status = mains_status;
 
-
+      if(finalOutput.user_assessments.type == 'SCREENING') {
+        finalOutput.screening_status = finalOutput.user_assessments.status;
+      }
+      if(finalOutput.user_assessments.type == 'MAINS') {
+        finalOutput.mains_status = finalOutput.user_assessments.status;
+      }
+     
       if(finalOutput.user_assessments && finalOutput.user_assessments.status) {
         finalOutput.status = finalOutput.user_assessments.status;
         finalOutput.type = finalOutput.user_assessments.type;
@@ -920,7 +924,6 @@ const getUserAssessment = async function (req, res) {
       } else {
         delete finalOutput.user_assessments;
       }
-
 
       if (err) return ReE(res, err, 422);
       return ReS(res, { data: finalOutput }, 200);
