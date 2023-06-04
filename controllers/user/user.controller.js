@@ -1035,11 +1035,7 @@ module.exports.getUserCommunications = getUserCommunications;
 const isUserAuthorize = async (req, res) => {
   let err, result;
   try {
-    [err, result] = await axios.post(`${process.env.AI_URL}/authorize`, req.body, {
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
+    result = await axios.post(`${process.env.AI_URL}/authorize`, req.body);
     if(result) {
       return ReS(res, {data: result.data}, 200);
     } else {
