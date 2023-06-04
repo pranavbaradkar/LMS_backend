@@ -10,7 +10,7 @@ module.exports = (sequelize, DataTypes) => {
     mains_status              : { type: DataTypes.ENUM('PENDING', 'STARTED', 'INPROGRESS', 'FINISHED', 'PASSED', 'FAILED', 'ABORTED'), defaultValue: 'PENDING' },
     screening_result_notified : { type: DataTypes.BOOLEAN, defaultValue: false, },
     mains_result_notified     : { type: DataTypes.BOOLEAN, defaultValue: false },
-    status: { type: DataTypes.ENUM('STARTED', 'INPROGRESS', 'FINISHED', 'PASSED', 'FAILED', 'ABORTED'), defaultValue: 'STARTED'},
+    status: { type: DataTypes.ENUM('PENDING', 'STARTED', 'INPROGRESS', 'FINISHED', 'PASSED', 'FAILED', 'ABORTED'), defaultValue: 'PENDING'},
     type: { type: DataTypes.ENUM('SCREENING', 'MAINS'), defaultValue: 'SCREENING' },
     deleted_at                : { type: DataTypes.DATE, allowNull: true, defaultValue: null }
   },{
