@@ -768,8 +768,8 @@ const verifyOtp = async function (req, res) {
       let is_screening_test_taken = false;
       let is_mains_test_taken = false;
 
-      [err, user_assessment_data_screening] = await to(user_assessments.findOne({ where: { user_id : user_id, status: { [Op.in]: ['FINISHED', 'PASSED', 'FAILED']}, type: 'SCREENING' }, raw: true, order: [['id', 'desc']] }));
-      [err, user_assessment_data_mains] = await to(user_assessments.findOne({ where: { user_id : user_id, status: { [Op.in]: ['FINISHED', 'PASSED', 'FAILED']}, type: 'MAINS' }, raw: true, order: [['id', 'desc']] }));
+      [err, user_assessment_data_screening] = await to(user_assessments.findOne({ where: { user_id : userData.id, status: { [Op.in]: ['FINISHED', 'PASSED', 'FAILED']}, type: 'SCREENING' }, raw: true, order: [['id', 'desc']] }));
+      [err, user_assessment_data_mains] = await to(user_assessments.findOne({ where: { user_id : userData.id, status: { [Op.in]: ['FINISHED', 'PASSED', 'FAILED']}, type: 'MAINS' }, raw: true, order: [['id', 'desc']] }));
       
       if(user_assessment_data_mains) {
         is_mains_test_taken = true
