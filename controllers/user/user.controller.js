@@ -1029,4 +1029,18 @@ const getUserCommunications = async (req, res) => {
     return ReE(res, err, 422)
   }
 }
-module.exports.getUserCommunications =getUserCommunications;
+module.exports.getUserCommunications = getUserCommunications;
+
+
+const isUserAuthorize = async (req, res) => {
+  let err, result;
+  try {
+    [err, result] = axios.post(`${process.env.AI_URL}/authorize`, req.body);
+    return ReS(res, {data: result.data}, 200);
+  } catch (err) {
+    return ReE(res, err, 422)
+  }
+}
+module.exports.isUserAuthorize = isUserAuthorize;
+
+
