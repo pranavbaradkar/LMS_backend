@@ -483,12 +483,7 @@ const testAnswersSubmit = async function (req, res) {
     
     if(req.params.type) {
       let payload = {};
-      if(req.params.type == 'screening') {
-        payload.screening_status = 'FINISHED';
-      }
-      if(req.params.type == 'mains') {
-        payload.mains_status = 'FINISHED';
-      }
+      payload.status = 'FINISHED';
       [err, user_assessment_data] = await to(user_assessments.findOne({ where: { assessment_id: req.params.assessment_id, user_id : req.user.id } }));
       if(user_assessment_data) {
         await user_assessment_data.update(payload, { where: { assessment_id: req.params.assessment_id, user_id : req.user.id } });
@@ -723,10 +718,10 @@ const recursiveResultSend = async function (req, res) {
    
     let object = { assessment_id: k.assessment_id, user_id : k.user_id };
     if(req.params.assessment_type.toUpperCase() == 'SCREENING') {
-      object.screening_status = "FINISHED";
+      object.status = "FINISHED";
     }
     if(req.params.assessment_type.toUpperCase() == 'MAINS') {
-      object.mains_status = "FINISHED";
+      object.status = "FINISHED";
     }
   
    
@@ -741,13 +736,13 @@ const recursiveResultSend = async function (req, res) {
       let payload = {};
       if(k.type == 'SCREENING') {
         payload = {
-          screening_status: status,
+          status: status,
           screening_result_notified: true
         };
       }
       if(k.type == 'MAINS') {
         payload = {
-          mains_status: status,
+          status: status,
           mains_result_notified: true
         };
       }

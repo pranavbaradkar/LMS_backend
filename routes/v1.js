@@ -104,7 +104,7 @@ router.post("/lobank/questions/:assessment_id",userPassport.authenticate("jwt", 
 
 
 router.post("/s3/put-object-url", HomeController.getUserSignedUrl);
-router.post("/s3/video/:user_id",upload.any(), HomeController.uploadVideo);
+router.post("/s3/video/:user_id", upload.any(), HomeController.uploadVideo);
 router.get("/result", UserAssessmentController.getAllAssessmentsResult);
 router.get("/all/assessments/result", userPassport.authenticate("jwt", { session: false }), UserAssessmentController.getAssessmentsFinalResult);
 router.get("/assessments/result/screen", userPassport.authenticate("jwt", { session: false }), UserAssessmentController.getAssessmentResultScreenData);

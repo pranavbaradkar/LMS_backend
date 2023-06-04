@@ -1,5 +1,6 @@
 const { users, countries, states, districts, cities, talukas, academics, professional_infos, user_communications, user_assessments, user_teaching_interests,levels,schools, boards, subjects } = require("../../models");
 const authService = require("../../services/auth.service");
+const assessmentService = require("../../services/assessment.service");
 const { to, ReE, ReS, toSnakeCase, sendSMS, isBlank, validatePhoneNo } = require("../../services/util.service");
 var moment = require("moment");
 var _ = require('underscore');
@@ -55,28 +56,15 @@ const get = async function (req, res) {
   }
   
 
-  let is_screening_test_taken = false;
-  let is_mains_test_taken = false;
-
-  [err, user_assessment_data_screening] = await to(user_assessments.findOne({ where: { user_id : userData.id, screening_status: { [Op.in]: ['FINISHED', 'PASSED', 'FAILED']} }, order: [['id', 'desc']] }));
-  [err, user_assessment_data_mains] = await to(user_assessments.findOne({ where: { user_id : userData.id, mains_status: { [Op.in]: ['FINISHED', 'PASSED', 'FAILED']} }, order: [['id', 'desc']] }));
-  
-  if(user_assessment_data_mains) {
-    is_mains_test_taken = true
-  }
-
-  if(user_assessment_data_screening) {
-    is_screening_test_taken = true
-  }
 
   userData.is_profile_created = isProfileCreated && isAcademicInfo && isProfessionalInfo;
   userData.is_personal_info_captured = isProfileCreated;
   userData.is_academic_info_captured = isAcademicInfo;
   userData.is_professional_info_captured = isProfessionalInfo;
   userData.is_interest_captured = isInterestInfo;
-  userData.is_mains_test_taken = is_mains_test_taken;
-  userData.is_screening_test_taken = is_screening_test_taken;
 
+  let status = await assessmentService.getStatus(user.id);
+  userData = {...status, ...userData};
   return ReS(res, { user: userData });
 };
 module.exports.get = get;
@@ -780,8 +768,8 @@ const verifyOtp = async function (req, res) {
       let is_screening_test_taken = false;
       let is_mains_test_taken = false;
 
-      [err, user_assessment_data_screening] = await to(user_assessments.findOne({ where: { user_id : userData.id, screening_status: { [Op.in]: ['FINISHED', 'PASSED', 'FAILED']} }, order: [['id', 'desc']] }));
-      [err, user_assessment_data_mains] = await to(user_assessments.findOne({ where: { user_id : userData.id, mains_status: { [Op.in]: ['FINISHED', 'PASSED', 'FAILED']} }, order: [['id', 'desc']] }));
+      [err, user_assessment_data_screening] = await to(user_assessments.findOne({ where: { user_id : userData.id, status: { [Op.in]: ['FINISHED', 'PASSED', 'FAILED']}, type: 'SCREENING' }, raw: true, order: [['id', 'desc']] }));
+      [err, user_assessment_data_mains] = await to(user_assessments.findOne({ where: { user_id : userData.id, status: { [Op.in]: ['FINISHED', 'PASSED', 'FAILED']}, type: 'MAINS' }, raw: true, order: [['id', 'desc']] }));
       
       if(user_assessment_data_mains) {
         is_mains_test_taken = true
