@@ -492,6 +492,12 @@ const loBankImport = async function(req, res) {
 
   let excelObj = await excelReader(path.join(__dirname +  `/../../public/assets/${req.body.file_name}`));
 
+  if(req.body.debug) 
+  {
+    let preTest = await testExcelFile(excelObj);
+    return ReS(res, {test_result: preTest}, 200);
+  }
+
   let responseB = await addToLoBank(req, res, excelObj);
   let responseQ = await addToLoQuestion(req, res, excelObj);
 
@@ -507,12 +513,46 @@ const loBankImport = async function(req, res) {
 };
 module.exports.loBankImport = loBankImport;
 
+const testExcelFile = async (excelObj, dataReturn) => {
+  let qTypeMap = { "SCQ": 'SINGLE_CHOICE', "MCQ": 'MULTIPLE_CHOICE', "FIB": 'FILL_IN_THE_BLANKS', "TF": 'TRUE_FALSE', "MTF":'MATCH_THE_FOLLOWING' };
+  if(dataReturn == 'question_type_map') { return qTypeMap;}
+
+  let expectedColumnOrder = ['NEP Category', 'Level/Grade', 'Pillar', "Subject","strand","substrand","Topic","LO1","LO2","LO3","LO4","LO5","Question Type","Question Statement","Media Type ","Media Link", "Option A", " Option B", "Option C", "Option D","Correct Answer","Answer Explanation","Blooms Tag","Difficulty Level Tag","Complexity Level Tag", "Review- Global comment", "Review- Specific Comment", "Review- Status"];
+  let preTestLog = [];
+  
+  
+  let excelColumnOrder = excelObj[0] ;
+  let columnPair = [['Expected ', 'Excel Columns']];
+  let questionType = {};
+  excelColumnOrder.forEach((element, i) => {
+    columnPair.push([expectedColumnOrder[i], excelColumnOrder[i]]);
+  });
+  excelObj.forEach((row,ri) => {
+    if(ri>0){
+      ri++;
+      if(!qTypeMap[row[12]]) { preTestLog.push(`${ri} ERROR: wrong question type found: ${row[12]}`); }
+      // let qtype = row[12].replace(/[^a-zA-Z0-9]/g,'');
+      // questionType[qtype] = row[12];
+    }
+  })
+  
+    
+  if(excelColumnOrder.length !== expectedColumnOrder.length) { 
+    preTestLog.push('No of columns differ for excel. We expect ('+expectedColumnOrder.length+') columns ')
+  }
+  else { preTestLog.push("No of columns Match"); }
+
+  return { log: preTestLog, data: [ questionType, columnPair] };
+}
+
+
 const addToLoBank = async (req, res, excelObj) => {
   let err, strandsData, subStrandsData, loBankData;  
   let level_id = req.body.level_id;
   let grade_id = req.body.grade_id;
   let subject_id = req.body.subject_id;
   let skill_id = req.body.skill_id;
+  let log = [];
 
   excelMapX = ['A','B','C','D','E', 'F','G','H','I','J','K','L','M'];
   let bsubjects = {};
@@ -525,22 +565,22 @@ const addToLoBank = async (req, res, excelObj) => {
   excelObj.forEach((single_row, row_no) => {
     if (row_no > 0) {
 
-      subject_name = single_row[3].replace(/ /g, "_").toLowerCase();
-      bsubjects[subject_name] = {};
+      // subject_name = single_row[3].replace(/ /g, "_").toLowerCase();
+      // bsubjects[subject_name] = {};
 
-      bstrands_name = single_row[4].replace(/ /g, "_").toLowerCase();
+      bstrands_name = single_row[4] ? single_row[4].replace(/ /g, "_").toLowerCase() : '';
       strands_text = single_row[4];
       bstrands[bstrands_name] = {};
       bstrands[bstrands_name].strand_text = strands_text;
-      bsubjects[subject_name].strands = bstrands;
+      // bsubjects[subject_name].strands = bstrands;
 
-      bsub_strands_name = single_row[5].replace(/ /g, "_").toLowerCase();
+      bsub_strands_name = single_row[5] ? single_row[5].replace(/ /g, "_").toLowerCase() : '';
       bsub_strands_text = single_row[5];
       bsub_strands[bsub_strands_name] = {};
       bsub_strands[bsub_strands_name].sub_strand_text = bsub_strands_text;
 
 
-      btopics_name = single_row[6].replace(/ /g, "_").toLowerCase();
+      btopics_name = single_row[6] ? single_row[6].replace(/ /g, "_").toLowerCase() : '';
       btopics_text = single_row[6];
       btopics[btopics_name] = {};
       btopics[btopics_name].topic_text = btopics_text;
@@ -557,12 +597,17 @@ const addToLoBank = async (req, res, excelObj) => {
   // insert strands
   [err, strandsData] = await to(strands.bulkCreate(bulkStrandPayload));
   let strandsMap = {};
+  if(strandsData) {
   strandsData.map(row => {
     let obj = {...row.get({plain: true})};
     let strand_text = obj.strand_text.replace(/ /g, "_").toLowerCase();
     bstrands[strand_text].strand_id = obj.id;
     return obj;
   });
+  }
+  else {
+    log.push("Stand insert failed");
+  }
   strandsMap = bstrands;
   // console.log(">>>>>>>>>>>>>>> the strand obj with ID ",strandsMap);
 
@@ -573,7 +618,7 @@ const addToLoBank = async (req, res, excelObj) => {
   let uniqueLo = {};
   excelObj.forEach((single_row, row_no) => {
     if (row_no > 0) {
-      bstrands_text = single_row[4].replace(/ /g, "_").toLowerCase();
+      bstrands_text = single_row[4] ? single_row[4].replace(/ /g, "_").toLowerCase() : '';
       let id = strandsMap[bstrands_text].strand_id;
       let key = bstrands_text+id;
       uniqueSubStrand[key] = {};
@@ -601,20 +646,23 @@ const addToLoBank = async (req, res, excelObj) => {
   // insert sub_strands
   [err, subStrandsData] = await to(sub_strands.bulkCreate(bulkSubStrandPayload));
   let subStrandsMap = {};
-  subStrandsData.map(row => {
-    let obj = {...row.get({plain: true})};
-    let sub_strand_text = obj.sub_strand_text.replace(/ /g, "_").toLowerCase();
-    bsub_strands[sub_strand_text].sub_strand_id = obj.id;
-    return obj;
-  });
+    if(subStrandsData) { 
+      subStrandsData.map(row => {
+      let obj = {...row.get({plain: true})};
+      let sub_strand_text = obj.sub_strand_text.replace(/ /g, "_").toLowerCase();
+      bsub_strands[sub_strand_text].sub_strand_id = obj.id;
+      return obj;
+    });
+  }  
+  else { log.push("Sub Strand Insert failed"); }
   subStrandsMap = bsub_strands;
   // console.log("<<<<<<<<<<<<<<< the sub strand obj with ID ",subStrandsMap);
 
   bulkTopicsPayload = [];
   excelObj.forEach((single_row, row_no) => {
     if (row_no > 0) {
-      bstrands_text = single_row[4].replace(/ /g, "_").toLowerCase();
-      bsub_strands_text = single_row[5].replace(/ /g, "_").toLowerCase();
+      bstrands_text = single_row[4] ? single_row[4].replace(/ /g, "_").toLowerCase() : '';
+      bsub_strands_text = single_row[5] ? single_row[5].replace(/ /g, "_").toLowerCase() : '';
       bulkTopicsPayload.push({
         topic_text  : single_row[6],
         level_id    : level_id,
@@ -630,13 +678,16 @@ const addToLoBank = async (req, res, excelObj) => {
   // insert sub_strands
   [err, topicData] = await to(topics.bulkCreate(bulkTopicsPayload));
   let topicsMap = {};
-  topicData.map(row => {
-    let obj = {...row.get({plain: true})};
-    let topic_text = obj.topic_text.replace(/ /g, "_").toLowerCase();
-    btopics[topic_text].topic_id = obj.id;
-    return obj;
-  });
-  topicsMap = btopics;
+  if(topicData) {
+    topicData.map(row => {
+      let obj = {...row.get({plain: true})};
+      let topic_text = obj.topic_text.replace(/ /g, "_").toLowerCase();
+      btopics[topic_text].topic_id = obj.id;
+      return obj;
+    });
+  }
+  else { log.push('Topics insert failed'); }
+    topicsMap = btopics;
   // console.log(">>>>>>>>>>>>>>>>> the topics obj with ID ",topicsMap);
 
   loBankPayload = [];
@@ -655,8 +706,10 @@ const addToLoBank = async (req, res, excelObj) => {
   // insert lo's to db
   [err, loBankData] = await to(lo_banks.bulkCreate(loBankPayload));
   if(err) { return ReE(res, err, 422); }
+  if(!loBankData) { log.push("Inser to Lo Bank Failed"); }
 
   return {
+    log: log,
     strand: [bulkStrandPayload, strandsMap],
     sub_strand: [uniqueSubStrand,bulkSubStrandPayload, subStrandsMap],
     topics: [bulkTopicsPayload,topicsMap],
@@ -675,11 +728,21 @@ const addToLoQuestion = async (req, res, excelObj) => {
 
   let questionData;
   let questionPayload =[];
-  let qTypeMap = { SCQ: 'SINGLE_CHOICE', MCQ: 'MULTIPLE_CHOICE', FIB: 'FILL_IN_THE_BLANKS', TF: 'TRUE_FALSE', MTF:'MATCH_THE_FOLLOWING' };
+  let qTypeMap = { "SCQ": 'SINGLE_CHOICE', "MCQ": 'MULTIPLE_CHOICE', "FIB": 'FILL_IN_THE_BLANKS', "TF": 'TRUE_FALSE', "MTF":'MATCH_THE_FOLLOWING' };
+  console.log("maps of question type", qTypeMap);
   excelObj.forEach((row, row_no) => {
+    if(!row[0]) { return; }
     if (row_no > 0) {
       let qOptions = [];
-      let correct_answer = row[20].replace(/[^a-zA-Z0-9]/g,'');
+      console.log("processing question insert on line ",row_no);
+      // console.log("single row (correct_ans",row[20],") (difficulty", row[23], ") [COMPLEXITY LEVEL:", row[24],"]");
+      let correct_answer = String(row[20]).replace(/[^a-zA-Z0-9]/g,'');
+      let correctAnsArray = [];
+      // type is mcq
+      isMultipleType = qTypeMap[row[12]]=='MULTIPLE_CHOICE';
+      if(isMultipleType) {
+        correctAnsArray = correct_answer.split(",");
+      }
       for(i=65;i<69;i++){
         j = i - 49;
         let key_code = String.fromCharCode(i);
@@ -688,7 +751,8 @@ const addToLoQuestion = async (req, res, excelObj) => {
           option_value: row[j],
           option_type: 'TEXT'
         };
-        if(correct_answer == key_code) {opt.correct_answer = key_code; }
+        if(isMultipleType && correctAnsArray.includes(key_code)) { opt.correct_answer = key_code; opt.is_correct = true; }
+        if(correct_answer == key_code) {opt.correct_answer = key_code; opt.is_correct = true;}
         qOptions.push(opt);
        }
        questionPayload.push({
@@ -700,7 +764,7 @@ const addToLoQuestion = async (req, res, excelObj) => {
         correct_answer      : correct_answer,
         answer_explanation  : row[21],
         blooms_taxonomy     : row[22].toUpperCase() == 'ANALYSE' ? 'ANALYZE': row[22].toUpperCase(),
-        difficulty_level    : row[23].toUpperCase(),
+        difficulty_level    : (row[23].toLowerCase()=='difficult')? 'HARD' :row[23].toUpperCase() ,
         complexity_level    : row[24].toUpperCase(),
         question_options    : qOptions,
         // required by older questions table
@@ -713,7 +777,9 @@ const addToLoQuestion = async (req, res, excelObj) => {
       });
     }
   });
+
   console.log("last questionPayload",questionPayload[(questionPayload.length-1)]);
+  // console.log("last questionPayload",questionPayload);
 
   [err, questionData] = await to(lo_questions.bulkCreate(questionPayload));
   if(err) return ReE(res, err, 422);
@@ -723,7 +789,13 @@ const addToLoQuestion = async (req, res, excelObj) => {
     e++;
     let excel = excelObj[e];
     let obj = {...qrow.get({plain: true})};
-    let correct_answer = excel[20].replace(/[^a-zA-Z0-9]/g,'');
+    let correct_answer = String(excel[20]).replace(/[^a-zA-Z0-9,]/g,'');
+    let correctAnsArray = [];
+      // type is mcq
+      isMultipleType = qTypeMap[excel[12]]=='MULTIPLE_CHOICE';
+      if(isMultipleType) {
+        correctAnsArray = correct_answer.split(",");
+      }
       for(i=65;i<69;i++){
         j = i - 49;
         let key_code = String.fromCharCode(i);
@@ -734,7 +806,8 @@ const addToLoQuestion = async (req, res, excelObj) => {
             option_type: 'TEXT',
             lo_question_id: obj.id
           };
-          if(correct_answer == key_code) {opt.correct_answer = key_code; }
+          if(isMultipleType && correctAnsArray.includes(key_code)) { opt.correct_answer = key_code; opt.is_correct = true; }
+          if(correct_answer == key_code) {opt.correct_answer = key_code; opt.is_correct = true;}
           questionOptionsPayload.push(opt);
         }
        } // end for
