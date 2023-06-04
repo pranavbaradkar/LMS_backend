@@ -13,7 +13,7 @@ module.exports = (sequelize, DataTypes) => {
     correct_answer       : { type: DataTypes.STRING, allowNull: false },
     difficulty_level     : { type: DataTypes.ENUM('EASY', 'MEDIUM', 'HARD', 'VERY_HARD'), allowNull: false, },
     complexity_level     : { type: DataTypes.ENUM('P1', 'P2', 'P3', 'P4', 'P5'), allowNull: false, },
-    knowledge_level      : { type: DataTypes.ENUM('MUST_KNOW', 'SHOULD_KNOW', 'NICE_TO_KNOW'), allowNull: false, },
+    knowledge_level      : { type: DataTypes.ENUM('MUST_KNOW', 'SHOULD_KNOW', 'NICE_TO_KNOW'), allowNull: true, defaultValue: null },
     proficiency_level    : { type: DataTypes.ENUM('A1', 'A2', 'B1', 'B2', 'C1', 'C2'), allowNull: true, defaultValue: null},
     blooms_taxonomy      : { type: DataTypes.ENUM('REMEMBER', 'UNDERSTAND', 'APPLY', 'ANALYZE', 'EVALUTE', 'CREATE'), allowNull: false, },
     skill_id             : { type: DataTypes.INTEGER(11), allowNull: false },
