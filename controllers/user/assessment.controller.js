@@ -893,7 +893,7 @@ const getMainsSlot = async function(req, res) {
 module.exports.getMainsSlot = getMainsSlot;
 
 const uploadVideoPacd = async function (req, res) {
-  let userId = req.params.user_id;
+  let userId = req.user.id;
   let payload = req.body;
   let path = `${payload.post_type}/${userId}`;
   url = await uploadVideoOnS3(path, `video_${new Date().getTime()}.webm`, req.files[0].mimetype, req.files[0].buffer, false);
