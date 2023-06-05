@@ -9,6 +9,7 @@ module.exports = (sequelize, DataTypes) => {
     video_link                : { type: DataTypes.STRING, allowNull: true },
     padv_video_link           : { type: DataTypes.STRING, allowNull: true },
     demo_link                 : { type: DataTypes.STRING, allowNull: true },
+    is_authorized             : { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false},
     created_at                : { type: DataTypes.DATE, allowNull: true, defaultValue: null },
     updated_at                : { type: DataTypes.DATE, allowNull: true, defaultValue: null },
     deleted_at                : { type: DataTypes.DATE, allowNull: true, defaultValue: null }

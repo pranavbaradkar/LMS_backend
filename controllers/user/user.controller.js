@@ -1,4 +1,4 @@
-const { users, countries, states, districts, cities, talukas, academics, professional_infos, user_communications, user_assessments, user_teaching_interests,levels,schools, boards, subjects } = require("../../models");
+const { users, countries, states, user_assessment_slots, districts, cities, talukas, academics, professional_infos, user_communications, user_assessments, user_teaching_interests,levels,schools, boards, subjects } = require("../../models");
 const authService = require("../../services/auth.service");
 const assessmentService = require("../../services/assessment.service");
 const { to, ReE, ReS, toSnakeCase, sendSMS, isBlank, validatePhoneNo } = require("../../services/util.service");
@@ -1035,9 +1035,18 @@ module.exports.getUserCommunications = getUserCommunications;
 const isUserAuthorize = async (req, res) => {
   let err, result;
   try {
+    let is_authorized = false;
     result = await axios.post(`${process.env.AI_URL}/authorize`, req.body);
+
+    if(result && result.data && result.data.message && result.data.message.facial_similarity && result.data.message.facial_similarity.indexOf('Matched') >= 0) {
+      let payload = {
+        is_authorized: true
+      };
+      is_authorized = true;
+      [err, updated] = await to(user_assessment_slots.update(payload, {where: { user_id: req.user.id }}));
+    }
     if(result) {
-      return ReS(res, {data: result.data}, 200);
+      return ReS(res, {data: {...result.data, ...{is_authorized: is_authorized} }}, 200);
     } else {
       return ReE(res, {data: {}}, 422)
     }
