@@ -561,9 +561,12 @@ const statusUserAssessment = async function (req, res) {
         if (err) return ReE(res, err, 422);
         return ReS(res, { data: user_assessment_data }, 200);
       } else {
-        return ReS(res, { data: user_assessment_data_exist }, 200);
-      }
-     
+          if(user_assessment_data_exist.status == 'STARTED' && user_assessment_data_exist.type == 'SCREENING')
+          return ReE(res, "This assessment has started already", 422);
+
+          return ReS(res, { data: user_assessment_data_exist }, 200);
+        }
+    // return ReS(res, { data: user_assessment_data_exist }, 200);
     } else {
       return ReE(res, "Assessment id not found.", 404);
     }
@@ -896,7 +899,7 @@ const uploadVideoPacd = async function (req, res) {
   let userId = req.user.id;
   let payload = req.body;
   let path = `${payload.post_type}/${userId}`;
-  url = await uploadVideoOnS3(path, `video_${new Date().getTime()}.webm`, req.files[0].mimetype, req.files[0].buffer, false);
+  url = await uploadVideoOnS3(path, `${userId}.mp4`, req.files[0].mimetype, req.files[0].buffer, false);
   return ReS(res, { data: url });
 }
 module.exports.uploadVideoPacd = uploadVideoPacd;
