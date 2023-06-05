@@ -896,7 +896,7 @@ const uploadVideoPacd = async function (req, res) {
   let userId = req.user.id;
   let payload = req.body;
   let path = `${payload.post_type}/${userId}`;
-  url = await uploadVideoOnS3(path, `video_${new Date().getTime()}.webm`, req.files[0].mimetype, req.files[0].buffer, false);
+  url = await uploadVideoOnS3(path, `${userId}.mp4`, req.files[0].mimetype, req.files[0].buffer, false);
   return ReS(res, { data: url });
 }
 module.exports.uploadVideoPacd = uploadVideoPacd;
