@@ -488,13 +488,15 @@ const questionImport = async function (req, res) {
 }
 module.exports.questionImport = questionImport;
 
+// TODO: find level grade subject from db
+// TODO: media upload
 const loBankImport = async function(req, res) {
 
   let excelObj = await excelReader(path.join(__dirname +  `/../../public/assets/${req.body.file_name}`));
 
   if(req.body.debug) 
   {
-    let preTest = await testExcelFile(excelObj);
+    let preTest = await testExcelFile(req, res, excelObj);
     return ReS(res, {test_result: preTest}, 200);
   }
 
@@ -513,12 +515,33 @@ const loBankImport = async function(req, res) {
 };
 module.exports.loBankImport = loBankImport;
 
-const testExcelFile = async (excelObj, dataReturn) => {
+const testExcelFile = async (req, res, excelObj, dataReturn) => {
   let qTypeMap = { "SCQ": 'SINGLE_CHOICE', "MCQ": 'MULTIPLE_CHOICE', "FIB": 'FILL_IN_THE_BLANKS', "TF": 'TRUE_FALSE', "MTF":'MATCH_THE_FOLLOWING' };
   if(dataReturn == 'question_type_map') { return qTypeMap;}
 
-  let expectedColumnOrder = ['NEP Category', 'Level/Grade', 'Pillar', "Subject","strand","substrand","Topic","LO1","LO2","LO3","LO4","LO5","Question Type","Question Statement","Media Type ","Media Link", "Option A", " Option B", "Option C", "Option D","Correct Answer","Answer Explanation","Blooms Tag","Difficulty Level Tag","Complexity Level Tag", "Review- Global comment", "Review- Specific Comment", "Review- Status"];
   let preTestLog = [];
+  
+  let level_id = 0;
+  [err, levelData] = await to(levels.findOne({ where: {name: req.body.level_name }}));
+  if(levelData) { level_id = levelData.id; preTestLog.push(`Level data Found with ID ${level_id}`);}
+  else { preTestLog.push("ERROR: Level Data not found, Check the name of level field.") }
+  
+  let grade_id = 0;
+  [err, gradeData] = await to(grades.findOne({ where: {name: req.body.grade_name }}));
+  if(gradeData) { grade_id = gradeData.id; preTestLog.push(`Grade data Found with ID ${grade_id}`);}
+  else { preTestLog.push("ERROR: Grade Data not found, Check the name of grade field.") }
+  
+  let subject_id = 0;
+  [err, subjectData] = await to(subjects.findOne({ where: {name: req.body.subject_name }}));
+  if(subjectData) { subject_id = subjectData.id; preTestLog.push(`subject data Found with ID ${subject_id}`);}
+  else { preTestLog.push("ERROR: subject Data not found, Check the name of subject field.") }
+  
+  let skill_id = 0;
+  [err, skillData] = await to(skills.findOne({ where: {name: req.body.skill_name }}));
+  if(skillData) { skill_id = skillData.id; preTestLog.push(`skill data Found with ID ${skill_id}`);}
+  else { preTestLog.push("ERROR: skill Data not found, Check the name of skill field.") }
+
+  let expectedColumnOrder = ['NEP Category', 'Level/Grade', 'Pillar', "Subject","strand","substrand","Topic","LO1","LO2","LO3","LO4","LO5","Question Type","Question Statement","Media Type ","Media Link", "Option A", " Option B", "Option C", "Option D","Correct Answer","Answer Explanation","Blooms Tag","Difficulty Level Tag","Complexity Level Tag", "Review- Global comment", "Review- Specific Comment", "Review- Status"];
   
   excelMapX = ['A','B','C','D','E', 'F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
   
@@ -532,7 +555,7 @@ const testExcelFile = async (excelObj, dataReturn) => {
   excelObj.forEach((row,ri) => {
     if(ri>0){
       ri++;
-      if(!qTypeMap[row[12]]) { preTestLog.push(`${ri} ERROR: wrong question type found: ${row[12]}`); }
+      if(!qTypeMap[row[12]]) { preTestLog.push(`ERROR: row no (${ri}) wrong question type found: ${row[12]}`); }
       row.forEach((cell, ci) => {
         if(impColumns.includes(ci) && !row[ci]) { preTestLog.push(`Empty value at ${expectedColumnOrder[ci]} ${ri} `); }
        });
