@@ -818,14 +818,14 @@ const createProfessionalInfos = async function (req, res) {
   payload.user_id = req.user.id;
 
   if(payload.is_fresher) {
-    payload.experience_year = 0;
-    payload.experience_month = 0;
+    payload.experience_min = 0;
+    payload.experience_max = 0;
     payload.position = "Teacher";
   }
 
-  if (payload.experience_year == undefined) {
+  if (payload.experience_min == undefined) {
     return ReE(res, "Please enter a experience year.", 422);
-  } else if (!payload.experience_month == undefined) {
+  } else if (!payload.experience_max == undefined) {
     return ReE(res, "Please enter a experience month.", 422);
   } else if (!payload.position) {
     return ReE(res, "Please enter a position.", 422);
@@ -867,8 +867,8 @@ const createBulkProfessionalInfos = async function (req, res) {
   payload = payload.map(ele => {
     let obj = {...ele};
     if(obj.is_fresher) {
-      obj.experience_year = 0;
-      obj.experience_month = 0;
+      obj.experience_min = 0;
+      obj.experience_max = 0;
       obj.position = "Teacher";
     }
     return obj;
@@ -877,7 +877,7 @@ const createBulkProfessionalInfos = async function (req, res) {
 
   
   let professonalError = [];
-  let professional_infos_required = ["experience_year", "experience_month"];
+  let professional_infos_required = ["experience_min", "experience_max"];
   payload.forEach((ele, k) => {
     let diff = _.difference(professional_infos_required, Object.keys(ele));
     if (diff.length > 0) {
