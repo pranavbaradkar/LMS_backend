@@ -5,8 +5,8 @@ module.exports = (sequelize, DataTypes) => {
   var Model = sequelize.define('professional_infos', {
     id               : { type: DataTypes.INTEGER(11), autoIncrement: true, allowNull: false, primaryKey: true },
     user_id          : { type: DataTypes.INTEGER(11), allowNull: false },
-    experience_year  : { type: DataTypes.INTEGER(11), allowNull: false },
-    experience_month : { type: DataTypes.INTEGER(11), allowNull: false },
+    experience_min   : { type: DataTypes.INTEGER(11), allowNull: false },
+    experience_max   : { type: DataTypes.INTEGER(11), allowNull: false },
     position         : { type: DataTypes.STRING, allowNull: false },
     employee_type_id : { type: DataTypes.INTEGER(11), allowNull: true },
     board_id         : { type: DataTypes.INTEGER(11), allowNull: true },
