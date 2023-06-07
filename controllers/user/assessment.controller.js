@@ -559,9 +559,12 @@ const statusUserAssessment = async function (req, res) {
         if (err) return ReE(res, err, 422);
         return ReS(res, { data: user_assessment_data }, 200);
       } else {
-        return ReS(res, { data: user_assessment_data_exist }, 200);
-      }
-     
+          if(user_assessment_data_exist.status == 'STARTED' && user_assessment_data_exist.type == 'SCREENING')
+          return ReE(res, "This assessment has started already", 422);
+
+          return ReS(res, { data: user_assessment_data_exist }, 200);
+        }
+    // return ReS(res, { data: user_assessment_data_exist }, 200);
     } else {
       return ReE(res, "Assessment id not found.", 404);
     }

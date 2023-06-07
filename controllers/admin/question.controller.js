@@ -43,7 +43,7 @@ const createQuestion = async function (req, res) {
       [err, questionData] = await to(questions.create(payload));
       if (err) return ReE(res, err, 422);
 
-      console.log(questionData);
+      // console.log(questionData);
 
       let metaObject = payload.question_options.map(ele => {
         return {
@@ -79,7 +79,7 @@ const createQuestion = async function (req, res) {
             lo_id: ele,
           }
         });
-        console.log(questionLoDataObject);
+        // console.log(questionLoDataObject);
         // return false;
         [err, questionLoData] = await to(question_los.bulkCreate(questionLoDataObject));
         if (err) return ReE(res, err, 422);
@@ -90,7 +90,7 @@ const createQuestion = async function (req, res) {
       return ReE(res, "Skill not found with this id", 404);
     }
   } catch (err) {
-    console.log(err);
+    // console.log(err);
     return ReE(res, err, 422);
   }
 }
@@ -520,6 +520,7 @@ const testExcelFile = async (excelObj, dataReturn) => {
   let expectedColumnOrder = ['NEP Category', 'Level/Grade', 'Pillar', "Subject","strand","substrand","Topic","LO1","LO2","LO3","LO4","LO5","Question Type","Question Statement","Media Type ","Media Link", "Option A", " Option B", "Option C", "Option D","Correct Answer","Answer Explanation","Blooms Tag","Difficulty Level Tag","Complexity Level Tag", "Review- Global comment", "Review- Specific Comment", "Review- Status"];
   let preTestLog = [];
   
+  excelMapX = ['A','B','C','D','E', 'F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
   
   let excelColumnOrder = excelObj[0] ;
   let columnPair = [['Expected ', 'Excel Columns']];
@@ -527,12 +528,14 @@ const testExcelFile = async (excelObj, dataReturn) => {
   excelColumnOrder.forEach((element, i) => {
     columnPair.push([expectedColumnOrder[i], excelColumnOrder[i]]);
   });
+  let impColumns = [4,5,6,12,13,16,17,18,19,20,21,22,23,24];
   excelObj.forEach((row,ri) => {
     if(ri>0){
       ri++;
       if(!qTypeMap[row[12]]) { preTestLog.push(`${ri} ERROR: wrong question type found: ${row[12]}`); }
-      // let qtype = row[12].replace(/[^a-zA-Z0-9]/g,'');
-      // questionType[qtype] = row[12];
+      row.forEach((cell, ci) => {
+        if(impColumns.includes(ci) && !row[ci]) { preTestLog.push(`Empty value at ${expectedColumnOrder[ci]} ${ri} `); }
+       });
     }
   })
   
@@ -554,7 +557,7 @@ const addToLoBank = async (req, res, excelObj) => {
   let skill_id = req.body.skill_id;
   let log = [];
 
-  excelMapX = ['A','B','C','D','E', 'F','G','H','I','J','K','L','M'];
+  excelMapxX = ['A','B','C','D','E', 'F','G','H','I','J','K','L','M'];
   let bsubjects = {};
   let bstrands = {};
   let bstrands_text = "";
@@ -735,13 +738,13 @@ const addToLoQuestion = async (req, res, excelObj) => {
     if (row_no > 0) {
       let qOptions = [];
       console.log("processing question insert on line ",row_no);
-      // console.log("single row (correct_ans",row[20],") (difficulty", row[23], ") [COMPLEXITY LEVEL:", row[24],"]");
-      let correct_answer = String(row[20]).replace(/[^a-zA-Z0-9]/g,'');
+      console.log("single row (correct_ans",row[20],") (difficulty", row[23], ") [COMPLEXITY LEVEL:", row[24],"]");
+      let correct_answer = String(row[20]).replace(/\b(?:both)\b/ig,'').replace(/[^a-zA-Z0-9,]/g,',').split(",").filter(e=> e!=='').join(",");
       let correctAnsArray = [];
       // type is mcq
       isMultipleType = qTypeMap[row[12]]=='MULTIPLE_CHOICE';
       if(isMultipleType) {
-        correctAnsArray = correct_answer.split(",");
+        correctAnsArray = correct_answer.replace(/\b(?:both)\b/ig,'').replace(/[^a-zA-Z0-9,]/g,',').split(",").filter(e=> e!=='');
       }
       for(i=65;i<69;i++){
         j = i - 49;
@@ -752,7 +755,7 @@ const addToLoQuestion = async (req, res, excelObj) => {
           option_type: 'TEXT'
         };
         if(isMultipleType && correctAnsArray.includes(key_code)) { opt.correct_answer = key_code; opt.is_correct = true; }
-        if(correct_answer == key_code) {opt.correct_answer = key_code; opt.is_correct = true;}
+        else if(correct_answer == key_code) {opt.correct_answer = key_code; opt.is_correct = true;}
         qOptions.push(opt);
        }
        questionPayload.push({
@@ -779,7 +782,7 @@ const addToLoQuestion = async (req, res, excelObj) => {
   });
 
   console.log("last questionPayload",questionPayload[(questionPayload.length-1)]);
-  // console.log("last questionPayload",questionPayload);
+  // console.log("All the payload questionPayload",JSON.stringify(questionPayload));
 
   [err, questionData] = await to(lo_questions.bulkCreate(questionPayload));
   if(err) return ReE(res, err, 422);
@@ -789,12 +792,12 @@ const addToLoQuestion = async (req, res, excelObj) => {
     e++;
     let excel = excelObj[e];
     let obj = {...qrow.get({plain: true})};
-    let correct_answer = String(excel[20]).replace(/[^a-zA-Z0-9,]/g,'');
+    let correct_answer = String(excel[20]).replace(/\b(?:both)\b/ig,'').replace(/[^a-zA-Z0-9,]/g,',').split(",").filter(e=> e!=='').join(",");
     let correctAnsArray = [];
       // type is mcq
       isMultipleType = qTypeMap[excel[12]]=='MULTIPLE_CHOICE';
       if(isMultipleType) {
-        correctAnsArray = correct_answer.split(",");
+        correctAnsArray = correct_answer.replace(/\b(?:both)\b/ig,'').replace(/[^a-zA-Z0-9,]/g,',').split(",").filter(e=> e!=='');
       }
       for(i=65;i<69;i++){
         j = i - 49;
@@ -812,6 +815,7 @@ const addToLoQuestion = async (req, res, excelObj) => {
         }
        } // end for
   });
+  // console.log("question options ",questionOptionsPayload);
   [err, qOptionsData] = await to(lo_question_options.bulkCreate(questionOptionsPayload));
   if(err) return ReE(res, err, 422);
 
