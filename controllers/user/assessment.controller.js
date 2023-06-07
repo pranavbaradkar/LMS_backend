@@ -87,6 +87,10 @@ const getScreeningTestDetails = async function (req, res) {
 
   [err, assessment_configurations_data] = await to(assessment_configurations.findOne({ where: { assessment_id: req.params.assessment_id, assessment_type: typeData }, raw: true }));
 
+  if(assessment_configurations_data == null) {
+    return ReE(res, "No questions data found", 404);
+  }
+
   let skillDistributions = assessment_configurations_data.skill_distributions;
 
   console.log(skillDistributions);
@@ -510,9 +514,7 @@ const logAssessment = async function (req, res) {
   if (_.isEmpty(req.params.assessment_type) || _.isUndefined(req.params.assessment_type)) {
     return ReE(res, "Assessment type required in params", 422);
   }
-  if (_.isEmpty(payload.answered_question) || _.isUndefined(payload.answered_question)) {
-    return ReE(res, "Answered Question JSON required in payload", 422);
-  }
+  
   // if (_.isEmpty(payload.question_status) || _.isUndefined(payload.question_status)) {
   //   return ReE(res, "Question Status required in payload", 422);
   // }
