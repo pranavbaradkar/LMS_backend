@@ -685,38 +685,6 @@ const addToLoBank = async (req, res, excelObj) => {
   subStrandsMap = bsub_strands;
   // console.log("<<<<<<<<<<<<<<< the sub strand obj with ID ",subStrandsMap);
 
-  bulkTopicsPayload = [];
-  excelObj.forEach((single_row, row_no) => {
-    if (row_no > 0) {
-      bstrands_text = single_row[4] ? single_row[4].replace(/ /g, "_").toLowerCase() : '';
-      bsub_strands_text = single_row[5] ? single_row[5].replace(/ /g, "_").toLowerCase() : '';
-      bulkTopicsPayload.push({
-        topic_text  : single_row[6],
-        level_id    : level_id,
-        grade_id    : grade_id,
-        subject_id  : subject_id,
-        skill_id    : skill_id,
-        strand_id   : strandsMap[bstrands_text].strand_id,
-        sub_strand_id : subStrandsMap[bsub_strands_text].sub_strand_id
-      })
-    }
-  });
-    console.log("================ bulk payload for topic ", bulkTopicsPayload[(bulkTopicsPayload.length-1)]);
-  // insert sub_strands
-  [err, topicData] = await to(topics.bulkCreate(bulkTopicsPayload));
-  let topicsMap = {};
-  if(topicData) {
-    topicData.map(row => {
-      let obj = {...row.get({plain: true})};
-      let topic_text = obj.topic_text.replace(/ /g, "_").toLowerCase();
-      btopics[topic_text].topic_id = obj.id;
-      return obj;
-    });
-  }
-  else { log.push('Topics insert failed'); }
-    topicsMap = btopics;
-  // console.log(">>>>>>>>>>>>>>>>> the topics obj with ID ",topicsMap);
-
   loBankPayload = [];
   Object.keys(uniqueLo).forEach(loc=>{
     loBankPayload.push({
@@ -742,9 +710,50 @@ const addToLoBank = async (req, res, excelObj) => {
       loMapData[lo_text] = obj.id;
       return obj;
     });
-
-    console.log("lo map data", loMapData);
+    // console.log("lo map data", loMapData);
   }
+
+  bulkTopicsPayload = [];
+  excelObj.forEach((single_row, row_no) => {
+    if (row_no > 0) {
+      // adding lo_id to topics
+      let topicLos = [];
+       for(lc=7;lc<12;lc++) {
+         if(single_row[lc]) {
+           let lo_code = single_row[lc].replace(/[^a-zA-Z0-9]/g,'').toLowerCase();
+            topicLos.push(loMapData[lo_code]);
+          }
+        }
+      bstrands_text = single_row[4] ? single_row[4].replace(/ /g, "_").toLowerCase() : '';
+      bsub_strands_text = single_row[5] ? single_row[5].replace(/ /g, "_").toLowerCase() : '';
+      bulkTopicsPayload.push({
+        topic_text  : single_row[6],
+        lo_id       : topicLos.join(","),
+        level_id    : level_id,
+        grade_id    : grade_id,
+        subject_id  : subject_id,
+        skill_id    : skill_id,
+        strand_id   : strandsMap[bstrands_text].strand_id,
+        sub_strand_id : subStrandsMap[bsub_strands_text].sub_strand_id
+        });
+    }
+  });
+    console.log("================ bulk payload for topic ", bulkTopicsPayload[(bulkTopicsPayload.length-1)]);
+  // insert sub_strands
+  [err, topicData] = await to(topics.bulkCreate(bulkTopicsPayload));
+  let topicsMap = {};
+  if(topicData) {
+    topicData.map(row => {
+      let obj = {...row.get({plain: true})};
+      let topic_text = obj.topic_text.replace(/ /g, "_").toLowerCase();
+      btopics[topic_text].topic_id = obj.id;
+      return obj;
+    });
+  }
+  else { log.push('Topics insert failed'); }
+    topicsMap = btopics;
+  // console.log(">>>>>>>>>>>>>>>>> the topics obj with ID ",topicsMap);
+
   return {
     log: log,
     strand: [bulkStrandPayload, strandsMap],
@@ -794,6 +803,7 @@ const addToLoQuestion = async (req, res, excelObj, loBankMapData) => {
         qOptions.push(opt);
        }
 
+       // looping on lo1,lo2,lo3,lo4,lo5
        let noOfLo = 0;
        for(lc=7;lc<12;lc++) {
          if(row[lc]) {

@@ -3,6 +3,7 @@ module.exports = (sequelize, DataTypes) => {
   var Model = sequelize.define('topics', {
     id             : { type: DataTypes.INTEGER, allowNull: false, autoIncrement: true, primaryKey: true },
     topic_text     : { type: DataTypes.STRING, allowNull: false },
+    lo_id          : { type: DataTypes.TEXT, allowNull: true, defaultValue: null },
     level_id       : { type: DataTypes.INTEGER, allowNull: true, defaultValue: null },
     grade_id       : { type: DataTypes.INTEGER, allowNull: true, defaultValue: null },
     subject_id     : { type: DataTypes.INTEGER, allowNull: true, defaultValue: null },
