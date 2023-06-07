@@ -501,7 +501,7 @@ const loBankImport = async function(req, res) {
   }
 
   let responseB = await addToLoBank(req, res, excelObj);
-  let loMapData = responseB.lo_bank[3];
+  let loMapData = await responseB.lo_bank[3];
   let responseQ = await addToLoQuestion(req, res, excelObj, loMapData);
 
   resData = {};
@@ -596,15 +596,19 @@ const addToLoBank = async (req, res, excelObj) => {
       // bsubjects[subject_name] = {};
 
       bstrands_name = single_row[4] ? single_row[4].replace(/ /g, "_").toLowerCase() : '';
+      if(bstrands_name) {
       strands_text = single_row[4];
       bstrands[bstrands_name] = {};
       bstrands[bstrands_name].strand_text = strands_text;
+    }
       // bsubjects[subject_name].strands = bstrands;
 
-      bsub_strands_name = single_row[5] ? single_row[5].replace(/ /g, "_").toLowerCase() : '';
-      bsub_strands_text = single_row[5];
-      bsub_strands[bsub_strands_name] = {};
-      bsub_strands[bsub_strands_name].sub_strand_text = bsub_strands_text;
+      bsub_strands_name = single_row[5] ? single_row[5].replace(/ /g, "_").toLowerCase() : null;
+      if(bsub_strands_name) {
+        bsub_strands_text = single_row[5];
+        bsub_strands[bsub_strands_name] = {};
+        bsub_strands[bsub_strands_name].sub_strand_text = bsub_strands_text;
+      }
 
 
       btopics_name = single_row[6] ? single_row[6].replace(/ /g, "_").toLowerCase() : '';
@@ -616,27 +620,29 @@ const addToLoBank = async (req, res, excelObj) => {
   }); // end foreach 
 
   // console.log(">>>>>>>>>>>>>>> unique Strands obj",bstrands);
+  
   let bulkStrandPayload=[];
   Object.keys(bstrands).forEach(ind => {
-    bulkStrandPayload.push({...bstrands[ind], level_id: level_id, grade_id: grade_id, subject_id: subject_id });
+    bulkStrandPayload.push({strand_text: bstrands[ind].strand_text, level_id: level_id, grade_id: grade_id, subject_id: subject_id });
   })
   console.log(">>>>>>>>>>>>>>> bulk Strand Payload",bulkStrandPayload[(bulkStrandPayload.length-1)]);
   // insert strands
   [err, strandsData] = await to(strands.bulkCreate(bulkStrandPayload));
+  if(err) { return ReE(res,{where: 'Strands Insert ', error: err}, 422); }
   let strandsMap = {};
   if(strandsData) {
   strandsData.map(row => {
     let obj = {...row.get({plain: true})};
     let strand_text = obj.strand_text.replace(/ /g, "_").toLowerCase();
-    bstrands[strand_text].strand_id = obj.id;
+    strandsMap[strand_text] = obj.id;
     return obj;
   });
   }
   else {
     log.push("Stand insert failed");
   }
-  strandsMap = bstrands;
-  // console.log(">>>>>>>>>>>>>>> the strand obj with ID ",strandsMap);
+  
+  // console.log(">>>>>>>>>>>>>>> the strand Map  ",strandsMap);
 
   // console.log("<<<<<<<<<<<<<<< Unique Sub-Strands obj ",bsub_strands);
   let bulkSubStrandPayload=[];
@@ -644,14 +650,14 @@ const addToLoBank = async (req, res, excelObj) => {
   let uniqueSubStrand = {};
   let uniqueLo = {};
   excelObj.forEach((single_row, row_no) => {
+    if (row_no > 0 && single_row[5]) {
+      bstrand_text = single_row[4].replace(/ /g, "_").toLowerCase();
+      bsub_strands_text = single_row[5].replace(/ /g, "_").toLowerCase();
+      uniqueSubStrand[bsub_strands_text] = {};
+      uniqueSubStrand[bsub_strands_text].text = single_row[5];
+      uniqueSubStrand[bsub_strands_text].strand_id = strandsMap[bstrand_text];
+    }
     if (row_no > 0) {
-      bstrands_text = single_row[4] ? single_row[4].replace(/ /g, "_").toLowerCase() : '';
-      let id = strandsMap[bstrands_text].strand_id;
-      let key = bstrands_text+id;
-      uniqueSubStrand[key] = {};
-      uniqueSubStrand[key].sub_strand_text = single_row[5];
-      uniqueSubStrand[key].strand_id = id;
-
       // populate unique lo here
       for(i=7;i<12;i++) {
         if(single_row[i] && single_row[i]!="") {
@@ -664,26 +670,30 @@ const addToLoBank = async (req, res, excelObj) => {
   // console.log("bulk payload for sub strand uniq ", uniqueSubStrand);
 
    Object.keys(uniqueSubStrand).forEach(ind => {
-    bulkSubStrandPayload.push({...uniqueSubStrand[ind] });
+    // console.log("the uniqe Subsstrand ", ind, uniqueSubStrand[ind]);
+      bulkSubStrandPayload.push({ sub_strand_text :uniqueSubStrand[ind].text, strand_id: uniqueSubStrand[ind].strand_id });
   })
-  
+
+  // return false;
   // bulkSubStrandPayload
   console.log("bulk payload for sub strand ", bulkSubStrandPayload[(bulkSubStrandPayload.length-1)]);
   
   // insert sub_strands
   [err, subStrandsData] = await to(sub_strands.bulkCreate(bulkSubStrandPayload));
+  if(err) { return ReE(res, {where: 'Sub Strand Insert Error:', error: err}, 422); }
+
   let subStrandsMap = {};
     if(subStrandsData) { 
       subStrandsData.map(row => {
       let obj = {...row.get({plain: true})};
       let sub_strand_text = obj.sub_strand_text.replace(/ /g, "_").toLowerCase();
-      bsub_strands[sub_strand_text].sub_strand_id = obj.id;
+      subStrandsMap[sub_strand_text] = obj.id;
       return obj;
     });
   }  
   else { log.push("Sub Strand Insert failed"); }
-  subStrandsMap = bsub_strands;
-  // console.log("<<<<<<<<<<<<<<< the sub strand obj with ID ",subStrandsMap);
+
+  // console.log("<<<<<<<<<<<<<<< the Sub Strand obj Map ",subStrandsMap);
 
   loBankPayload = [];
   Object.keys(uniqueLo).forEach(loc=>{
@@ -710,12 +720,12 @@ const addToLoBank = async (req, res, excelObj) => {
       loMapData[lo_text] = obj.id;
       return obj;
     });
-    // console.log("lo map data", loMapData);
   }
+  // console.log("lo map data", loMapData);
 
   bulkTopicsPayload = [];
   excelObj.forEach((single_row, row_no) => {
-    if (row_no > 0) {
+    if (row_no > 0 && single_row[0]) {
       // adding lo_id to topics
       let topicLos = [];
        for(lc=7;lc<12;lc++) {
@@ -726,6 +736,8 @@ const addToLoBank = async (req, res, excelObj) => {
         }
       bstrands_text = single_row[4] ? single_row[4].replace(/ /g, "_").toLowerCase() : '';
       bsub_strands_text = single_row[5] ? single_row[5].replace(/ /g, "_").toLowerCase() : '';
+      // console.log("excel topic text line no ",row_no, single_row);
+      // console.log("~~~~~~~~~~~~~~~~~sub strand map key ", bsub_strands_text);
       bulkTopicsPayload.push({
         topic_text  : single_row[6],
         lo_id       : topicLos.join(","),
@@ -733,14 +745,16 @@ const addToLoBank = async (req, res, excelObj) => {
         grade_id    : grade_id,
         subject_id  : subject_id,
         skill_id    : skill_id,
-        strand_id   : strandsMap[bstrands_text].strand_id,
-        sub_strand_id : subStrandsMap[bsub_strands_text].sub_strand_id
+        strand_id   : strandsMap[bstrands_text],
+        sub_strand_id : subStrandsMap[bsub_strands_text]
         });
     }
   });
     console.log("================ bulk payload for topic ", bulkTopicsPayload[(bulkTopicsPayload.length-1)]);
-  // insert sub_strands
+    
+  // insert topics
   [err, topicData] = await to(topics.bulkCreate(bulkTopicsPayload));
+  if(err) { return ReE(res, err, 422); }
   let topicsMap = {};
   if(topicData) {
     topicData.map(row => {
