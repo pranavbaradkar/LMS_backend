@@ -87,6 +87,10 @@ const getScreeningTestDetails = async function (req, res) {
 
   [err, assessment_configurations_data] = await to(assessment_configurations.findOne({ where: { assessment_id: req.params.assessment_id, assessment_type: typeData }, raw: true }));
 
+  if(assessment_configurations_data == null) {
+    return ReE(res, "No questions data found", 404);
+  }
+
   let skillDistributions = assessment_configurations_data.skill_distributions;
 
   console.log(skillDistributions);
