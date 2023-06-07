@@ -10,6 +10,7 @@ module.exports = (sequelize, DataTypes) => {
     padv_video_link           : { type: DataTypes.STRING, allowNull: true },
     demo_link                 : { type: DataTypes.STRING, allowNull: true },
     is_authorized             : { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false},
+    demo_video_status         : { type: DataTypes.ENUM('PENDING', 'SUBMITTED', 'AI_STATUS_COMPLETED', 'MANUAL_STATUS_COMPLETED', 'PASSED', 'FAILED'), allowNull: true, defaultValue: 'PENDING'},
     created_at                : { type: DataTypes.DATE, allowNull: true, defaultValue: null },
     updated_at                : { type: DataTypes.DATE, allowNull: true, defaultValue: null },
     deleted_at                : { type: DataTypes.DATE, allowNull: true, defaultValue: null }
