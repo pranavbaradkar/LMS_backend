@@ -510,9 +510,7 @@ const logAssessment = async function (req, res) {
   if (_.isEmpty(req.params.assessment_type) || _.isUndefined(req.params.assessment_type)) {
     return ReE(res, "Assessment type required in params", 422);
   }
-  if (_.isEmpty(payload.answered_question) || _.isUndefined(payload.answered_question)) {
-    return ReE(res, "Answered Question JSON required in payload", 422);
-  }
+  
   // if (_.isEmpty(payload.question_status) || _.isUndefined(payload.question_status)) {
   //   return ReE(res, "Question Status required in payload", 422);
   // }
