@@ -762,12 +762,12 @@ const addToLoQuestion = async (req, res, excelObj) => {
       let qOptions = [];
       console.log("processing question insert on line ",row_no);
       console.log("single row (correct_ans",row[20],") (difficulty", row[23], ") [COMPLEXITY LEVEL:", row[24],"]");
-      let correct_answer = String(row[20]).replace(/\b(?:both)\b/ig,'').replace(/[^a-zA-Z0-9,]/g,',').split(",").filter(e=> e!=='').join(",");
+      let correct_answer = String(row[20]).replace(/\b(?:both)\b/ig,'').replace(/\b(?:option)\b/ig,'').replace(/[^a-zA-Z0-9,]/g,',').split(",").filter(e=> e!=='').join(",");
       let correctAnsArray = [];
       // type is mcq
       isMultipleType = qTypeMap[row[12]]=='MULTIPLE_CHOICE';
       if(isMultipleType) {
-        correctAnsArray = correct_answer.replace(/\b(?:both)\b/ig,'').replace(/[^a-zA-Z0-9,]/g,',').split(",").filter(e=> e!=='');
+        correctAnsArray = correct_answer.replace(/\b(?:both)\b/ig,'').replace(/\b(?:option)\b/ig,'').replace(/[^a-zA-Z0-9,]/g,',').split(",").filter(e=> e!=='');
       }
       for(i=65;i<69;i++){
         j = i - 49;
@@ -782,6 +782,7 @@ const addToLoQuestion = async (req, res, excelObj) => {
         qOptions.push(opt);
        }
        questionPayload.push({
+        skill_id            : skill_id,
         level_id            : level_id,
         grade_id            : grade_id,
         subject_id          : subject_id,
@@ -795,10 +796,9 @@ const addToLoQuestion = async (req, res, excelObj) => {
         question_options    : qOptions,
         // required by older questions table
         hint                : 'No Hint',
-        answer_explanation  : 'No Explanation',
+        // answer_explanation  : 'No Explanation',
         correct_answer_score: 1,
         knowledge_level     : 'SHOULD_KNOW',
-        skill_id            : skill_id,
         estimated_time      : 90,
       });
     }
@@ -815,12 +815,12 @@ const addToLoQuestion = async (req, res, excelObj) => {
     e++;
     let excel = excelObj[e];
     let obj = {...qrow.get({plain: true})};
-    let correct_answer = String(excel[20]).replace(/\b(?:both)\b/ig,'').replace(/[^a-zA-Z0-9,]/g,',').split(",").filter(e=> e!=='').join(",");
+    let correct_answer = String(excel[20]).replace(/\b(?:both)\b/ig,'').replace(/\b(?:option)\b/ig,'').replace(/[^a-zA-Z0-9,]/g,',').split(",").filter(e=> e!=='').join(",");
     let correctAnsArray = [];
       // type is mcq
       isMultipleType = qTypeMap[excel[12]]=='MULTIPLE_CHOICE';
       if(isMultipleType) {
-        correctAnsArray = correct_answer.replace(/\b(?:both)\b/ig,'').replace(/[^a-zA-Z0-9,]/g,',').split(",").filter(e=> e!=='');
+        correctAnsArray = correct_answer.replace(/\b(?:both)\b/ig,'').replace(/\b(?:option)\b/ig,'').replace(/[^a-zA-Z0-9,]/g,',').split(",").filter(e=> e!=='');
       }
       for(i=65;i<69;i++){
         j = i - 49;
