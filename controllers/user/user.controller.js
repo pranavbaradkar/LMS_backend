@@ -112,7 +112,7 @@ const update = async function (req, res) {
     if(countryData) { 
       data.country_id = countryData.id; 
       data.country_name = countryData.country_name;
-    }
+    } else { data.country_id = -1; }
   }
   if(data.state_name || data.state_id) {
     let whereCondition = {};
@@ -124,7 +124,7 @@ const update = async function (req, res) {
     if(stateData) { 
       data.state_id = stateData.id; 
       data.state_name = stateData.state_name;
-    }
+    } else { data.state_id = -1; }
   }
 
   if(data.district_name || data.district_id) {
@@ -137,7 +137,7 @@ const update = async function (req, res) {
     if(districtData) { 
       data.district_id = districtData.id; 
       data.district_name = districtData.district_name;
-    }
+    } else { data.district_id = -1; }
   }
 
   if(data.city_name || data.city_id) {
@@ -150,7 +150,7 @@ const update = async function (req, res) {
     if(cityData) { 
       data.city_id = cityData.id; 
       data.city_name = cityData.city_name;
-    }
+    } else { data.city_id = -1; }
   }
   
   user.set(data);
