@@ -501,7 +501,8 @@ const loBankImport = async function(req, res) {
   }
 
   let responseB = await addToLoBank(req, res, excelObj);
-  let responseQ = await addToLoQuestion(req, res, excelObj);
+  let loMapData = responseB.lo_bank[3];
+  let responseQ = await addToLoQuestion(req, res, excelObj, loMapData);
 
   resData = {};
   if(responseB && responseB.lo_bank[2] && responseB.lo_bank[2][2]) {
@@ -730,21 +731,31 @@ const addToLoBank = async (req, res, excelObj) => {
   console.log("last payload for Lo Bank ", loBankPayload[(loBankPayload.length-1)]);
   
   // insert lo's to db
+  let loMapData = {};
   [err, loBankData] = await to(lo_banks.bulkCreate(loBankPayload));
   if(err) { return ReE(res, err, 422); }
   if(!loBankData) { log.push("Inser to Lo Bank Failed"); }
+  else {
+    loBankData.map(row => {
+      let obj = {...row.get({plain: true})};
+      let lo_text = obj.lo_text.replace(/[^a-zA-Z0-9]/g,'').toLowerCase();
+      loMapData[lo_text] = obj.id;
+      return obj;
+    });
 
+    console.log("lo map data", loMapData);
+  }
   return {
     log: log,
     strand: [bulkStrandPayload, strandsMap],
     sub_strand: [uniqueSubStrand,bulkSubStrandPayload, subStrandsMap],
     topics: [bulkTopicsPayload,topicsMap],
-    lo_bank: [uniqueLo, loBankPayload, loBankData]
+    lo_bank: [uniqueLo, loBankPayload, loBankData, loMapData]
   };
 
 }
 
-const addToLoQuestion = async (req, res, excelObj) => {
+const addToLoQuestion = async (req, res, excelObj, loBankMapData) => {
   let err, strandsData, subStrandsData, loBankData;  
 
   let level_id    = req.body.level_id;
@@ -755,7 +766,8 @@ const addToLoQuestion = async (req, res, excelObj) => {
   let questionData;
   let questionPayload =[];
   let qTypeMap = { "SCQ": 'SINGLE_CHOICE', "MCQ": 'MULTIPLE_CHOICE', "FIB": 'FILL_IN_THE_BLANKS', "TF": 'TRUE_FALSE', "MTF":'MATCH_THE_FOLLOWING' };
-  console.log("maps of question type", qTypeMap);
+  // console.log("maps of question type", qTypeMap);
+  let loCountInExcelRow = [];
   excelObj.forEach((row, row_no) => {
     if(!row[0]) { return; }
     if (row_no > 0) {
@@ -781,39 +793,52 @@ const addToLoQuestion = async (req, res, excelObj) => {
         else if(correct_answer == key_code) {opt.correct_answer = key_code; opt.is_correct = true;}
         qOptions.push(opt);
        }
-       questionPayload.push({
-        skill_id            : skill_id,
-        level_id            : level_id,
-        grade_id            : grade_id,
-        subject_id          : subject_id,
-        question_type       : qTypeMap[row[12]],
-        statement           : row[13],
-        correct_answer      : correct_answer,
-        answer_explanation  : row[21],
-        blooms_taxonomy     : row[22].toUpperCase() == 'ANALYSE' ? 'ANALYZE': row[22].toUpperCase(),
-        difficulty_level    : (row[23].toLowerCase()=='difficult')? 'HARD' :row[23].toUpperCase() ,
-        complexity_level    : row[24].toUpperCase(),
-        question_options    : qOptions,
-        // required by older questions table
-        hint                : 'No Hint',
-        // answer_explanation  : 'No Explanation',
-        correct_answer_score: 1,
-        knowledge_level     : 'SHOULD_KNOW',
-        estimated_time      : 90,
-      });
+
+       let noOfLo = 0;
+       for(lc=7;lc<12;lc++) {
+         if(row[lc]) {
+          noOfLo++;
+          let lo_text = row[lc].replace(/[^a-zA-Z0-9]/g,'').toLowerCase();
+          questionPayload.push({
+            lo_id               : loBankMapData[lo_text],
+            skill_id            : skill_id,
+            level_id            : level_id,
+            grade_id            : grade_id,
+            subject_id          : subject_id,
+            question_type       : qTypeMap[row[12]],
+            statement           : row[13],
+            correct_answer      : correct_answer,
+            answer_explanation  : row[21],
+            blooms_taxonomy     : row[22].toUpperCase() == 'ANALYSE' ? 'ANALYZE': row[22].toUpperCase(),
+            difficulty_level    : (row[23].toLowerCase()=='difficult')? 'HARD' :row[23].toUpperCase() ,
+            complexity_level    : row[24].toUpperCase(),
+            question_options    : qOptions,
+            // required by older questions table
+            hint                : 'No Hint',
+            // answer_explanation  : 'No Explanation',
+            correct_answer_score: 1,
+            knowledge_level     : 'SHOULD_KNOW',
+            estimated_time      : 90,
+          });
+        }
+       }
+       loCountInExcelRow.push(noOfLo);
+      
     }
   });
 
-  console.log("last questionPayload",questionPayload[(questionPayload.length-1)]);
+  console.log("========================================= last questionPayload",questionPayload[(questionPayload.length-1)]);
   // console.log("All the payload questionPayload",JSON.stringify(questionPayload));
-
+  // console.log(" lo count in single Excel rows ",loCountInExcelRow);
   [err, questionData] = await to(lo_questions.bulkCreate(questionPayload));
   if(err) return ReE(res, err, 422);
 
   let questionOptionsPayload = [];
+  let excelRow = 0;
   questionData.forEach((qrow, e) => {
-    e++;
-    let excel = excelObj[e];
+    let excel = excelObj[excelRow];
+    // console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> excelRow ",excelRow,loCountInExcelRow[excelRow]);
+    // console.log("excel",excel[20]);
     let obj = {...qrow.get({plain: true})};
     let correct_answer = String(excel[20]).replace(/\b(?:both)\b/ig,'').replace(/\b(?:option)\b/ig,'').replace(/[^a-zA-Z0-9,]/g,',').split(",").filter(e=> e!=='').join(",");
     let correctAnsArray = [];
@@ -837,18 +862,21 @@ const addToLoQuestion = async (req, res, excelObj) => {
           questionOptionsPayload.push(opt);
         }
        } // end for
+       e++;
+       if(loCountInExcelRow[excelRow] == 1){ excelRow++; }
+       else { loCountInExcelRow[excelRow]--; }
   });
   // console.log("question options ",questionOptionsPayload);
   [err, qOptionsData] = await to(lo_question_options.bulkCreate(questionOptionsPayload));
   if(err) return ReE(res, err, 422);
 
-    // insert to older db using axios post
-    let promise = [];
-    console.log("the last question payload for older question table", questionPayload[1]);
-    questionPayload.forEach( async (element) => {
-      let request = await axios.post(`${process.env.BASE_URL}/api/v1/admin/bypass/questions`, element);
-    promise.push(request)
-  });
+  //   // insert to older db using axios post
+  //   let promise = [];
+  //   console.log("the last question payload for older question table", questionPayload[1]);
+  //   questionPayload.forEach( async (element) => {
+  //     let request = await axios.post(`${process.env.BASE_URL}/api/v1/admin/bypass/questions`, element);
+  //   promise.push(request)
+  // });
   // console.log("the returned result from axios ",request);
 
   return {

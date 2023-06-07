@@ -4,6 +4,7 @@
 module.exports = (sequelize, DataTypes) => {
   var Model = sequelize.define('lo_questions', {
     id                   : { type: DataTypes.INTEGER(11), autoIncrement: true, allowNull: false, primaryKey: true },
+    lo_id                : { type: DataTypes.INTEGER, allowNull: true },
     level_id             : { type: DataTypes.INTEGER, allowNull: true },
     grade_id             : { type: DataTypes.INTEGER, allowNull: true },
     subject_id           : { type: DataTypes.INTEGER, allowNull: true },
