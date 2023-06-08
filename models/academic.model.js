@@ -12,14 +12,14 @@ module.exports = (sequelize, DataTypes) => {
                                       const startDate = this.getDataValue('start_date');
                                       if(!startDate) { return "";}
                                       let d = new Date(startDate);
-                                      return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+                                      return d.getFullYear().toString().padStart(4, '0') + '-' + (d.getMonth() + 1).toString().padStart(2, '0') + '-' + d.getDate().toString().padStart(2, '0');
                                     } },
     end_date                    : { type: DataTypes.DATE, allowNull: true, defaultValue: null, 
                                     get() {
                                       const endDate = this.getDataValue('end_date');
                                       if(!endDate) { return "";}
                                       let d = new Date(endDate);
-                                      return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+                                      return d.getFullYear().toString().padStart(4, '0') + '-' + (d.getMonth() + 1).toString().padStart(2, '0') + '-' + d.getDate().toString().padStart(2, '0');
                                     } },
     field_of_study              : { type: DataTypes.TEXT, allowNull: false },
     extra_carricular_activities : { type: DataTypes.TEXT, allowNull: true },
