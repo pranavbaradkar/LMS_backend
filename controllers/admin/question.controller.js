@@ -799,14 +799,17 @@ const addToLoQuestion = async (req, res, excelObj, loBankMapData) => {
       console.log("single row (correct_ans",row[20],") (difficulty", row[23], ") [COMPLEXITY LEVEL:", row[24],"]");
       let correct_answer = String(row[20]).replace(/\b(?:both)\b/ig,'').replace(/\b(?:option)\b/ig,'').replace(/[^a-zA-Z0-9,]/g,',').split(",").filter(e=> e!=='').join(",");
       let correctAnsArray = [];
+      let loopLimit = 69;
       // type is mcq
       isMultipleType = qTypeMap[row[12]]=='MULTIPLE_CHOICE';
+      isTrueFalseType = qTypeMap[row[12]]=='TRUE_FALSE';
       if(isMultipleType) {
         correctAnsArray = correct_answer.replace(/\b(?:both)\b/ig,'').replace(/\b(?:option)\b/ig,'').replace(/[^a-zA-Z0-9,]/g,',').split(",").filter(e=> e!=='');
       }
-      for(i=65;i<69;i++){
+      if(isTrueFalseType) { loopLimit = 67;}
+      for(i=65;i<loopLimit;i++){
         j = i - 49;
-        let key_code = String.fromCharCode(i);
+        let key_code = String.fromCharCode(i); // generate A,B,C,D
         let opt =  { 
           option_key: key_code,
           option_value: row[j],
@@ -857,25 +860,35 @@ const addToLoQuestion = async (req, res, excelObj, loBankMapData) => {
   [err, questionData] = await to(lo_questions.bulkCreate(questionPayload));
   if(err) return ReE(res, err, 422);
 
+  // remove label row in excel
+  excelObj.shift();
   let questionOptionsPayload = [];
   let excelRow = 0;
   questionData.forEach((qrow, e) => {
     let excel = excelObj[excelRow];
     // console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> excelRow ",excelRow,loCountInExcelRow[excelRow]);
-    // console.log("excel",excel[20]);
+    // console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Question text ",excelRow, excel[13]);
+    // console.log(" question type ============ ",excel[12]);
     let obj = {...qrow.get({plain: true})};
     let correct_answer = String(excel[20]).replace(/\b(?:both)\b/ig,'').replace(/\b(?:option)\b/ig,'').replace(/[^a-zA-Z0-9,]/g,',').split(",").filter(e=> e!=='').join(",");
     let correctAnsArray = [];
+    let loopLimit = 69;
       // type is mcq
       isMultipleType = qTypeMap[excel[12]]=='MULTIPLE_CHOICE';
+      isTrueFalseType = qTypeMap[excel[12]]=='TRUE_FALSE';
       if(isMultipleType) {
         correctAnsArray = correct_answer.replace(/\b(?:both)\b/ig,'').replace(/\b(?:option)\b/ig,'').replace(/[^a-zA-Z0-9,]/g,',').split(",").filter(e=> e!=='');
       }
-      for(i=65;i<69;i++){
+      if(isTrueFalseType) { loopLimit = 67;}
+      for(i=65;i<loopLimit;i++){
         j = i - 49;
-        let key_code = String.fromCharCode(i);
-        if(excel[j]) {
+        let key_code = String.fromCharCode(i); // Generate A,B,C,D
+        if(String(excel[j])) {
           let opt =  { 
+            // question: excel[13],
+            // question_row_count: e,
+            // excel_row_no: excelRow,
+            // excel_row_lo_count: loCountInExcelRow[excelRow],
             option_key: key_code,
             option_value: excel[j],
             option_type: 'TEXT',
@@ -886,11 +899,16 @@ const addToLoQuestion = async (req, res, excelObj, loBankMapData) => {
           questionOptionsPayload.push(opt);
         }
        } // end for
+      //  console.log("------------------------------------------ the options ", questionOptionsPayload[e]);
        e++;
-       if(loCountInExcelRow[excelRow] == 1){ excelRow++; }
-       else { loCountInExcelRow[excelRow]--; }
+      // to match the options to lo_questions
+      if(loCountInExcelRow[excelRow] == 1){ excelRow++; }
+      else { loCountInExcelRow[excelRow]--; }
   });
+
   // console.log("question options ",questionOptionsPayload);
+  
+  // return ReE(res, "err", 422);
   [err, qOptionsData] = await to(lo_question_options.bulkCreate(questionOptionsPayload));
   if(err) return ReE(res, err, 422);
 
