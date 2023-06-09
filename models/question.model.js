@@ -23,7 +23,12 @@ module.exports = (sequelize, DataTypes) => {
     level_id             : { type: DataTypes.INTEGER, allowNull: true },
     tags                 : { type: DataTypes.TEXT, allowNull: true },
     subject_id           : { type: DataTypes.INTEGER, allowNull: true },
-    deleted_at           : { type: DataTypes.DATE, allowNull: true, defaultValue: null }
+    deleted_at           : { type: DataTypes.DATE, allowNull: true, defaultValue: null },
+    grade_id             : { type: DataTypes.INTEGER, allowNull: true },
+    strand_id            : { type: DataTypes.INTEGER, allowNull: true },
+    sub_strand_id        : { type: DataTypes.INTEGER, allowNull: true },
+    topic_id             : { type: DataTypes.INTEGER, allowNull: true },
+    lo_ids               : { type: DataTypes.TEXT, allowNull: true }
   },{
     timestamps: true,
     paranoid: true,
