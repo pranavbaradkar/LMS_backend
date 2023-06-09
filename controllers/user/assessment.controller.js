@@ -559,6 +559,7 @@ const statusUserAssessment = async function (req, res) {
       wherePayload.type = payload.type;
       [err, user_assessment_data_exist] = await to(user_assessments.findOne({ where: wherePayload }));
       if(user_assessment_data_exist == null) {
+        [err, userAssessmentData] = await to(user_assessments.destroy({ where: { user_id: req.user.id }, force: true }));
         [err, user_assessment_data] = await to(user_assessments.create(payload));
         if (err) return ReE(res, err, 422);
         return ReS(res, { data: user_assessment_data }, 200);
