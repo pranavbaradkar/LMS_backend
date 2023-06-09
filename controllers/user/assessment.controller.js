@@ -562,19 +562,20 @@ const statusUserAssessment = async function (req, res) {
     let restrictedStatus = ['FINISHED', 'PASSED', 'FAILED'];
     if(userAssessmentData) {
       userAssessmentData.map(row => {
-        if(row.type == 'MAINS' && row.status == 'FINISHED')
-          return ReE(res, "Already Appeared for Mains", 422);
-
-        if(restrictedStatus.includes(row.status))
-          return ReE(res, "Already appeared for Screening", 422);
-
-        if(row.type == 'SCREENING') {
-          if(row.status == 'STARTED' && row.assessment_id == payload.assessment_id)
-            return ReE(res, "This assessment has started already", 422);
-            
-          if(allowedStatus.includes(row.status))
-            screeningAssessmentIds.push(row.assessment_id);
+        if (restrictedStatus.includes(row.status)) {
+          if (row.type == 'MAINS'){
+            return ReE(res, "Already Appeared for Mains", 422);
+          } else {
+            return ReE(res, "Already appeared for Screening", 422);
+          }
         }
+        
+        if (row.type == 'SCREENING' && row.status == 'STARTED' && row.assessment_id == payload.assessment_id)
+          return ReE(res, "This assessment has started already", 422);
+        
+        if (row.type == 'SCREENING' && allowedStatus.includes(row.status))
+          screeningAssessmentIds.push(row.assessment_id);
+        
       });
     } 
 
