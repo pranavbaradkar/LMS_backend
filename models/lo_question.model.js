@@ -21,8 +21,8 @@ module.exports = (sequelize, DataTypes) => {
     mime_type            : { type: DataTypes.STRING, allowNull: true, defaultValue: null },
     correct_answer       : { type: DataTypes.STRING, allowNull: false },
     answer_explanation   : { type: DataTypes.TEXT, allowNull: false },
-    blooms_taxonomy      : { type: DataTypes.ENUM('REMEMBER', 'UNDERSTAND', 'APPLY', 'ANALYZE', 'EVALUTE', 'CREATE'), allowNull: false, },
-    difficulty_level     : { type: DataTypes.ENUM('EASY', 'MEDIUM', 'HARD', 'VERY_HARD'), allowNull: false, },
+    blooms_taxonomy      : { type: DataTypes.ENUM('REMEMBER', 'UNDERSTAND', 'APPLY', 'ANALYZE', 'EVALUTE', 'CREATE'), allowNull: true },
+    difficulty_level     : { type: DataTypes.ENUM('EASY', 'MEDIUM', 'HARD', 'VERY_HARD'), allowNull: true },
     complexity_level     : { type: DataTypes.ENUM('P1', 'P2', 'P3', 'P4', 'P5'), allowNull: false, },
     deleted_at           : { type: DataTypes.DATE, allowNull: true, defaultValue: null }
   },{

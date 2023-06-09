@@ -557,7 +557,7 @@ const testExcelFile = async (req, res, excelObj, dataReturn) => {
       ri++;
       if(!qTypeMap[row[12]]) { preTestLog.push(`ERROR: row no (${ri}) wrong question type found: ${row[12]}`); }
       row.forEach((cell, ci) => {
-        if(impColumns.includes(ci) && !row[ci]) { preTestLog.push(`Empty value at ${expectedColumnOrder[ci]} ${ri} `); }
+        if(impColumns.includes(ci) && !row[ci]) { preTestLog.push(`Empty value at ${expectedColumnOrder[ci]} ${ri} for ${row[12]} `); }
        });
     }
   })
@@ -591,9 +591,6 @@ const addToLoBank = async (req, res, excelObj) => {
   excelObj.forEach((single_row, row_no) => {
     if (row_no > 0) {
 
-      // subject_name = single_row[3].replace(/ /g, "_").toLowerCase();
-      // bsubjects[subject_name] = {};
-
       bstrands_name = single_row[4] ? single_row[4].replace(/ /g, "_").toLowerCase() : '';
       if(bstrands_name) {
       strands_text = single_row[4];
@@ -608,13 +605,10 @@ const addToLoBank = async (req, res, excelObj) => {
         bsub_strands[bsub_strands_name] = {};
         bsub_strands[bsub_strands_name].sub_strand_text = bsub_strands_text;
       }
-
-
-      btopics_name = single_row[6] ? single_row[6].replace(/ /g, "_").toLowerCase() : '';
-      btopics_text = single_row[6];
-      btopics[btopics_name] = {};
-      btopics[btopics_name].topic_text = btopics_text;
-      
+      // btopics_name = single_row[6] ? single_row[6].replace(/ /g, "_").toLowerCase() : '';
+      // btopics_text = single_row[6];
+      // btopics[btopics_name] = {};
+      // btopics[btopics_name].topic_text = btopics_text;
     }
   }); // end foreach 
 
@@ -625,10 +619,14 @@ const addToLoBank = async (req, res, excelObj) => {
     bulkStrandPayload.push({strand_text: bstrands[ind].strand_text, level_id: level_id, grade_id: grade_id, subject_id: subject_id });
   })
   console.log(">>>>>>>>>>>>>>> bulk Strand Payload",bulkStrandPayload[(bulkStrandPayload.length-1)]);
+  
+  //do no insert for Hindi language
+  if(req.body.language == "hindi") { bulkStrandPayload = []; }
+
   // insert strands
   [err, strandsData] = await to(strands.bulkCreate(bulkStrandPayload));
   if(err) { return ReE(res,{where: 'Strands Insert ', error: err}, 422); }
-  let strandsMap = {};
+  let strandsMap = {"":-1};
   if(strandsData) {
   strandsData.map(row => {
     let obj = {...row.get({plain: true})};
@@ -661,14 +659,13 @@ const addToLoBank = async (req, res, excelObj) => {
       // populate unique lo here
       for(i=7;i<12;i++) {
         if(single_row[i] && single_row[i]!="") {
-          let uniqueKey = single_row[i].replace(/[^a-zA-Z0-9]/g,'').toLowerCase();
+          let uniqueKey = single_row[i].replace(/[^\u0900-\u097Fa-zA-Z0-9]/g,'').toLowerCase();
           uniqueLo[uniqueKey] = { lo_text: cleanLoText(single_row[i]) };
         }
       }
     }
   });
   // console.log("bulk payload for sub strand uniq ", uniqueSubStrand);
-  // console.log("uniq topics ", uniqueTopics);
 
    Object.keys(uniqueSubStrand).forEach(ind => {
     // console.log("the uniqe Subsstrand ", ind, uniqueSubStrand[ind]);
@@ -679,11 +676,14 @@ const addToLoBank = async (req, res, excelObj) => {
   // bulkSubStrandPayload
   console.log("bulk payload for sub strand ", bulkSubStrandPayload[(bulkSubStrandPayload.length-1)]);
   
+  //do no insert for Hindi language
+  if(req.body.language == "hindi") { bulkSubStrandPayload = []; }
+
   // insert sub_strands
   [err, subStrandsData] = await to(sub_strands.bulkCreate(bulkSubStrandPayload));
   if(err) { return ReE(res, {where: 'Sub Strand Insert Error:', error: err}, 422); }
 
-  let subStrandsMap = {};
+  let subStrandsMap = {"":-1};
     if(subStrandsData) { 
       subStrandsData.map(row => {
       let obj = {...row.get({plain: true})};
@@ -717,7 +717,7 @@ const addToLoBank = async (req, res, excelObj) => {
   else {
     loBankData.map(row => {
       let obj = {...row.get({plain: true})};
-      let lo_text = obj.lo_text.replace(/[^a-zA-Z0-9]/g,'').toLowerCase();
+      let lo_text = obj.lo_text.replace(/[^\u0900-\u097Fa-zA-Z0-9]/g,'').toLowerCase();
       loMapData[lo_text] = obj.id;
       return obj;
     });
@@ -731,7 +731,7 @@ const addToLoBank = async (req, res, excelObj) => {
       let topicLos = [];
        for(lc=7;lc<12;lc++) {
          if(single_row[lc]) {
-           let lo_code = single_row[lc].replace(/[^a-zA-Z0-9]/g,'').toLowerCase();
+           let lo_code = single_row[lc].replace(/[^\u0900-\u097Fa-zA-Z0-9]/g,'').toLowerCase();
             topicLos.push(loMapData[lo_code]);
           }
         }
@@ -741,11 +741,15 @@ const addToLoBank = async (req, res, excelObj) => {
       // console.log("~~~~~~~~~~~~~~~~~sub strand map key ", bsub_strands_text);
 
       // populate unisqu topics here
-      let topicCode = single_row[6].replace(/[^a-zA-Z0-9]/g,'').toLowerCase();
+      let topicCode = single_row[6].replace(/[^\u0900-\u097Fa-zA-Z0-9]/g,'').toLowerCase();
       topicCode += bstrands_text;
       topicCode += bsub_strands_text;
-      topicCode += topicLos.join(",");
+      topicCode += topicLos.join("_");
+      // console.log("=================>>>>>>>>>>>>>>>>hindi code ",topicCode);
       
+      //do no insert for Hindi language
+      if(req.body.language == "hindi") { bstrands_text = ""; bsub_strands_text = ""; }
+
       uniqueTopics[topicCode] = {
         topic_text  : single_row[6],
         lo_id       : topicLos.join(","),
@@ -756,28 +760,40 @@ const addToLoBank = async (req, res, excelObj) => {
         strand_id   : strandsMap[bstrands_text],
         sub_strand_id : subStrandsMap[bsub_strands_text]
         }
-
-      // bulkTopicsPayload.push({
-      //   topic_text  : single_row[6],
-      //   lo_id       : topicLos.join(","),
-      //   level_id    : level_id,
-      //   grade_id    : grade_id,
-      //   subject_id  : subject_id,
-      //   skill_id    : skill_id,
-      //   strand_id   : strandsMap[bstrands_text],
-      //   sub_strand_id : subStrandsMap[bsub_strands_text]
-      //   });
     }
   });
 
+  // create topics payload
   Object.keys(uniqueTopics).forEach((code) => {
     bulkTopicsPayload.push(uniqueTopics[code]);
   });
+
+  // reduce further to concatenate lo_ids
+  const reducedTopicPayload = Object.values(bulkTopicsPayload.reduce((accumulator, current) => {
+    if (!accumulator[current.topic_text]) {
+      accumulator[current.topic_text] = {
+        topic_text  : current.topic_text,
+        lo_id       : current.lo_id,
+        level_id    : current.level_id,
+        grade_id    : current.grade_id,
+        subject_id  : current.subject_id,
+        skill_id    : current.skill_id,
+        strand_id   : current.strand_id,
+        sub_strand_id : current.sub_strand_id
+      };
+    } else {
+      accumulator[current.topic_text].lo_id += `,${current.lo_id}`;
+    }
+    return accumulator;
+  }, {}));
+
   // console.log("================ bulk payload for topic ", bulkTopicsPayload);
-  console.log("================ last bulk payload for topic ", bulkTopicsPayload[(bulkTopicsPayload.length-1)]);
-    
+  // console.log("================ooooooooooooo bulk payload for reduced topic ", reducedArray);
+  // console.log("================ last bulk payload for topic ", bulkTopicsPayload[(bulkTopicsPayload.length-1)]);
+  
+  
   // insert topics
-  [err, topicData] = await to(topics.bulkCreate(bulkTopicsPayload));
+  [err, topicData] = await to(topics.bulkCreate(reducedTopicPayload));
   if(err) { return ReE(res, err, 422); }
   let topicsMap = {};
   if(topicData) {
@@ -827,8 +843,8 @@ const addToLoQuestion = async (req, res, excelObj, loBankData) => {
     if (row_no > 0) {
       let qOptions = [];
 
-      console.log("processing question insert on line ",row_no);
-      console.log("single row (correct_ans",row[20],") (difficulty", row[23], ") [COMPLEXITY LEVEL:", row[24],"]");
+      // console.log("processing question insert on line ",row_no);
+      // console.log("single row (correct_ans",row[20],") (difficulty", row[23], ") [COMPLEXITY LEVEL:", row[24],"]");
       let correct_answer = String(row[20]).replace(/\b(?:both)\b/ig,'').replace(/\b(?:option)\b/ig,'').replace(/[^a-zA-Z0-9,]/g,',').split(",").filter(e=> e!=='').join(",");
       let correctAnsArray = [];
       let loopLimit = 69;
@@ -856,12 +872,15 @@ const addToLoQuestion = async (req, res, excelObj, loBankData) => {
        let questionLos = [];
        for(lc=7;lc<12;lc++) {
          if(row[lc]) {
-          let lo_code = row[lc].replace(/[^a-zA-Z0-9]/g,'').toLowerCase();
+          let lo_code = row[lc].replace(/[^\u0900-\u097Fa-zA-Z0-9]/g,'').toLowerCase();
           questionLos.push(loBankMapData[lo_code]);
         }
       }
       strands_code      = row[4].replace(/ /g, "_").toLowerCase();
       sub_strand_code   = row[5].replace(/ /g, "_").toLowerCase();
+      //do no insert for Hindi language
+      if(req.body.language == "hindi") { strands_code = ""; sub_strand_code = ""; }
+
       topic_code        = row[6].replace(/ /g, "_").toLowerCase();
       questionPayload.push({
         lo_ids              : questionLos.join(","),
@@ -876,8 +895,8 @@ const addToLoQuestion = async (req, res, excelObj, loBankData) => {
         statement           : row[13],
         correct_answer      : correct_answer,
         answer_explanation  : row[21],
-        blooms_taxonomy     : row[22].toUpperCase() == 'ANALYSE' ? 'ANALYZE': row[22].toUpperCase(),
-        difficulty_level    : (row[23].toLowerCase()=='difficult')? 'HARD' :row[23].toUpperCase() ,
+        blooms_taxonomy     : row[22] ? (row[22].toUpperCase() == 'ANALYSE' ? 'ANALYZE': row[22].toUpperCase()) : null,
+        difficulty_level    : row[23] ? ((row[23].toLowerCase()=='difficult')? 'HARD' :row[23].toUpperCase()) : null ,
         complexity_level    : row[24].toUpperCase(),
         question_options    : qOptions,
         // required by older questions table
