@@ -553,25 +553,46 @@ const statusUserAssessment = async function (req, res) {
   payload.user_id = req.user.id;
   try {
     [err, assessment_data] = await to(assessments.findOne({ where: { id: payload.assessment_id } }));
-    if (assessment_data !== null) {
-      let wherePayload = { assessment_id: payload.assessment_id, user_id : req.user.id };
-      wherePayload.status = payload.status;
-      wherePayload.type = payload.type;
-      [err, user_assessment_data_exist] = await to(user_assessments.findOne({ where: wherePayload }));
-      if(user_assessment_data_exist == null) {
-        [err, user_assessment_data] = await to(user_assessments.create(payload));
-        if (err) return ReE(res, err, 422);
-        return ReS(res, { data: user_assessment_data }, 200);
-      } else {
-          if(user_assessment_data_exist.status == 'STARTED' && user_assessment_data_exist.type == 'SCREENING')
-          return ReE(res, "This assessment has started already", 422);
+    if(!assessment_data) { return ReE(res, "Assessment id not found.", 404); }
 
-          return ReS(res, { data: user_assessment_data_exist }, 200);
+    let wherePayload = { user_id : req.user.id };
+    let screeningAssessmentIds = [];
+    [err, userAssessmentData] = await to(user_assessments.findAll({ where: wherePayload, raw:true }));
+    let allowedStatus = ['STARTED', 'PENDING', 'ABORTED', 'INPROGRESS'];
+    let restrictedStatus = ['FINISHED', 'PASSED', 'FAILED'];
+    if(userAssessmentData) {
+      userAssessmentData.map(row => {
+        if (restrictedStatus.includes(row.status)) {
+          if (row.type == 'MAINS'){
+            return ReE(res, "Already Appeared for Mains", 422);
+          } else {
+            return ReE(res, "Already appeared for Screening", 422);
+          }
         }
-    // return ReS(res, { data: user_assessment_data_exist }, 200);
-    } else {
-      return ReE(res, "Assessment id not found.", 404);
-    }
+        
+        if (row.type == 'SCREENING' && row.status == 'STARTED' && row.assessment_id == payload.assessment_id)
+          return ReE(res, "This assessment has started already", 422);
+        
+        if (row.type == 'SCREENING' && allowedStatus.includes(row.status))
+          screeningAssessmentIds.push(row.assessment_id);
+        
+      });
+    } 
+
+    // delete all filtered user_assessments 
+    if(screeningAssessmentIds.length > 0){
+      [err, userAssessmentData] = await to(user_assessments.destroy({ 
+        where: { 
+          user_id: req.user.id, type:"SCREENING",
+          assessment_id: { [Op.in]: screeningAssessmentIds }
+        }, 
+        force: true 
+      }));
+    }   
+      
+    [err, user_assessment_data] = await to(user_assessments.create(payload));
+    if (err) return ReE(res, err, 422);
+    return ReS(res, { data: user_assessment_data }, 200);      
   } catch (err) {
     return ReE(res, err, 422);
   }
