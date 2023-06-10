@@ -943,16 +943,32 @@ const getAssessmentResultScreenData = (req, res) => {
 module.exports.getAssessmentResultScreenData = getAssessmentResultScreenData;
 
 const getAssessmentAnalytics = async (req, res) => {
-  let err, resultData;
+  let err, assessmentConfig, assessmentResultData;
   if (req.params && req.params.assessment_id == undefined) {
     return ReE(res, { message: "assessment_id params is missing" }, 422);
   }
   try {
+    [err, assessmentConfig] = await to(assessment_configurations.findOne({
+      where: { assessment_id: req.params.assessment_id }
+    }))
+    if (err) return ReE(res, err, 422);
+    //    console.log(assessmentConfig);
+    let totalScore = assessmentConfig.total_no_of_questions * assessmentConfig.correct_score_answer;
+    [err, assessmentResultData] = await to(assessment_results.findOne({ 
+      where: { user_id: req.user.id, assessment_id: req.params.assessment_id },
+      raw:true
+    }));
+    if(err) return ReE(res, "No results Found", 442);  
+    
+    let skillScore = JSON.parse(assessmentResultData.skill_scores);
     resultData = {};
-    resultData.labels = ["IQ/EQ", "Pedagogy", "English", "Psychometry", "Subject", "Computer"];
-    resultData.data = [20, 35, 50, 60, 100, 45];
-    resultData.dataScore = { 'scored': 45, 'total_score': 60 };
-    resultData.percentage = 85;
+    resultData.labels = Object.keys(skillScore);
+    resultData.data = Object.values(skillScore);
+    resultData.dataScore = { 
+      'scored': Object.values(skillScore).reduce((a, b) => a+b), 
+      'total_score': totalScore 
+    };
+    resultData.percentage = assessmentResultData.percentile;
     return ReS(res, {data: resultData }, 200);
   } catch (err) {
     return ReE(res,err,442);
