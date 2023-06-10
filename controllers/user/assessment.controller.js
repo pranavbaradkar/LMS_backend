@@ -1,5 +1,5 @@
 const model = require('../../models');
-const { user_assessment_slots, question_pools, user_assessment_logs, user_assessments, assessments, assessment_questions,campaigns,campaign_assessments, assessment_configurations,levels, questions, question_options, question_mtf_answers, custom_attributes, professional_infos, user_assessment_responses, skills, users, user_teaching_interests, subjects } = require("../../models");
+const { assessment_results, user_assessment_slots, question_pools, user_assessment_logs, user_assessments, assessments, assessment_questions,campaigns,campaign_assessments, assessment_configurations,levels, questions, question_options, question_mtf_answers, custom_attributes, professional_infos, user_assessment_responses, skills, users, user_teaching_interests, subjects } = require("../../models");
 const { to, ReE, ReS, toSnakeCase, returnObjectEmpty, uploadVideoOnS3 } = require('../../services/util.service');
 const { getLiveCampaignAssessments } = require('../../services/campaign.service');
 const validator = require('validator');
@@ -942,7 +942,7 @@ const getAssessmentResultScreenData = (req, res) => {
 }
 module.exports.getAssessmentResultScreenData = getAssessmentResultScreenData;
 
-const getAssessmentAnalytics = (req, res) => {
+const getAssessmentAnalytics = async (req, res) => {
   let err, resultData;
   if (req.params && req.params.assessment_id == undefined) {
     return ReE(res, { message: "assessment_id params is missing" }, 422);
@@ -959,6 +959,105 @@ const getAssessmentAnalytics = (req, res) => {
   }
 }
 module.exports.getAssessmentAnalytics = getAssessmentAnalytics;
+
+const setAssessmentAnalytics = async (req, res) => {
+  let err, assessmentResultData;
+  if (req.params && req.params.assessment_id == undefined) {
+    return ReE(res, { message: "assessment_id params is missing" }, 422);
+  }
+
+  try {
+    [skillScores, totalScored, percentile, result, type] = await calculateSkillScores(req.params.assessment_id, req.user.id);
+    // console.log("Total skillScores[skill] now ",skillScores);
+    let assessmentResultPayload = {};
+
+    assessmentResultPayload.user_id         = req.user.id;
+    assessmentResultPayload.assessment_id   = req.params.assessment_id;
+    assessmentResultPayload.skill_scores    = JSON.stringify(skillScores);
+    assessmentResultPayload.percentile      = percentile;
+    assessmentResultPayload.result          = result;
+    assessmentResultPayload.type            = type;
+
+    // console.log("assessmentResultPayload", assessmentResultPayload);
+    [err, assessmentResultData] = await to(assessment_results.findOne({ 
+      where: { user_id: req.user.id, assessment_id: req.params.assessment_id }
+    }));
+    if(assessmentResultData) { return ReS(res, { data: assessmentResultData }, 200); }
+    else {
+      [err, assessmentResultData] = await to(assessment_results.create(assessmentResultPayload));
+      if(err) return ReE(res, err, 422);
+    }
+    return ReS(res, { data: assessmentResultData }, 200);
+  } catch (err) {
+    return ReE(res, err, 422);
+  }
+}
+module.exports.setAssessmentAnalytics = setAssessmentAnalytics;
+
+const calculateSkillScores = async (assessment_id, user_id) => {
+  let err, assessmentConfigData, userResponseData, questionData, skillsData;
+
+  [err, assessmentConfigData] = await to(assessment_configurations.findOne({
+    where: { assessment_id: assessment_id }, raw:true
+  }));
+
+  // console.log("assessmentConfigData", assessmentConfigData);
+
+  let assessmentSkillId = assessmentConfigData.skill_distributions.map(obj => obj.skill_id );
+  
+  [err, userResponseData] = await to(user_assessment_responses.findOne({
+    where: { user_id: user_id, assessment_id: assessment_id },
+    raw: true
+  }));
+  let userResponse =  JSON.parse(userResponseData.response_json);
+
+  // get question and their skills data
+  let questionIds = Object.keys(userResponse);
+  // console.log("question ids ", questionIds);
+  [err, questionData] = await to(questions.findAll({where: { id: { [Op.in]: questionIds }}, raw:true }));
+  
+  [err, skillsData ]= await to(skills.findAll({where:{ id: { [Op.in]: assessmentSkillId } }, raw:true }));
+  
+  let skillMap = {};
+  let skillScores = {};
+  if(skillsData) { 
+    skillsData.forEach(ele => { 
+      skillMap[ele.id] = ele.name; 
+      skillScores[ele.name] = 0;
+    });
+  }
+
+  questionData.forEach(qe => {
+    let skill = skillMap[qe.skill_id];
+    if(qe.type == 'MULTIPLE_CHOICE'){
+      userResponse[qe.id].map( ans => { qe.correct_answer.includes(ans) ? calculateScore(assessmentConfigData, skill, skillScores) : ''; } );
+    }
+    else if(qe.type == 'MATCH_THE_FOLLOWING'){
+      Object.keys(userResponse[qe.id]).forEach(function(key, index) {
+        if(lowercaseKeyValue(userResponse[qe.id])[key] == qe.correct_answer[key]) { calculateScore(assessmentConfigData, skill, skillScores); }
+      });
+    }
+    else {
+      if(userResponse[qe.id].toLowerCase() == qe.correct_answer.toLowerCase()) { calculateScore(assessmentConfigData, skill, skillScores); }
+    }
+  });
+
+  let totalScored = 0;
+  Object.keys(skillScores).forEach(ele => {
+    totalScored += skillScores[ele];
+  });
+
+  let percentile  = ((totalScored/(assessmentConfigData.correct_score_answer * assessmentConfigData.total_no_of_questions))*100).toFixed(2);
+  // let totalScore = 
+  let result = percentile > parseFloat(assessmentConfigData.passing_criteria) ? 'PASSED' : 'FAILED' ;
+  return [skillScores, totalScored, percentile, result, assessmentConfigData.assessment_type];
+}
+
+const calculateScore = (config, skill, skillScores) => {
+  if(config.correct_score_answer) {
+    skillScores[skill] += config.correct_score_answer;
+  }
+}
 
 const insertQuestions = async (req, res) => {
   let err, insertData;
