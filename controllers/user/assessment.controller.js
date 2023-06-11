@@ -952,13 +952,26 @@ const getAssessmentAnalytics = async (req, res) => {
       where: { assessment_id: req.params.assessment_id }
     }))
     if (err) return ReE(res, err, 422);
-    //    console.log(assessmentConfig);
+    if(!assessmentConfig) { 
+      assessmentConfig = {};
+      assessmentConfig.total_no_of_questions = 40;
+      assessmentConfig.correct_score_answer = 1;
+    }
     let totalScore = assessmentConfig.total_no_of_questions * assessmentConfig.correct_score_answer;
     [err, assessmentResultData] = await to(assessment_results.findOne({ 
       where: { user_id: req.user.id, assessment_id: req.params.assessment_id },
       raw:true
     }));
-    if(err) return ReE(res, "No results Found", 442);  
+    if(assessmentResultData == null) //return ReE(res, "No results Found", 442);  
+    {
+      // set dummy scores
+      let dummy = {};
+      dummy.skill_scores = "";
+      dummy.skill_scores = JSON.stringify({"Pedagogy": 0, "Digital Skills": 0, "Language Skill": 0, "Communication Skill": 0, "Psychometry": 0});
+      dummy.percentile = 80;
+      assessmentResultData = dummy;
+      totalScore = 60;
+    }
     
     let skillScore = JSON.parse(assessmentResultData.skill_scores);
     resultData = {};
