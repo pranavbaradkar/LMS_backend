@@ -1,4 +1,4 @@
-const { roles, users, user_assessments, academics, professional_infos, custom_attributes, school_inventories } = require("../../models");
+const { roles,subjects, schools, levels, user_teaching_interests, users, user_assessments, academics, professional_infos, custom_attributes, school_inventories } = require("../../models");
 const model = require('../../models');
 const authService = require("../../services/auth.service");
 const { to, ReE, ReS, toSnakeCase, paginate, snakeToCamel, requestQueryObject, randomHash, getUUID } = require('../../services/util.service');
@@ -346,6 +346,89 @@ const bulkDeleteUser = async function (req, res) {
 }
 module.exports.bulkDeleteUser = bulkDeleteUser
 
+const updateUserPreference = async (req, res) => {
+  let [excel] = await readNewExcelData();
+  let userMobileMap = {};
+  let subjectsArray = new Set();
+  let levelsArray = new Set();
+  let schoolsArray = new Set();
+  let usersArray = new Set();
+  excel.shift();
+  excel.forEach(ele => {
+    let phone = ele[5];
+    for(i=9;i<12;i++) { if(ele[i]) { subjectsArray.add(ele[i]); }  }
+    levelsArray.add(ele[7]);
+    schoolsArray.add(ele[6]);
+    if(ele[5])
+      usersArray.add(String(ele[5]));
+
+    userMobileMap[phone] = {
+      "level_ids": [ele[7]],
+      // "teaching_type": ele[8],
+      "subject_ids": [ele[9],ele[10],ele[11]],
+      "school_ids" : [ele[6]]
+    };
+  });
+
+    // console.log("subjects Array", Array.from(subjectsArray));
+    // console.log("Levels Array", Array.from(levelsArray));
+    // console.log("Schools Array", Array.from(schoolsArray));
+    
+    [err, subjectsData] = await to(subjects.findAll({ where: { name: { [Op.in]: Array.from(subjectsArray) }}, raw: true }));
+    let subjectMap = {};
+    subjectsData.forEach(sub => { subjectMap[sub.name] = sub.id; });
+
+    [err, levelsData] = await to(levels.findAll({ where: { name: { [Op.in]: Array.from(levelsArray) }}, raw: true }));
+    let levelMap = {};
+    levelsData.forEach(sub => { levelMap[sub.name] = sub.id; });
+
+    [err, schoolsData] = await to(schools.findAll({ where: { name: { [Op.in]: Array.from(schoolsArray) }}, raw: true }));
+    let schoolMap = {};
+    schoolsData.forEach(sub => { schoolMap[sub.name] = sub.id; });
+
+    [err, usersData] = await to(users.findAll({ where: { phone_no: { [Op.in]: Array.from(usersArray) }}, raw: true, attributes: ['id', 'phone_no'] }));
+    let userMap = {};
+    if(err) return ReE(res, err, 422);
+
+    usersData.forEach(sub => { userMap[sub.phone_no] = sub.id; });
+
+
+  // console.log("subjects map ", subjectMap);
+  // console.log("levels map ", levelMap);
+  // console.log("schools map ", schoolMap);
+  // console.log("users map ", userMap);
+
+  let bulkPayload = [];
+  excel.forEach(ele => {
+    let phone = ele[5];
+    let user_id = userMap[phone];
+    let subjectIds = new Set();
+    for(i=9;i<12;i++) { if(ele[i]) { 
+      if(subjectMap[ele[i]])
+        subjectIds.add(subjectMap[ele[i]]); 
+    }}
+    let data = {
+      user_id     : user_id,
+      level_ids   : JSON.stringify(levelMap[ele[7]]),
+      subject_ids : JSON.stringify(Array.from(subjectIds)),
+      school_ids  : JSON.stringify(schoolMap[ele[6]])
+    }
+    if(user_id)
+      bulkPayload.push(data);
+  });
+
+  console.log("bulkPayload[4]", bulkPayload.length);
+  for(i=30;i<50;i++) {
+    console.log("bulkPayload[i]", bulkPayload[i]);
+
+  }
+  // 355
+  [err, bulkInsertData] = await to(user_teaching_interests.bulkCreate(bulkPayload));
+  if(err) return ReE(res, err,422);
+
+    return ReS(res, { data: "success"}, 200);
+}
+module.exports.updateUserPreference =updateUserPreference;
 
 // ############################# user Import ###########################
 const readNewExcelData = async () => {

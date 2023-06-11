@@ -114,6 +114,7 @@ router.delete("/campaigns/:campaign_id", adminPassport.authenticate("jwt", { ses
 
 // ********************* User Import **************************
 router.post("/users/import", adminPassport.authenticate("jwt", { session: false }), UserController.userImport);
+router.post("/users/pref_import", adminPassport.authenticate("jwt", { session: false }), UserController.updateUserPreference);
 router.post("/schools/import", adminPassport.authenticate("jwt", { session: false }), UserController.schoolsImport);
 router.post("/schools/inventory/import", adminPassport.authenticate("jwt", { session: false }), UserController.schoolsInventoryImport);
 
