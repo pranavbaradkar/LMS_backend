@@ -1,5 +1,5 @@
 const model = require('../../models');
-const { assessments, user_assessment_logs, assessment_questions, campaign_assessments, questions, question_options, custom_attributes, assessment_configurations, skills, levels, user_assessments, users, inventory_blocks, user_assessment_responses, subjects } = require("../../models");
+const { assessments, user_assessment_logs, assessment_questions, strands, sub_strands, campaign_assessments, questions, question_options, custom_attributes, assessment_configurations, skills, levels, user_assessments, users, inventory_blocks, user_assessment_responses, subjects } = require("../../models");
 const { to, ReE, ReS, requestQueryObject, lowercaseKeyValue } = require('../../services/util.service');
 const validator = require('validator');
 const mailer = require("../../helpers/mailer"); 
@@ -367,15 +367,14 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
     // 5E : 3M : 1H : 1VH = screening
     // 6E : 6M : 6H : 2VH = mains
     // 'EASY', 'MEDIUM', 'HIGH', 'VERY_HIGH'
+
     let distributions = {
       screening: [{limit: 5, difficulty_level: 'EASY'},
       {limit: 3, difficulty_level: 'MEDIUM'},
-      {limit: 1, difficulty_level: 'HARD'},
-      {limit: 1, difficulty_level: 'VERY_HARD'}],
-      mains: [{limit: 6, difficulty_level: 'EASY'},
+      {limit: 2, difficulty_level: 'HARD'}],
+      mains: [{limit: 8, difficulty_level: 'EASY'},
       {limit: 6, difficulty_level: 'MEDIUM'},
-      {limit: 6, difficulty_level: 'HARD'},
-      {limit: 2, difficulty_level: 'VERY_HARD'}]
+      {limit: 6, difficulty_level: 'HARD'}]
     };
 
     let distributionsOrg = JSON.parse(JSON.stringify(distributions));
@@ -387,47 +386,51 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
 
       console.log(obj);
 
-      let isSkillpsyhometry = [44, 46, 48];
-      distributions[req.params.assessment_type][0].limit = distributionsOrg[req.params.assessment_type][0].limit
-      if(isSkillpsyhometry.indexOf(ele.id) >= 0 ) {
-        distributions[req.params.assessment_type][0].limit = 10;
-      }
+      // let isSkillpsyhometry = [44, 46, 48];
+      // distributions[req.params.assessment_type][0].limit = distributionsOrg[req.params.assessment_type][0].limit
+      // if(isSkillpsyhometry.indexOf(ele.id) >= 0 ) {
+      //   distributions[req.params.assessment_type][0].limit = 10;
+      // }
      
       let subjectObjO = skillSubjects[ele.id] ? skillSubjects[ele.id] : null;
-      console.log("skillquestion", obj, subjectObjO);
-      if(subjectObjO == null) {
-        obj.questions = await Promise.all([
-          await getQuestions(ele,distributions[req.params.assessment_type][0]),
-          await getQuestions(ele,distributions[req.params.assessment_type][1]),
-          await getQuestions(ele,distributions[req.params.assessment_type][2]),
-          await getQuestions(ele,distributions[req.params.assessment_type][3])
-        ]);
-      } else {
-        let question = [];
-        let subjectLength = subjectObjO.length;
-        let allQuery = [];
-        distributions[req.params.assessment_type].forEach(dd => {
-          
-          let subj = getSubObj(dd, subjectObjO, subjectLength);
-          console.log("=============", subj);
-          allQuery = [...subj, ...allQuery];
-        });
-       
-        let finalSubjectQuery = allQuery.filter(ddd => ddd.limit > 0);
-        console.log(finalSubjectQuery);
+     
+      // if(subjectObjO == null) {
+      //   obj.questions = await Promise.all([
+      //     await getQuestions(ele,distributions[req.params.assessment_type][0], type, assessment_configurations_data.level_id),
+      //     await getQuestions(ele,distributions[req.params.assessment_type][1], type, assessment_configurations_data.level_id),
+      //     await getQuestions(ele,distributions[req.params.assessment_type][2], type, assessment_configurations_data.level_id),
+      //     await getQuestions(ele,distributions[req.params.assessment_type][3], type, assessment_configurations_data.level_id)
+      //   ]);
+      // } else {
+        let finalSubjectQuery = [];
+
+        let gradeIdsValues = [];
+        [err, gradeIds] = await to(model.level_grades.findAll({where: {level_id: assessment_configurations_data.level_id}, attributes: ['grade_id'], raw: true}));
+        if(gradeIds) {
+          gradeIdsValues = gradeIds.map(h => { return h.grade_id } );
+        }
+
+        if(type.toLowerCase() == 'screening') {
+          if(ele.name.toLowerCase() === 'core skill') {
+            finalSubjectQuery = await getCoreSkillQuestions(obj, gradeIdsValues, assessment_configurations_data, subjectObjO);
+          }
+          if(ele.name.toLowerCase() === 'communication skills') {
+
+            let strandsData = [];
+            [err, strandsData] = await to(strands.findAll({where: { strand_text : {
+              [Op.in]: ['Written Communication', 'Oral Communication', 'Effective Listening']
+            } }, attributes: ['strand_text', 'id'], raw: true}));
+            
+            finalSubjectQuery = await getCommunicationSkill(obj, strandsData, assessment_configurations_data);
+          }
+        }
 
         obj.questions = await Promise.all( 
           finalSubjectQuery.map(async fq => {
-            return await getQuestions(ele,fq);
+            return await getQuestions(ele, fq, type, assessment_configurations_data.level_id);
           })
         );
-        // console.log(subjectObjO);
-
-        // await getQuestions(ele,distributions[req.params.assessment_type][0]),
-        // await getQuestions(ele,distributions[req.params.assessment_type][1]),
-        // await getQuestions(ele,distributions[req.params.assessment_type][2]),
-        // await getQuestions(ele,distributions[req.params.assessment_type][3])
-      }
+     // }
       
       return obj;
     });
@@ -488,15 +491,36 @@ function randomIntFromInterval(min, max) { // min and max included
   return Math.floor(Math.random() * (max - min + 1) + min)
 }
 
-async function getQuestions(ele, k) {
+async function getQuestions(ele, k, type, level_id) {
   let err, questionsData;
 
-  let where = { skill_id: ele.id , difficulty_level: k.difficulty_level };
-  if(k.subject_id) {
-    where.subject_id = k.subject_id;
-  }
-  
-  [err, questionsData] = await to(questions.findAll({ 
+    let where = { skill_id: ele.id };
+    if(k && k.subject_id) {
+      where.subject_id = k.subject_id;
+    }
+   
+    if(k.subject_ids) {
+      where.subject_id = { [Op.in]: k.subject_ids };
+    }
+   
+    if(k.complex) {
+      where.complexity_level = k.complex;
+    }
+   
+    if(k.bloom) {
+      where.blooms_taxonomy = k.bloom;
+    }
+    
+    if(k.level_id) {
+      where.level_id = k.level_id;
+    }
+
+    if(k.strand_id) {
+      where.strand_id = k.strand_id;
+    }
+    
+    console.log("where", where);
+    [err, questionsData] = await to(questions.findAll({ 
     where : where,
     include: [{
       model: question_options
@@ -506,22 +530,125 @@ async function getQuestions(ele, k) {
     { model: model.subjects, attributes: ['name'] }],
     order: Sequelize.literal('random()'),
     limit: k.limit }));
-    let isSkillpsyhometry = [44, 46, 48];
-    if(questionsData.length == 0 && isSkillpsyhometry.indexOf(ele.id) == -1) {
-      delete where.difficulty_level;
-      [err, questionsData] = await to(questions.findAll({ 
-        where : where,
-        include: [{
-          model: question_options
-        },
-        { model: model.skills, attributes: ['name'] },
-        { model: model.levels, attributes: ['name'] },
-        { model: model.subjects, attributes: ['name'] }],
-        order: Sequelize.literal('random()'),
-        limit: k.limit }));
-    }
+
+    // let isSkillpsyhometry = [44, 46, 48];
+    // if(questionsData.length == 0 && isSkillpsyhometry.indexOf(ele.id) == -1) {
+    //   delete where.difficulty_level;
+    //   [err, questionsData] = await to(questions.findAll({ 
+    //     where : where,
+    //     include: [{
+    //       model: question_options
+    //     },
+    //     { model: model.skills, attributes: ['name'] },
+    //     { model: model.levels, attributes: ['name'] },
+    //     { model: model.subjects, attributes: ['name'] }],
+    //     order: Sequelize.literal('random()'),
+    //     limit: k.limit }));
+    // }
     return questionsData;
+  
 }
+
+async function getCommunicationSkill(obj, strands, assessment_configurations_data) {
+  let finalSubjectQuery = [];
+  
+  let isListening = strands.filter(ele => ele.strand_text == 'Effective Listening');
+
+  let oneFourthPart = isListening ? Math.ceil(obj.no_of_questions / 4) : 0;
+  let first3rd = obj.no_of_questions - oneFourthPart;
+ 
+  let matrixProblem  = [{ complex: 'P1'}, { complex: 'P2'}];
+  let finalObjectValue = [];
+
+  strands.forEach(ele => {
+    matrixProblem.forEach(e => {
+      finalObjectValue.push({
+        ...ele,
+        ...{
+          strand_id: ele.id,
+          complex: e.complex
+        }
+      });
+    });
+  });
+
+  let lowRatio = finalObjectValue.filter(ele => ele.strand_text == 'Effective Listening');
+  let highRatio = finalObjectValue.filter(ele => ele.strand_text != 'Effective Listening');
+
+  let ratio1 = getRatioLimitValue(oneFourthPart, lowRatio);
+  let ratio2 = getRatioLimitValue(first3rd, highRatio);
+
+  return [...ratio1, ...ratio2];
+}
+
+function getRatioLimitValue(numberOfQuestion, setGrid) {
+  let finalSubjectQuery = [];
+  let finalLimit = Math.ceil(numberOfQuestion / setGrid.length);
+
+  console.log("======ratio", finalLimit, setGrid.length);
+
+  let totalLimit = 0;
+  let count = 0;
+  setGrid.forEach(el => {
+    count = count + 1;
+    let assignlimit = totalLimit <= numberOfQuestion ? parseInt(finalLimit) : 0;
+    totalLimit = totalLimit + parseInt(assignlimit);
+    
+    if(assignlimit > 0) {
+      finalSubjectQuery.push({
+        ...el,
+        ...{
+          limit: finalLimit
+        }
+      });
+    }
+  });
+
+  if(totalLimit != numberOfQuestion) {
+    finalSubjectQuery[finalSubjectQuery.length - 1].limit = finalSubjectQuery[finalSubjectQuery.length - 1].limit - (totalLimit - numberOfQuestion);
+  }
+  return finalSubjectQuery;
+}
+
+
+async function getCoreSkillQuestions(obj, gradeIdsValues, assessment_configurations_data, subjectObjO) {
+  let finalSubjectQuery = [];
+  let gradeValue = gradeIdsValues;
+  let gridValue = [{ bloom: 'UNDERSTAND', complex: 'P1'},
+  { bloom: 'APPLY', complex: 'P1'},
+  { bloom: 'ANALYZE', complex: 'P1'},
+  { bloom: 'UNDERSTAND', complex: 'P2'}]
+  let gradeLimit = obj.no_of_questions / gradeValue.length;
+  let finalLimit = Math.ceil(gradeLimit / gridValue.length);
+
+  let totalLimit = 0;
+  let count = 0;
+  gradeValue.forEach(e => {
+    gridValue.forEach(el => {
+      count = count + 1;
+      let assignlimit = totalLimit <= obj.no_of_questions ? parseInt(finalLimit) : 0;
+      totalLimit = totalLimit + parseInt(assignlimit);
+      
+      if(assignlimit > 0) {
+        finalSubjectQuery.push({
+          ...el,
+          ...{
+            subject_ids: subjectObjO.map(el => { return el.subject_id }),
+            level_id: assessment_configurations_data.level_id,
+            limit: finalLimit
+          }
+        });
+      }
+    });
+  });
+
+  if(totalLimit != obj.no_of_questions) {
+    finalSubjectQuery[finalSubjectQuery.length - 1].limit = finalSubjectQuery[finalSubjectQuery.length - 1].limit - (totalLimit - obj.no_of_questions);
+  }
+  return finalSubjectQuery;
+}
+
+
 // ************************************************** USER SIDE API **************************************************
 
 const blockSchoolInventory = async function (req, res) {
