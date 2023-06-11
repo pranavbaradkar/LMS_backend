@@ -409,9 +409,9 @@ const updateUserPreference = async (req, res) => {
     }}
     let data = {
       user_id     : user_id,
-      level_ids   : JSON.stringify(levelMap[ele[7]]),
-      subject_ids : JSON.stringify(Array.from(subjectIds)),
-      school_ids  : JSON.stringify(schoolMap[ele[6]])
+      level_ids   : [levelMap[ele[7]]],//JSON.stringify(levelMap[ele[7]]),
+      subject_ids : Array.from(subjectIds),//JSON.stringify(),
+      school_ids  : [schoolMap[ele[6]]] //JSON.stringify(schoolMap[ele[6]])
     }
     if(user_id)
       bulkPayload.push(data);
