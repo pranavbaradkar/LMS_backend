@@ -11,6 +11,7 @@ const mailer = require("../../helpers/mailer");
 const axios = require('axios');
 const NodeCache = require( "node-cache" );
 const otpCache = new NodeCache( { stdTTL: 10000, checkperiod: 10000 } );
+const assessmentCache = new NodeCache( { stdTTL: 0, checkperiod: ((3600*24)*7) } );
 
 var Sequelize = require("sequelize");
 const { response } = require("express");
@@ -419,6 +420,9 @@ const createUserTeachingInterest = async function (req, res) {
       } else {
         [err, response] = await to(user_teaching_interests.create(payload));
         if (err) return ReE(res, err, 422);
+      }
+      if(assessmentCache.has(`user-${req.user.id}`)) {
+        assessmentCache.delete(`user-${req.user.id}`);
       }
       return ReS(res, { data: response }, 200);
     } catch (err) {
