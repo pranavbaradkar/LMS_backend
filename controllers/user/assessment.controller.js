@@ -20,6 +20,7 @@ const redis = new Redis({
 });
 
 const NodeCache = require( "node-cache" );
+const { userInfo } = require('os');
 const assessmentCache = new NodeCache( { stdTTL: 0, checkperiod: ((3600*24)*7) } );
 
 questions.belongsTo(model.skills, { foreignKey: 'skill_id' });
@@ -114,7 +115,7 @@ const getScreeningTestDetails = async function (req, res) {
           [
             {
               model: questions,
-              attributes:['id','question_type', 'statement', 'mime_type','hint','difficulty_level','complexity_level','knowledge_level','proficiency_level','blooms_taxonomy','skill_id','estimated_time','correct_answer_score','level_id','tags','subject_id', 's3_asset_urls'],
+              attributes:['id','question_type', 'statement', 'mime_type','hint','difficulty_level','complexity_level','knowledge_level','proficiency_level','blooms_taxonomy','skill_id','estimated_time','correct_answer_score','level_id','tags','subject_id', 's3_asset_urls', 'grade_id',  'topic_id', 'sub_strand_id', 'strand_id', 'lo_ids'],
               include: [
                 { model: question_options },
                 { model: question_mtf_answers },
@@ -164,9 +165,7 @@ const getUserRecommendedAssessments = async function (req, res) {
     // live campaign assessmnets list
     let liveAssessmentList = await getLiveCampaignAssessments();
     
-    [err, userAssessmentExist] = await to(user_assessments.findOne({ where: { user_id: req.user.id, screening_status: { [Op.in]: ['STARTED', 'INPROGRESS', 'FINISHED', 'PASSED', 'FAILED']} }, raw: true }));
-
-    console.log("tetstst", userAssessmentExist);
+    [err, userAssessmentExist] = await to(user_assessments.findOne({ where: { user_id: req.user.id, status: { [Op.in]: ['STARTED', 'INPROGRESS', 'FINISHED', 'PASSED', 'FAILED']}, type: type.toUpperCase() }, raw: true }));
 
     if(userAssessmentExist) {
       req.query.debug = userAssessmentExist.assessment_id;
@@ -553,25 +552,46 @@ const statusUserAssessment = async function (req, res) {
   payload.user_id = req.user.id;
   try {
     [err, assessment_data] = await to(assessments.findOne({ where: { id: payload.assessment_id } }));
-    if (assessment_data !== null) {
-      let wherePayload = { assessment_id: payload.assessment_id, user_id : req.user.id };
-      wherePayload.status = payload.status;
-      wherePayload.type = payload.type;
-      [err, user_assessment_data_exist] = await to(user_assessments.findOne({ where: wherePayload }));
-      if(user_assessment_data_exist == null) {
-        [err, user_assessment_data] = await to(user_assessments.create(payload));
-        if (err) return ReE(res, err, 422);
-        return ReS(res, { data: user_assessment_data }, 200);
-      } else {
-          if(user_assessment_data_exist.status == 'STARTED' && user_assessment_data_exist.type == 'SCREENING')
-          return ReE(res, "This assessment has started already", 422);
+    if(!assessment_data) { return ReE(res, "Assessment id not found.", 404); }
 
-          return ReS(res, { data: user_assessment_data_exist }, 200);
+    let wherePayload = { user_id : req.user.id };
+    let screeningAssessmentIds = [];
+    [err, userAssessmentData] = await to(user_assessments.findAll({ where: wherePayload, raw:true }));
+    let allowedStatus = ['STARTED', 'PENDING', 'ABORTED', 'INPROGRESS'];
+    let restrictedStatus = ['FINISHED', 'PASSED', 'FAILED'];
+    if(userAssessmentData) {
+      userAssessmentData.map(row => {
+        if (restrictedStatus.includes(row.status)) {
+          if (row.type == 'MAINS'){
+            return ReE(res, "Already Appeared for Mains", 422);
+          } else {
+            return ReE(res, "Already appeared for Screening", 422);
+          }
         }
-    // return ReS(res, { data: user_assessment_data_exist }, 200);
-    } else {
-      return ReE(res, "Assessment id not found.", 404);
-    }
+        
+        if (row.type == 'SCREENING' && row.status == 'STARTED' && row.assessment_id == payload.assessment_id)
+          return ReE(res, "This assessment has started already", 422);
+        
+        if (row.type == 'SCREENING' && allowedStatus.includes(row.status))
+          screeningAssessmentIds.push(row.assessment_id);
+        
+      });
+    } 
+
+    // delete all filtered user_assessments 
+    if(screeningAssessmentIds.length > 0){
+      [err, userAssessmentData] = await to(user_assessments.destroy({ 
+        where: { 
+          user_id: req.user.id, type:"SCREENING",
+          assessment_id: { [Op.in]: screeningAssessmentIds }
+        }, 
+        force: true 
+      }));
+    }   
+      
+    [err, user_assessment_data] = await to(user_assessments.create(payload));
+    if (err) return ReE(res, err, 422);
+    return ReS(res, { data: user_assessment_data }, 200);      
   } catch (err) {
     return ReE(res, err, 422);
   }
@@ -921,17 +941,46 @@ const getAssessmentResultScreenData = (req, res) => {
 }
 module.exports.getAssessmentResultScreenData = getAssessmentResultScreenData;
 
-const getAssessmentAnalytics = (req, res) => {
-  let err, resultData;
+const getAssessmentAnalytics = async (req, res) => {
+  let err, assessmentConfig, assessmentResultData;
   if (req.params && req.params.assessment_id == undefined) {
     return ReE(res, { message: "assessment_id params is missing" }, 422);
   }
   try {
+    [err, assessmentConfig] = await to(assessment_configurations.findOne({
+      where: { assessment_id: req.params.assessment_id }
+    }))
+    if (err) return ReE(res, err, 422);
+    if(!assessmentConfig) { 
+      assessmentConfig = {};
+      assessmentConfig.total_no_of_questions = 40;
+      assessmentConfig.correct_score_answer = 1;
+    }
+    let totalScore = assessmentConfig.total_no_of_questions * assessmentConfig.correct_score_answer;
+    [err, assessmentResultData] = await to(assessment_results.findOne({ 
+      where: { user_id: req.user.id, assessment_id: req.params.assessment_id },
+      raw:true
+    }));
+    if(assessmentResultData == null) //return ReE(res, "No results Found", 442);  
+    {
+      // set dummy scores
+      let dummy = {};
+      dummy.skill_scores = "";
+      dummy.skill_scores = JSON.stringify({"Pedagogy": 0, "Digital Skills": 0, "Language Skill": 0, "Communication Skill": 0, "Psychometry": 0});
+      dummy.percentile = 80;
+      assessmentResultData = dummy;
+      totalScore = 60;
+    }
+    
+    let skillScore = JSON.parse(assessmentResultData.skill_scores);
     resultData = {};
-    resultData.labels = ["IQ/EQ", "Pedagogy", "English", "Psychometry", "Subject", "Computer"];
-    resultData.data = [20, 35, 50, 60, 100, 45];
-    resultData.dataScore = { 'scored': 45, 'total_score': 60 };
-    resultData.percentage = 85;
+    resultData.labels = Object.keys(skillScore);
+    resultData.data = Object.values(skillScore);
+    resultData.dataScore = { 
+      'scored': Object.values(skillScore).reduce((a, b) => a+b), 
+      'total_score': totalScore 
+    };
+    resultData.percentage = assessmentResultData.percentile;
     return ReS(res, {data: resultData }, 200);
   } catch (err) {
     return ReE(res,err,442);

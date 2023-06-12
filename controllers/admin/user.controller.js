@@ -1,4 +1,4 @@
-const { roles, users, user_assessments, academics, professional_infos, custom_attributes, school_inventories } = require("../../models");
+const { roles,subjects, schools, levels, user_teaching_interests, users, user_assessments, academics, professional_infos, custom_attributes, school_inventories } = require("../../models");
 const model = require('../../models');
 const authService = require("../../services/auth.service");
 const { to, ReE, ReS, toSnakeCase, paginate, snakeToCamel, requestQueryObject, randomHash, getUUID } = require('../../services/util.service');
@@ -105,7 +105,7 @@ const createUser = async function (req, res) {
     return ReE(res, "User academics at least one is required.", 422);
   }
   let professonalError = [];
-  let professional_infos_required = ["experience_year", "experience_month", "start_date"];
+  let professional_infos_required = ["experience_min", "experience_max", "start_date"];
   body.professional_info.forEach((ele, k) => {
     let diff = _.difference(professional_infos_required, Object.keys(ele));
     if (diff.length > 0) {
@@ -346,8 +346,173 @@ const bulkDeleteUser = async function (req, res) {
 }
 module.exports.bulkDeleteUser = bulkDeleteUser
 
+const updateUserPreference = async (req, res) => {
+  let [excel] = await readNewExcelData();
+  let userMobileMap = {};
+  let subjectsArray = new Set();
+  let levelsArray = new Set();
+  let schoolsArray = new Set();
+  let usersArray = new Set();
+  excel.shift();
+  excel.forEach(ele => {
+    let phone = ele[5];
+    for(i=9;i<12;i++) { if(ele[i]) { subjectsArray.add(ele[i]); }  }
+    levelsArray.add(ele[7]);
+    schoolsArray.add(ele[6]);
+    if(ele[5])
+      usersArray.add(String(ele[5]));
+
+    userMobileMap[phone] = {
+      "level_ids": [ele[7]],
+      // "teaching_type": ele[8],
+      "subject_ids": [ele[9],ele[10],ele[11]],
+      "school_ids" : [ele[6]]
+    };
+  });
+
+    // console.log("subjects Array", Array.from(subjectsArray));
+    // console.log("Levels Array", Array.from(levelsArray));
+    // console.log("Schools Array", Array.from(schoolsArray));
+    
+    [err, subjectsData] = await to(subjects.findAll({ where: { name: { [Op.in]: Array.from(subjectsArray) }}, raw: true }));
+    let subjectMap = {};
+    subjectsData.forEach(sub => { subjectMap[sub.name] = sub.id; });
+
+    [err, levelsData] = await to(levels.findAll({ where: { name: { [Op.in]: Array.from(levelsArray) }}, raw: true }));
+    let levelMap = {};
+    levelsData.forEach(sub => { levelMap[sub.name] = sub.id; });
+
+    [err, schoolsData] = await to(schools.findAll({ where: { name: { [Op.in]: Array.from(schoolsArray) }}, raw: true }));
+    let schoolMap = {};
+    schoolsData.forEach(sub => { schoolMap[sub.name] = sub.id; });
+
+    [err, usersData] = await to(users.findAll({ where: { phone_no: { [Op.in]: Array.from(usersArray) }}, raw: true, attributes: ['id', 'phone_no'] }));
+    let userMap = {};
+    if(err) return ReE(res, err, 422);
+
+    usersData.forEach(sub => { userMap[sub.phone_no] = sub.id; });
+
+
+  // console.log("subjects map ", subjectMap);
+  // console.log("levels map ", levelMap);
+  // console.log("schools map ", schoolMap);
+  // console.log("users map ", userMap);
+
+  let bulkPayload = [];
+  excel.forEach(ele => {
+    let phone = ele[5];
+    let user_id = userMap[phone];
+    let subjectIds = new Set();
+    for(i=9;i<12;i++) { if(ele[i]) { 
+      if(subjectMap[ele[i]])
+        subjectIds.add(subjectMap[ele[i]]); 
+    }}
+    let data = {
+      user_id     : user_id,
+      level_ids   : [levelMap[ele[7]]],//JSON.stringify(levelMap[ele[7]]),
+      subject_ids : Array.from(subjectIds),//JSON.stringify(),
+      school_ids  : [schoolMap[ele[6]]] //JSON.stringify(schoolMap[ele[6]])
+    }
+    if(user_id)
+      bulkPayload.push(data);
+  });
+
+  console.log("bulkPayload[4]", bulkPayload.length);
+  for(i=30;i<50;i++) {
+    console.log("bulkPayload[i]", bulkPayload[i]);
+
+  }
+  // 355
+  [err, bulkInsertData] = await to(user_teaching_interests.bulkCreate(bulkPayload));
+  if(err) return ReE(res, err,422);
+
+    return ReS(res, { data: "success"}, 200);
+}
+module.exports.updateUserPreference =updateUserPreference;
 
 // ############################# user Import ###########################
+const readNewExcelData = async () => {
+  let newSchema = {
+    'Personal Info': {
+      prop: 'personal_info',
+      type: {
+        'Title': {
+          prop: 'title',
+          type: String,
+          oneOf: ["Ms", "Mrs", "Mr"]
+        },
+        'Employee Code': {
+          prop: 'employee_code',
+          type: String
+        },
+        'First Name': {
+          prop: 'first_name',
+          type: String
+        },
+        'Middle Name': {
+          prop: 'middle_name',
+          type: String
+        },
+        'Last Name': {
+          prop: 'last_name',
+          type: String
+        },
+        'Email Address': {
+          prop: 'email',
+          type: String
+        },
+        'Mobile Number': {
+          prop: 'phone_no',
+          type: String
+        },
+      }
+    },
+    'Professional Information': {
+      prop: 'professional_info',
+      type: {
+        'Role / Position': {
+          prop: 'position',
+          type: String,
+        },
+        'Employment Type': {
+          prop: 'employee_type_id',
+          type: String
+        },
+        'School / Institute': {
+          prop: 'school_id',
+          type: String
+        },
+        'Experience in Years': {
+          prop: 'experience_year',
+          type: Number
+        },
+        'Experience in Months': {
+          prop: 'experience_month',
+          type: Number
+        },
+        'Professional Start Date': {
+          prop: 'start_date',
+          type: Date
+        },
+        'Professional End Date': {
+          prop: 'end_date',
+          type: Date
+        }
+      }
+    },
+  }
+  
+  
+  let newTeacherData = await readXlsxFile(fs.readFileSync( path.join(__dirname + "/../../public/assets/Vibgyor-Teachers-Data.xlsx")), { newSchema }, { dateFormat: 'yyyy-mm-dd' });
+  
+    // populate schools data
+    let schoolNames = [];
+    newTeacherData.forEach(ele => {
+      schoolNames.push(ele[6]);
+    })
+
+  return [newTeacherData, schoolNames ];
+}
 
 const userImport = async function (req, res) {
   const schema = {
@@ -503,13 +668,84 @@ const userImport = async function (req, res) {
     "Contractual": 2,
     "Probation": 3,
   };
-  
+
   try {
     readXlsxFile(fs.readFileSync( path.join(__dirname + "/../../public/assets/final_teacher_onboarding_data.xlsx")), { schema }, { dateFormat: 'yyyy-mm-dd' }).then( async (rows, errors) => {
-     // console.log(JSON.stringify(rows,null, 4))
+
       if (rows.errors.length === 0 && rows.rows.length > 0){
-        let data = rows.rows.map(ele => {
-         // console.log("test..............", ele);
+
+        //============================= START: Hack for 11th June user loading =============
+        let [newExcelRows, schoolIds] = await readNewExcelData();
+        
+        let oldTeachersData = {};
+        rows.rows.map(ele => {
+          let phone = ele.personal_info.phone_no;
+          let pi = ele.personal_info;
+          oldTeachersData[phone] = ele;
+        });
+
+        let newTeachersData = [];
+        let obj = {};
+        obj.old = [];
+        obj.new = [];
+        newExcelRows.map((ele, ei) => {
+          let phone = ele[5];
+      
+          if(oldTeachersData[phone]) { 
+            ele = oldTeachersData[phone];
+            obj.old.push(phone);
+          }
+          else {
+            obj.new.push(ele[5]);
+            let labels = ['title', 'first_name', 'middle_name', 'last_name', 'email','phone_no', 'school_id' ];
+            let teacherData = {};
+            let pi = {};
+            labels.forEach((val, index) => {
+              pi[val] = ele[index];
+            });
+            pi['user_type'] = 'TEACHER';
+            pi['country_id'] = 0;
+            teacherData.personal_info = pi;
+            let pro = {
+              country_id : 0,
+              state_id : 0,
+              city_id : 0,
+              district_id : 0,
+              position: 'Subject Teacher',
+              school_id : ele[6],
+              experience_min: 1,
+              experience_max: 2,
+              start_date: new Date()
+            }
+            teacherData.professional_info = pro;
+            // ["institution", "programme", "start_date", "field_of_study"]
+            let ai = {
+              institution: 'Not Specified',
+              programme : 'Not Specified',
+              start_date: '',
+              field_of_stydy: "General"
+            }
+            teacherData.academics_info = ai;
+            // newTeachersData.push(teacherData);
+            if(ele[5] == '9148817181') {
+              console.log("new teacherData for 9148817181", teacherData);
+            }
+            ele = teacherData;
+          }
+          ele.taluka_id = 0;
+          newTeachersData.push(ele);
+        });
+
+        // console.log("all new records ", newTeachersData.length);
+        // console.log("fetched data from old ", obj.old.length);
+        // console.log("fetched data from new ", obj.new.length);
+        // return '';
+        
+        let data = newTeachersData.map(ele => {
+        //============================= END: Hack for 11th June user loading =============
+
+        // let data = rows.rows.map(ele => {
+          
           ele.personal_info.dob = moment(ele.personal_info.dob).format('YYYY-MM-DD');
           ele.personal_info.gender = ele.gender == 'Female' ? 'FEMALE' : "MALE";
 
@@ -584,18 +820,21 @@ const userImport = async function (req, res) {
         let stateReponse; let err; let cityReponse, districtResponse, talukaReponse, schoolsReponse;
         [err, countryReponse] = await to(model.countries.findAll({where: {country_name: { [Op.in]: countryData }}, raw: true }));
         let mapCountryId = {};
+        if(countryReponse)
         countryReponse.forEach(ele => {
           mapCountryId[ele.country_name] = ele.id;
         });
         
         [err, stateReponse] = await to(model.states.findAll({where: {state_name: { [Op.in]: stateData }}, raw: true }));
         let mapStateId = {};
+        if(stateReponse)
         stateReponse.forEach(ele => {
           mapStateId[ele.state_name] = ele.id;
         });
 
         [err, cityReponse] = await to(model.cities.findAll({where: { city_name: { [Op.in]: cityData }}, raw: true }));
         let mapCityId = {};
+        if(cityReponse)
         cityReponse.forEach(ele => {
           if(ele.city_name){ 
             mapCityId[ele.city_name] = ele.id;
@@ -605,23 +844,26 @@ const userImport = async function (req, res) {
         districtData = districtData.filter(ele => ele != undefined);
         [err, districtResponse] = await to(model.districts.findAll({where: {district_name: { [Op.in]: districtData }}, raw: true }));
         let mapDistrictId = {};
+        if(districtResponse)
         districtResponse.forEach(ele => {
           mapDistrictId[ele.district_name] = ele.id;
         });
 
         [err, talukaReponse] = await to(model.talukas.findAll({where: {taluka_name: { [Op.in]: talukaData }}, raw: true }));
         let mapTalukaId = {};
+        if(talukaReponse)
         talukaReponse.forEach(ele => {
           mapTalukaId[ele.taluka_name] = ele.id;
         });
 
         [err, schoolsReponse] = await to(model.schools.findAll({where: {name: { [Op.in]: schoolsData }}, raw: true }));
         let mapSchoolId = {};
+        if(schoolsReponse)
         schoolsReponse.forEach(ele => {
           mapSchoolId[ele.name] = ele.id;
         });
 
-        console.log(schoolsData);
+        // console.log(schoolsData);
 
         
         
@@ -785,7 +1027,7 @@ const uploadUser = async function (body) {
     [err, professional_infos_bulk] = await to(professional_infos.bulkCreate(professional_infos_payload));
     return true;
   } else {
-    const dirPath = path.join(__dirname, '/userNotStore.json');
+    const dirPath = path.join(__dirname+'/../../../userNotStore.json');
     var fileData = fs.readFileSync(dirPath);
     var json = JSON.parse(fileData);
     json.push(userPayload);

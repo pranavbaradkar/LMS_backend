@@ -104,6 +104,7 @@ router.post("/lobank/questions/:assessment_id",userPassport.authenticate("jwt", 
 
 
 router.post("/s3/put-object-url", HomeController.getUserSignedUrl);
+router.get("/healthcheck", HomeController.getServerHealth);
 
 router.post("/user/authorize", userPassport.authenticate("jwt", { session: false }), UserController.isUserAuthorize);
 
