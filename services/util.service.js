@@ -246,8 +246,8 @@ module.exports.getSignedUrl = async (path, fileName, contentType) => {
 module.exports.uploadVideoOnS3 = async (path, fileName, contentType, videoBlobStream, type = false) => {
    
     const key = fileName;
-    let httpUrl = "hhox-streamvideos";
-    let finalPath =  `hhox-streamvideos/${path}`;
+    let httpUrl = process.env.STREAM_VIDEO;
+    let finalPath =  `${process.env.STREAM_VIDEO}/${path}`;
     if(type) {
         finalPath  =  `${process.env.BUCKET}/${path}`
         httpUrl = process.env.BUCKET;

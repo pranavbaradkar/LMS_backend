@@ -24,5 +24,5 @@ module.exports.getLiveCampaignAssessments = async function() {
     attributes: ['campaign_assessments.assessment_id'],
     raw: true
   }));
-  return [...new Set(campaignData.map(ele => { return ele.assessment_id }))]
+  return [...new Set(campaignData.map(ele => { return ele.assessment_id }))].filter(ele => ele != null);
 }

@@ -171,8 +171,8 @@ const getUserRecommendedAssessments = async function (req, res) {
       req.query.debug = userAssessmentExist.assessment_id;
     }
 
-    let assessmentData = assessmentCache.get(`user-${req.user.id}`);
-    //console.log("assessmentData", assessmentData);
+    let assessmentData =  assessmentCache.get(`user-${req.user.id}`);
+    console.log("assessmentData", assessmentData);
     if(assessmentData && req.query && req.query.debug == undefined) {
       req.query.debug = assessmentData;
     }
@@ -217,7 +217,7 @@ const getUserRecommendedAssessments = async function (req, res) {
     if(subjectIds.length > 0) {
       let skill_distributions  = {
         [Op.or]: subjectIds.map(ele => {
-          return { skill_distributions : { 
+          let obj = { skill_distributions : { 
               [Op.contains] : [
                 { subject_ids:[{
                     'subject_id': ele
@@ -226,6 +226,8 @@ const getUserRecommendedAssessments = async function (req, res) {
               ]
               }
             }
+            console.log("teststt=========", obj, JSON.stringify(where), where, subjectIds, liveAssessmentList);
+            return obj;
         })
       };
       where.push(skill_distributions);
@@ -249,13 +251,12 @@ const getUserRecommendedAssessments = async function (req, res) {
       order: [
         Sequelize.literal('random()')
       ],
-      limit: 1,
       raw: true,
       nest: true
     }));
 
-    console.log(where);
-    
+   
+    console.log("=============", assessments_screening);
     
     if(assessments_screening.length == 0) {
       //console.log(levelIds);
@@ -301,6 +302,8 @@ const getUserRecommendedAssessments = async function (req, res) {
           return null
         }
       }).filter(e => e != null);
+
+     
 
       let mapData = screeningData[0];
 
