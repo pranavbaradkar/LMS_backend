@@ -165,9 +165,7 @@ const getUserRecommendedAssessments = async function (req, res) {
     // live campaign assessmnets list
     let liveAssessmentList = await getLiveCampaignAssessments();
     
-    [err, userAssessmentExist] = await to(user_assessments.findOne({ where: { user_id: req.user.id, screening_status: { [Op.in]: ['STARTED', 'INPROGRESS', 'FINISHED', 'PASSED', 'FAILED']} }, raw: true }));
-
-    console.log("tetstst", userAssessmentExist);
+    [err, userAssessmentExist] = await to(user_assessments.findOne({ where: { user_id: req.user.id, status: { [Op.in]: ['STARTED', 'INPROGRESS', 'FINISHED', 'PASSED', 'FAILED']}, type: type.toUpperCase() }, raw: true }));
 
     if(userAssessmentExist) {
       req.query.debug = userAssessmentExist.assessment_id;

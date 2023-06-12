@@ -425,6 +425,32 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
           }
         }
 
+        if(type.toLowerCase() == 'mains') {
+          if(ele.name.toLowerCase() === 'core skill') {
+            finalSubjectQuery = await getCoreSkillQuestions(obj, gradeIdsValues, assessment_configurations_data, subjectObjO);
+          }
+          if(ele.name.toLowerCase() === 'communication skills') {
+            let strandsData = [];
+            [err, strandsData] = await to(strands.findAll({where: { strand_text : {
+              [Op.in]: ['Written Communication', 'Oral Communication', 'Effective Listening']
+            } }, attributes: ['strand_text', 'id'], raw: true}));
+            
+            finalSubjectQuery = await getCommunicationSkill(obj, strandsData, assessment_configurations_data);
+          }
+          if(ele.name.toLowerCase() === 'pedagogy') {
+            finalSubjectQuery = await getPedagogySkill(obj, assessment_configurations_data);
+          }
+          if(ele.name.toLowerCase() === 'digital literacy') {
+            
+            finalSubjectQuery = await getPedagogySkill(obj, assessment_configurations_data);
+          }
+
+          console.log("====*******=====", finalSubjectQuery);
+          
+        }
+
+
+
         obj.questions = await Promise.all( 
           finalSubjectQuery.map(async fq => {
             return await getQuestions(ele, fq, type, assessment_configurations_data.level_id);
@@ -531,22 +557,28 @@ async function getQuestions(ele, k, type, level_id) {
     order: Sequelize.literal('random()'),
     limit: k.limit }));
 
-    // let isSkillpsyhometry = [44, 46, 48];
-    // if(questionsData.length == 0 && isSkillpsyhometry.indexOf(ele.id) == -1) {
-    //   delete where.difficulty_level;
-    //   [err, questionsData] = await to(questions.findAll({ 
-    //     where : where,
-    //     include: [{
-    //       model: question_options
-    //     },
-    //     { model: model.skills, attributes: ['name'] },
-    //     { model: model.levels, attributes: ['name'] },
-    //     { model: model.subjects, attributes: ['name'] }],
-    //     order: Sequelize.literal('random()'),
-    //     limit: k.limit }));
-    // }
     return questionsData;
   
+}
+
+async function getPedagogySkill(obj, assessment_configurations_data) {
+  let oneFourthPart = Math.ceil(obj.no_of_questions / 3);
+  let matrixProblem  = [{ complex: 'P1'}, { complex: 'P2'}, { complex: 'P3'}];
+  let finalObjectValue = [];
+
+  matrixProblem.forEach(e => {
+    finalObjectValue.push({
+      ...e,
+      ...{
+        complex: e.complex
+      }
+    });
+  });
+
+  let highRatio = finalObjectValue;
+  let ratio2 = getRatioLimitValue(oneFourthPart, highRatio);
+
+  return [...[], ...ratio2];
 }
 
 async function getCommunicationSkill(obj, strands, assessment_configurations_data) {
