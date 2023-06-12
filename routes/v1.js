@@ -113,7 +113,6 @@ router.get("/result", UserAssessmentController.getAllAssessmentsResult);
 router.get("/all/assessments/result", userPassport.authenticate("jwt", { session: false }), UserAssessmentController.getAssessmentsFinalResult);
 router.get("/assessments/result/screen", userPassport.authenticate("jwt", { session: false }), UserAssessmentController.getAssessmentResultScreenData);
 router.get("/assessments/:assessment_id/result/analytics", userPassport.authenticate("jwt", { session: false }), UserAssessmentController.getAssessmentAnalytics);
-router.post("/assessments/:assessment_id/result/analytics", userPassport.authenticate("jwt", { session: false }), UserAssessmentController.setAssessmentAnalytics);
 
 //********* API DOCUMENTATION **********  
 router.use("/docs/api.json",express.static(path.join(__dirname, "/../public/v1/documentation/api.json")));

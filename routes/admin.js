@@ -54,8 +54,7 @@ router.post("/assessments/inventory/block/:user_id", AssessmentController.blockS
 router.get("/result/assessments/:assessment_id", adminPassport.authenticate("jwt", { session: false }), AssessmentController.userAssessmentsResult);
 
 router.post("/result/user_assessments/:assessment_type", UserAssessmentController.recursiveResultSend);
-
-
+router.post("/assessments/publish/result", adminPassport.authenticate("jwt", { session: false }), AssessmentController.setAssessmentAnalytics);
 
 // ********************* QUESTION ROUTES **************************
 router.post("/bypass/questions", QuestionController.createQuestion);
