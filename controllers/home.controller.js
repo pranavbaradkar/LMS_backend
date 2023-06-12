@@ -36,6 +36,10 @@ const accountVerify = async function (req, res) {
 };
 module.exports.accountVerify = accountVerify;
 
+const getServerHealth = async (req, res) => {
+  return ReS(res, { status: 'available'} , 200);
+}
+module.exports.getServerHealth = getServerHealth;
 
 const getUserSignedUrl = async function (req, res) {
   let payload = req.body;

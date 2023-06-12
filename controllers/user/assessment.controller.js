@@ -20,6 +20,7 @@ const redis = new Redis({
 });
 
 const NodeCache = require( "node-cache" );
+const { userInfo } = require('os');
 const assessmentCache = new NodeCache( { stdTTL: 0, checkperiod: ((3600*24)*7) } );
 
 questions.belongsTo(model.skills, { foreignKey: 'skill_id' });
@@ -942,17 +943,46 @@ const getAssessmentResultScreenData = (req, res) => {
 }
 module.exports.getAssessmentResultScreenData = getAssessmentResultScreenData;
 
-const getAssessmentAnalytics = (req, res) => {
-  let err, resultData;
+const getAssessmentAnalytics = async (req, res) => {
+  let err, assessmentConfig, assessmentResultData;
   if (req.params && req.params.assessment_id == undefined) {
     return ReE(res, { message: "assessment_id params is missing" }, 422);
   }
   try {
+    [err, assessmentConfig] = await to(assessment_configurations.findOne({
+      where: { assessment_id: req.params.assessment_id }
+    }))
+    if (err) return ReE(res, err, 422);
+    if(!assessmentConfig) { 
+      assessmentConfig = {};
+      assessmentConfig.total_no_of_questions = 40;
+      assessmentConfig.correct_score_answer = 1;
+    }
+    let totalScore = assessmentConfig.total_no_of_questions * assessmentConfig.correct_score_answer;
+    [err, assessmentResultData] = await to(assessment_results.findOne({ 
+      where: { user_id: req.user.id, assessment_id: req.params.assessment_id },
+      raw:true
+    }));
+    if(assessmentResultData == null) //return ReE(res, "No results Found", 442);  
+    {
+      // set dummy scores
+      let dummy = {};
+      dummy.skill_scores = "";
+      dummy.skill_scores = JSON.stringify({"Pedagogy": 0, "Digital Skills": 0, "Language Skill": 0, "Communication Skill": 0, "Psychometry": 0});
+      dummy.percentile = 80;
+      assessmentResultData = dummy;
+      totalScore = 60;
+    }
+    
+    let skillScore = JSON.parse(assessmentResultData.skill_scores);
     resultData = {};
-    resultData.labels = ["IQ/EQ", "Pedagogy", "English", "Psychometry", "Subject", "Computer"];
-    resultData.data = [20, 35, 50, 60, 100, 45];
-    resultData.dataScore = { 'scored': 45, 'total_score': 60 };
-    resultData.percentage = 85;
+    resultData.labels = Object.keys(skillScore);
+    resultData.data = Object.values(skillScore);
+    resultData.dataScore = { 
+      'scored': Object.values(skillScore).reduce((a, b) => a+b), 
+      'total_score': totalScore 
+    };
+    resultData.percentage = assessmentResultData.percentile;
     return ReS(res, {data: resultData }, 200);
   } catch (err) {
     return ReE(res,err,442);
