@@ -44,7 +44,7 @@ module.exports = (sequelize, DataTypes) => {
   };
 
   Model.associate = (models)=> {
-    Model.hasMany(models.question_options, {foreignKey: 'question_id'});
+    // Model.hasMany(models.question_options, {foreignKey: 'question_id'});
     // Model.belongsTo(models.strands, {foreignKey: 'strand_id'});
     // Model.belongsTo(models.topics, {foreignKey: 'topic_id'});
   };
