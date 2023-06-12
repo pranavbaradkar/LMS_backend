@@ -1,5 +1,5 @@
 const model = require('../../models');
-const { lo_banks, topics, strands, sub_strands, lo_questions, lo_question_options, levels,grades,subjects, learning_objectives, questions, skills, question_options, question_mtf_answers, question_los } = require("../../models");
+const { lo_banks, topics, strands, sub_strands, levels,grades,subjects, learning_objectives, questions, skills, question_options, question_mtf_answers, question_los } = require("../../models");
 const { to, ReE, ReS, toSnakeCase,cleanLoText, requestQueryObject } = require("../../services/util.service");
 
 const axios = require('axios');
@@ -508,7 +508,7 @@ const loBankImport = async function(req, res) {
     resData.lo_bank = "inserted to Lo_bank";
   }
   if(responseQ && responseQ.questions && responseQ.questions[2]) {
-    resData.questions = "inserted to Lo_question";
+    resData.questions = "inserted to Questions Table ";
   }
 
   return ReS(res, { data: resData }, 200);
@@ -914,7 +914,7 @@ const addToLoQuestion = async (req, res, excelObj, loBankData) => {
   
   // console.log("the question payload",questionPayload);
 
-  [err, questionData] = await to(lo_questions.bulkCreate(questionPayload));
+  [err, questionData] = await to(questions.bulkCreate(questionPayload));
   if(err) return ReE(res, err, 422);
 
   // remove label row in excel
@@ -949,7 +949,7 @@ const addToLoQuestion = async (req, res, excelObj, loBankData) => {
             option_key: key_code,
             option_value: excel[j],
             option_type: 'TEXT',
-            lo_question_id: obj.id
+            question_id: obj.id
           };
           if(isMultipleType && correctAnsArray.includes(key_code)) { opt.correct_answer = key_code; opt.is_correct = true; }
           if(correct_answer == key_code) {opt.correct_answer = key_code; opt.is_correct = true;}
@@ -966,7 +966,7 @@ const addToLoQuestion = async (req, res, excelObj, loBankData) => {
   // console.log("question options ",questionOptionsPayload);
   
   // return ReE(res, "err", 422);
-  [err, qOptionsData] = await to(lo_question_options.bulkCreate(questionOptionsPayload));
+  [err, qOptionsData] = await to(question_options.bulkCreate(questionOptionsPayload));
   if(err) return ReE(res, err, 422);
 
   //   // insert to older db using axios post
