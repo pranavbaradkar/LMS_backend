@@ -11,7 +11,7 @@ module.exports = (sequelize, DataTypes) => {
     is_logged_in       : { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     uuid               : { type: DataTypes.STRING, allowNull: true, defaultValue: 0 },
     profile_pic        : { type: DataTypes.TEXT, allowNull: true, defaultValue: "" },
-    title              : { type: DataTypes.ENUM, defaultValue: "Ms", values: ["Ms", "Mrs", "Mr"] },
+    title              : { type: DataTypes.ENUM("Ms", "Mrs", "Mr"), allowNull: true, defaultValue:"" },
     first_name         : { type: DataTypes.STRING, allowNull: true, defaultValue: "" },
     middle_name        : { type: DataTypes.STRING, allowNull: true, fieldName: 'middleName', defaultValue: "" },
     last_name          : { type: DataTypes.STRING, allowNull: true, as: 'lastName', defaultValue: "" },
