@@ -173,11 +173,11 @@ const getUserRecommendedAssessments = async function (req, res) {
       req.query.debug = userAssessmentExist.assessment_id;
     }
 
-    let assessmentData =  assessmentCache.get(`user-${req.user.id}`);
-    console.log("assessmentData", assessmentData);
-    if(assessmentData && req.query && req.query.debug == undefined) {
-      req.query.debug = assessmentData;
-    }
+    // let assessmentData =  assessmentCache.get(`user-${req.user.id}`);
+    // console.log("assessmentData", assessmentData);
+    // if(assessmentData && req.query && req.query.debug == undefined) {
+    //   req.query.debug = assessmentData;
+    // }
 
     let subjectIds = [], levelIds = [];
     if(req.query && req.query.debug == undefined) {
