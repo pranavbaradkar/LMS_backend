@@ -883,13 +883,17 @@ const setAssessmentAnalytics = async (req, res) => {
     assessmentResultPayload.percentile      = percentile;
     assessmentResultPayload.result          = result;
     assessmentResultPayload.type            = type;
-
+    
     let resultLink =  process.env.FRONTEND_URL+`/#/assessment/${assessment_id}/${type.toLowerCase()}/result`;
+    let subject    = `${type == 'MAINS'? 'Mains' : 'Screening'} Assessment Result Notification - Access Your Results Now!`;
+
     // get user info
     [err, userData] = await to(users.findOne({where : {id: user_id}, raw:true }));
     // console.log("the result link", userData);
     
     // console.log("assessmentResultPayload", assessmentResultPayload);
+    if(req.body.force_mail) sendResultMail(userData, resultLink, subject);
+
     [err, assessmentResultData] = await to(assessment_results.findOne({ 
       where: { user_id: user_id, assessment_id: assessment_id }
     }));
@@ -898,7 +902,7 @@ const setAssessmentAnalytics = async (req, res) => {
       [err, assessmentResultData] = await to(assessment_results.create(assessmentResultPayload));
       if(err) return ReE(res, err, 422);
       if(assessmentResultData)
-        sendResultMail(userData, resultLink);
+        sendResultMail(userData, resultLink, subject);
     }
 
     return ReS(res, { data: assessmentResultData }, 200);
@@ -908,13 +912,12 @@ const setAssessmentAnalytics = async (req, res) => {
 }
 module.exports.setAssessmentAnalytics = setAssessmentAnalytics;
 
-const sendResultMail = async (userInfo, resultLink ) => {
+const sendResultMail = async (userInfo, resultLink, subject ) => {
   parameters = { name: userInfo.first_name, result_link: resultLink };
   let html = await ejs.render(
     fs.readFileSync(__dirname + `/../../views/results.ejs`).toString(),
     parameters
   );
-  let subject = `Assessment Result Notification - Access Your Results Now!`;
   console.log(" here ", html);
   if(userInfo && userInfo.email) {
     try {
