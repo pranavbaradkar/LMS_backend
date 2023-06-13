@@ -164,6 +164,8 @@ const getUserRecommendedAssessments = async function (req, res) {
     
     // live campaign assessmnets list
     let liveAssessmentList = await getLiveCampaignAssessments();
+
+    console.log("live campaign", liveAssessmentList);
     
     [err, userAssessmentExist] = await to(user_assessments.findOne({ where: { user_id: req.user.id, status: { [Op.in]: ['STARTED', 'INPROGRESS', 'FINISHED', 'PASSED', 'FAILED']}, type: type.toUpperCase() }, raw: true }));
 
@@ -171,11 +173,11 @@ const getUserRecommendedAssessments = async function (req, res) {
       req.query.debug = userAssessmentExist.assessment_id;
     }
 
-    let assessmentData =  assessmentCache.get(`user-${req.user.id}`);
-    console.log("assessmentData", assessmentData);
-    if(assessmentData && req.query && req.query.debug == undefined) {
-      req.query.debug = assessmentData;
-    }
+    // let assessmentData =  assessmentCache.get(`user-${req.user.id}`);
+    // console.log("assessmentData", assessmentData);
+    // if(assessmentData && req.query && req.query.debug == undefined) {
+    //   req.query.debug = assessmentData;
+    // }
 
     let subjectIds = [], levelIds = [];
     if(req.query && req.query.debug == undefined) {
@@ -255,8 +257,9 @@ const getUserRecommendedAssessments = async function (req, res) {
       nest: true
     }));
 
+    let skillSpecificDataFound = assessments_screening.length;
    
-    console.log("=============", assessments_screening);
+    console.log("======is fine assesemnt=======", assessments_screening, assessments_screening.length);
     
     if(assessments_screening.length == 0) {
       //console.log(levelIds);
@@ -288,24 +291,34 @@ const getUserRecommendedAssessments = async function (req, res) {
     }
 
     if (err) return ReE(res, err, 422);
-    // console.log(assessments_screening);
+    console.log("assessments_screeningassessments_screening", assessments_screening);
     if (assessments_screening !== null) {
 
-      let screeningData = assessments_screening.map(element => {
-        let skill_distributions = element.skill_distributions;
-        var exists = skill_distributions.filter(function (o) {
-          return o.hasOwnProperty('subject_ids');
-        }).length > 0;
-        if (exists) {
-          return element;
-        } else {
-          return null
+      let generalAssessement = assessments_screening;
+
+      let screeningData = assessments_screening; 
+
+      let isSubjectFound = false;
+      if(skillSpecificDataFound > 0) {
+        screeningData = assessments_screening.map(element => {
+          let skill_distributions = element.skill_distributions;
+          var exists = skill_distributions.filter(function (o) {
+            return o.hasOwnProperty('subject_ids');
+          }).length > 0;
+          if (exists) {
+            return element;
+          } else {
+            return null
+          }
+        }).filter(e => e != null);
+        if(screeningData.length > 0) {
+          isSubjectFound = true;
         }
-      }).filter(e => e != null);
+      }
 
-     
-
-      let mapData = screeningData[0];
+      console.log("skillSpecificDataFound", skillSpecificDataFound, screeningData.length);
+      
+      let mapData = !isSubjectFound ? generalAssessement[0] : screeningData[0];
 
       if (screeningData.length > 1) {
         mapData = screeningData.map(element => {
@@ -321,7 +334,7 @@ const getUserRecommendedAssessments = async function (req, res) {
         mapData = mapData[0];
       }
 
-      //console.log(mapData);
+      console.log(mapData);
       if(mapData == undefined || mapData == null) {
         return ReE(res, "No assessments data found", 404);
       }
