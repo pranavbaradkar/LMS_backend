@@ -294,8 +294,11 @@ const getUserRecommendedAssessments = async function (req, res) {
     console.log("assessments_screeningassessments_screening", assessments_screening);
     if (assessments_screening !== null) {
 
+      let generalAssessement = assessments_screening;
+
       let screeningData = assessments_screening; 
 
+      let isSubjectFound = false;
       if(skillSpecificDataFound > 0) {
         screeningData = assessments_screening.map(element => {
           let skill_distributions = element.skill_distributions;
@@ -308,9 +311,14 @@ const getUserRecommendedAssessments = async function (req, res) {
             return null
           }
         }).filter(e => e != null);
+        if(screeningData.length > 0) {
+          isSubjectFound = true;
+        }
       }
+
+      console.log("skillSpecificDataFound", skillSpecificDataFound, screeningData.length);
       
-      let mapData = screeningData[0];
+      let mapData = !isSubjectFound ? generalAssessement[0] : screeningData[0];
 
       if (screeningData.length > 1) {
         mapData = screeningData.map(element => {
@@ -326,7 +334,7 @@ const getUserRecommendedAssessments = async function (req, res) {
         mapData = mapData[0];
       }
 
-      //console.log(mapData);
+      console.log(mapData);
       if(mapData == undefined || mapData == null) {
         return ReE(res, "No assessments data found", 404);
       }
