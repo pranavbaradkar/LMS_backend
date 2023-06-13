@@ -284,10 +284,20 @@ const getUserRecommendedAssessments = async function (req, res) {
         order: [
           Sequelize.literal('random()')
         ],
-        limit: 1,
         raw: true,
         nest: true
       }));
+
+      assessments_screening = assessments_screening.filter(ele => {
+        let isSubjectNotExist = ele.skill_distributions.find(e => {
+          return e && e.subject_ids
+        });
+        if(isSubjectNotExist == undefined) {
+          return true;
+        } else {
+          return false;
+        }
+      });
     }
 
     if (err) return ReE(res, err, 422);
