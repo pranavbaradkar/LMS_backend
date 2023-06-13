@@ -164,6 +164,8 @@ const getUserRecommendedAssessments = async function (req, res) {
     
     // live campaign assessmnets list
     let liveAssessmentList = await getLiveCampaignAssessments();
+
+    console.log("live campaign", liveAssessmentList);
     
     [err, userAssessmentExist] = await to(user_assessments.findOne({ where: { user_id: req.user.id, status: { [Op.in]: ['STARTED', 'INPROGRESS', 'FINISHED', 'PASSED', 'FAILED']}, type: type.toUpperCase() }, raw: true }));
 
@@ -255,8 +257,9 @@ const getUserRecommendedAssessments = async function (req, res) {
       nest: true
     }));
 
+    let skillSpecificDataFound = assessments_screening.length;
    
-    console.log("=============", assessments_screening);
+    console.log("======is fine assesemnt=======", assessments_screening, assessments_screening.length);
     
     if(assessments_screening.length == 0) {
       //console.log(levelIds);
@@ -288,23 +291,25 @@ const getUserRecommendedAssessments = async function (req, res) {
     }
 
     if (err) return ReE(res, err, 422);
-    // console.log(assessments_screening);
+    console.log("assessments_screeningassessments_screening", assessments_screening);
     if (assessments_screening !== null) {
 
-      let screeningData = assessments_screening.map(element => {
-        let skill_distributions = element.skill_distributions;
-        var exists = skill_distributions.filter(function (o) {
-          return o.hasOwnProperty('subject_ids');
-        }).length > 0;
-        if (exists) {
-          return element;
-        } else {
-          return null
-        }
-      }).filter(e => e != null);
+      let screeningData = assessments_screening; 
 
-     
-
+      if(skillSpecificDataFound > 0) {
+        screeningData = assessments_screening.map(element => {
+          let skill_distributions = element.skill_distributions;
+          var exists = skill_distributions.filter(function (o) {
+            return o.hasOwnProperty('subject_ids');
+          }).length > 0;
+          if (exists) {
+            return element;
+          } else {
+            return null
+          }
+        }).filter(e => e != null);
+      }
+      
       let mapData = screeningData[0];
 
       if (screeningData.length > 1) {
