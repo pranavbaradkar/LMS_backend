@@ -260,8 +260,9 @@ const getUserRecommendedAssessments = async function (req, res) {
     let skillSpecificDataFound = assessments_screening.length;
    
     console.log("======is fine assesemnt=======", assessments_screening, assessments_screening.length);
-    
+    let isSubjectDataFoundOntoplevel = true;
     if(assessments_screening.length == 0) {
+      isSubjectDataFoundOntoplevel = false;
       //console.log(levelIds);
       [err, assessments_screening] = await to(assessment_configurations.findAll({
         where: {
@@ -298,6 +299,9 @@ const getUserRecommendedAssessments = async function (req, res) {
           return false;
         }
       });
+
+      assessments_screening.sort(function(a, b){return b.level_id - a.level_id});
+      
     }
 
     if (err) return ReE(res, err, 422);
@@ -330,7 +334,7 @@ const getUserRecommendedAssessments = async function (req, res) {
       
       let mapData = !isSubjectFound ? generalAssessement[0] : screeningData[0];
 
-      if (screeningData.length > 1) {
+      if (screeningData.length > 1 && isSubjectDataFoundOntoplevel) {
         mapData = screeningData.map(element => {
           let skill_distributions = element.skill_distributions;
           let skill2 = skill_distributions.find(ele => ele.subject_ids != undefined);
