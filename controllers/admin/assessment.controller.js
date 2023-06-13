@@ -873,13 +873,16 @@ const setAssessmentAnalytics = async (req, res) => {
   let user_id = req.body.user_id;
 
   try {
-    [skillScores, totalScored, percentile, result, type] = await calculateSkillScores(assessment_id, user_id);
-    // console.log("Total skillScores[skill] now ",skillScores);
+    [skillScores, subjectScores, totalScored, percentile, result, type] = await calculateSkillScores(assessment_id, user_id);
+    
+    // skillScores.subjectScores = subjectScores; 
+    // throw new Error("working ");
     let assessmentResultPayload = {};
 
     assessmentResultPayload.user_id         = user_id;
     assessmentResultPayload.assessment_id   = assessment_id;
-    assessmentResultPayload.skill_scores    = JSON.stringify(skillScores);
+    assessmentResultPayload.skill_scores    = skillScores;
+    assessmentResultPayload.subject_scores  = subjectScores;
     assessmentResultPayload.percentile      = percentile;
     assessmentResultPayload.result          = result;
     assessmentResultPayload.type            = type;
@@ -933,7 +936,7 @@ const sendResultMail = async (userInfo, resultLink, subject ) => {
 }
 
 const calculateSkillScores = async (assessment_id, user_id) => {
-  let err, assessmentConfigData, userResponseData, questionData, skillsData;
+  let err, assessmentConfigData, userResponseData, questionData, skillsData, subjectsData;
 
   [err, assessmentConfigData] = await to(assessment_configurations.findOne({
     where: { assessment_id: assessment_id }, raw:true
@@ -941,20 +944,30 @@ const calculateSkillScores = async (assessment_id, user_id) => {
 
   // console.log("assessmentConfigData", assessmentConfigData);
 
-  let assessmentSkillId = assessmentConfigData.skill_distributions.map(obj => obj.skill_id );
-  
+  let assessmentSkillId = [];
+  let assessmentSubjectId = [];
+  assessmentConfigData.skill_distributions.map(obj => {
+    assessmentSkillId.push(obj.skill_id);
+    if(obj.subject_ids) {
+      obj.subject_ids.map(sobj => { assessmentSubjectId.push(sobj.subject_id); });
+    }
+  } );
+  // console.log("assessmentConfigData.skill_distributions", assessmentConfigData.skill_distributions);
   [err, userResponseData] = await to(user_assessment_responses.findOne({
     where: { user_id: user_id, assessment_id: assessment_id },
     raw: true
   }));
   let userResponse =  JSON.parse(userResponseData.response_json);
 
+  [err, assessmentQuestionData] = await to(assessment_questions.findAll({ where: { assessment_id: assessment_id}, attributes:['question_id'], raw:true }));
+  // console.log("assessmentQuestionData", assessmentQuestionData);
+  
   // get question and their skills data
-  let questionIds = Object.keys(userResponse);
+  let questionIds = assessmentQuestionData.map(ele => ele.question_id);
   // console.log("question ids ", questionIds);
   [err, questionData] = await to(questions.findAll({where: { id: { [Op.in]: questionIds }}, raw:true }));
   
-  [err, skillsData ]= await to(skills.findAll({where:{ id: { [Op.in]: assessmentSkillId } }, raw:true }));
+  [err, skillsData ]= await to(skills.findAll({where:{ id: { [Op.in]: assessmentSkillId } }, raw:true, attributes:['id', 'name'] }));
   
   let skillMap = {};
   let skillScores = {};
@@ -965,20 +978,37 @@ const calculateSkillScores = async (assessment_id, user_id) => {
     });
   }
 
+  [err, subjectsData ]= await to(subjects.findAll({where:{ id: { [Op.in]: assessmentSubjectId } }, raw:true, attributes:['id', 'name'] }));
+  let subjectMap = {};
+  let subjectScores = {};
+  if(subjectsData) { 
+    subjectsData.forEach(ele => { 
+      subjectMap[ele.id] = ele.name; 
+      subjectScores[ele.name] = 0;
+    });
+  }
+
   questionData.forEach(qe => {
-    let skill = skillMap[qe.skill_id];
-    if(qe.type == 'MULTIPLE_CHOICE'){
-      userResponse[qe.id].map( ans => { qe.correct_answer.includes(ans) ? calculateScore(assessmentConfigData, skill, skillScores) : ''; } );
+    let skill     = skillMap[qe.skill_id];
+    let subject   = subjectMap[qe.subject_id];
+    if(userResponse[qe.id] && qe.question_type == 'MULTIPLE_CHOICE'){
+      userResponse[qe.id].map( ans => { qe.correct_answer.includes(ans) ? calculateScore(assessmentConfigData, skill, skillScores, subject, subjectScores) : ''; } );
     }
-    else if(qe.type == 'MATCH_THE_FOLLOWING'){
+    else if(userResponse[qe.id] && qe.question_type == 'MATCH_THE_FOLLOWING'){
       Object.keys(userResponse[qe.id]).forEach(function(key, index) {
-        if(lowercaseKeyValue(userResponse[qe.id])[key] == qe.correct_answer[key]) { calculateScore(assessmentConfigData, skill, skillScores); }
+        if(lowercaseKeyValue(userResponse[qe.id])[key] == qe.correct_answer[key]) { calculateScore(assessmentConfigData, skill, skillScores, subject, subjectScores); }
       });
     }
     else {
-      if(userResponse[qe.id].toLowerCase() == qe.correct_answer.toLowerCase()) { calculateScore(assessmentConfigData, skill, skillScores); }
+      if(userResponse[qe.id] && userResponse[qe.id].toLowerCase() == qe.correct_answer.toLowerCase()) { calculateScore(assessmentConfigData, skill, skillScores, subject, subjectScores); }
     }
+    // console.log("the question id is ",qe.question_type, qe.id);
   });
+
+  // console.log("the questions ", questionData);
+  // console.log("the score skill now ", skillScores);
+  // console.log("the score subject now ", subjectScores);
+  // throw new Error("work in progress");
 
   let totalScored = 0;
   Object.keys(skillScores).forEach(ele => {
@@ -988,15 +1018,16 @@ const calculateSkillScores = async (assessment_id, user_id) => {
   let percentile  = ((totalScored/(assessmentConfigData.correct_score_answer * assessmentConfigData.total_no_of_questions))*100).toFixed(2);
   // let totalScore = 
   let result = percentile > parseFloat(assessmentConfigData.passing_criteria) ? 'PASSED' : 'FAILED' ;
-  return [skillScores, totalScored, percentile, result, assessmentConfigData.assessment_type];
+  return [skillScores, subjectScores, totalScored, percentile, result, assessmentConfigData.assessment_type];
 }
 
-const calculateScore = (config, skill, skillScores) => {
+const calculateScore = (config, skill, skillScores, subject, subjectScores) => {
   if(config.correct_score_answer) {
     skillScores[skill] += config.correct_score_answer;
+    if(skill=="Core Skill")
+      subjectScores[subject] += config.correct_score_answer;
   }
 }
-
 
 const userAssessmentsResult = async function (req, res) {
   let err, assessmentsData;
