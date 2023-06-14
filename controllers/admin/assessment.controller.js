@@ -1036,7 +1036,7 @@ const calculateScore = (config, skill, skillScores, subject, subjectScores) => {
 For claculating scores, saving to db and mail for MULTIPLE user 
 =========================================================*/
 const userAssessmentsResult = async function (req, res) {
-  let err, assessmentsData;
+  let err, assessmentsData,userAssessmentData;
   payload = req.body;
   
   if(req.params && (req.params.assessment_id == undefined)) {
@@ -1045,16 +1045,38 @@ const userAssessmentsResult = async function (req, res) {
   if(req.query && (req.query.type == undefined)) {
     return ReE(res, { message: "Assessment type is required in query parameter." }, 422);
   }
-  if(req.query && (req.query.user_id == undefined)) {
-    return ReE(res, { message: "user_id is required in query parameter." }, 422);
-  }
-  
+  // if(req.query && (req.query.user_id == undefined)) {
+  //   return ReE(res, { message: "user_id is required in query parameter." }, 422);
+  // }
+
   let assessment_type = req.query.type.toUpperCase();
   let assessment_id   = req.params.assessment_id;
-  let userAssessmentWhere = {}
-  if(req.query && req.query.user_id) {
-    userAssessmentWhere = { user_id: { [Op.in]: req.query.user_id.split(",") } }
+
+  let userAssessmentWhere = {};
+  // if user_ids not provided
+  let assessmentUserIds = [];
+  if(req.query && (req.query.user_id == undefined)) {
+    // find users who [FINISHED, PASSED, FAILED] the assessment 
+    let userAssessmentStatus = ["FINISHED", "PASSED", "FAILED"];
+    [err, userAssessmentData] = await to(user_assessments.findAll({ 
+      where: { assessment_id: assessment_id, status: { [Op.in]: userAssessmentStatus} }, raw: true }));
+    if(userAssessmentData) {
+      userAssessmentData.map(adata => { 
+        // console.log("the assessmnet data ", adata);
+        assessmentUserIds.push(adata.user_id); 
+      });
+    }
+
+    console.log("elegible user for result ", assessmentUserIds);
   }
+  else {
+    assessmentUserIds = req.query.user_id.split(",");
+  }
+  
+  userAssessmentWhere = { user_id: { [Op.in]: assessmentUserIds } };
+
+  // if(req.query && req.query.user_id) {
+  // }
 
   let whereAssessmentConfig = {};
   if(req.query && req.query.type) {
@@ -1109,6 +1131,8 @@ const userAssessmentsResult = async function (req, res) {
       assessmentConfig = obj.assessment_configurations[0];
       
       obj.user_assessment_responses.map(uar => {
+        if(!uar.user) return;
+        // console.log("the user response user", uar.user);
         let user_response = uar.response_json;
         let user_id = uar.user_id;
         user_response = JSON.parse(user_response);
@@ -1116,6 +1140,7 @@ const userAssessmentsResult = async function (req, res) {
         userInfo[user_id]['email'] = uar.user.email;
         userInfo[user_id]['first_name'] = uar.user.first_name;
 
+        // return ReS(res, { data: assessmentsData }, 200);
         skillScores[user_id] = {};
         subjectScores[user_id] = {};
         // uar.assessment_configurations = obj.assessment_configurations.find(e => uar.type == e.assessment_type);
@@ -1208,6 +1233,7 @@ const userAssessmentsResult = async function (req, res) {
 module.exports.userAssessmentsResult = userAssessmentsResult
 
 const saveScoreToDb = async(resultPayload) => {
+  let err, assessmentResultData;
   let assessmentResultPayload = [];
   Object.keys(resultPayload.skill_scores).map(user_id => {
     let obj = {};
@@ -1221,7 +1247,8 @@ const saveScoreToDb = async(resultPayload) => {
     assessmentResultPayload.push(obj);
   });
   
-  console.log("assessment result payload for bulk insert ", assessmentResultPayload);
+
+  // console.log("assessment result payload for bulk insert ", assessmentResultPayload);
   let resultLink =  process.env.FRONTEND_URL+`/#/assessment/${resultPayload.assessment_id}/${resultPayload.type.toLowerCase()}/result`;
   let subject    = `${resultPayload.type == 'MAINS'? 'Mains' : 'Screening'} Assessment Result Notification - Access Your Results Now!`;
 
@@ -1232,6 +1259,7 @@ const saveScoreToDb = async(resultPayload) => {
   assessmentResultData.forEach(ele => {
     sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
   })
+  return assessmentResultData;
 }
 
 const calculateFinalScores = async (userSkillScores, assessmentConfigData) => {
