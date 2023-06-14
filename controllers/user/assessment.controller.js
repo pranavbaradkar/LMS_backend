@@ -418,7 +418,7 @@ const getUserRecommendedAssessments = async function (req, res) {
           finalOutput.screening_status = finalOutput.user_assessments.status;
         } 
         if(type == 'MAINS') {
-          finalOutput.mains_status = finalOutput.user_assessments.mains_status;
+          finalOutput.mains_status = finalOutput.user_assessments.status;
         }
         delete finalOutput.user_assessments;
       } else {
