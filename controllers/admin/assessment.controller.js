@@ -1259,6 +1259,12 @@ const saveToDbAndMail = async(resultPayload) => {
     where: { user_id: {[Op.in]:userIds }, assessment_id: resultPayload.assessment_id }
   }).then(rows=>{
     rows.forEach(row => {
+      if(resultPayload.type == "SCREENING") {
+        row.screening_status = resultPayload.user_results[row.user_id];
+      }
+      if(resultPayload.type == "MAINS") {
+        row.mains_status = resultPayload.user_results[row.user_id];
+      }
       row.status = resultPayload.user_results[row.user_id];
       row.save();
     });
