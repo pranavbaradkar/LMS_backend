@@ -76,7 +76,7 @@ router.get("/users/assessments",userPassport.authenticate("jwt", { session: fals
 router.post("/users/communications", userPassport.authenticate("jwt", { session: false }), UserController.userCommunications);
 router.get("/users/communications", userPassport.authenticate("jwt", { session: false }), UserController.getUserCommunications);
 
-
+router.get('/users/:script_type/script', userPassport.authenticate("jwt", {session: false}), UserController.userScript);
 
 // ********************* Assessment **************************
 router.get("/assessments/:assessment_id",userPassport.authenticate("jwt", { session: false }), AssessmentController.getUserAssessment);
