@@ -1250,16 +1250,14 @@ module.exports.getAllUserAssessments = getAllUserAssessments;
 const getAssessmentConfigurationUsers = async function (req, res) {
   let assessment_id  = req.params.assessment_id;
   let assessment_type  = req.params.assessment_type.toUpperCase();
-  let attributes = ['screening_status', 'user_id', 'screening_result_notified', 'mains_result_notified'];
-  if(assessment_type == 'screening') {
-    attributes = ['mains_status', 'user_id', 'screening_result_notified', 'mains_result_notified'];
-  }
+  attributes = ['status', 'type', 'user_id', 'screening_result_notified', 'mains_result_notified'];
 
   try {
     [err, assessment_configurations_data] = await to(assessment_configurations.findOne({ 
       where: { assessment_id: assessment_id, assessment_type: assessment_type },
       include: [{
         model: user_assessments,
+        where: { type: assessment_type },
         attributes: attributes,
         include: [{
           model: users
