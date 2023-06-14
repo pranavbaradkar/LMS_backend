@@ -43,7 +43,7 @@ const getUserAssessmentSlot = async (req,res) => {
   let err, userAssessmentSlotData;
   try {
     [err, userAssessmentSlotData] = await to(user_assessment_slots.findOne({where: {user_id: req.user.id}}));
-    if (err) return ReE(res, err, 422);
+    if(!userAssessmentSlotData) { return ReE(res, err, 422); }
 
     return ReS(res, { data: userAssessmentSlotData }, 200);
   } catch (err) {
