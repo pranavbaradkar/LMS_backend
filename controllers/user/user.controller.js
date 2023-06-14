@@ -646,8 +646,9 @@ const generateOtp = async function (req, res) {
       if(payload.mobile == '0987654321') {
         success = otpCache.set(payload.mobile, payload.otp, 300 );
       } else {
-        let data = await sendSMS(payload.mobile, payload.otp);
+       
         success = otpCache.set(payload.mobile, payload.otp, 300 );
+        let data = await sendSMS(payload.mobile, payload.otp);
         console.log(data);
       }
     }
