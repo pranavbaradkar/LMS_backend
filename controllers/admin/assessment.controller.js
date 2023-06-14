@@ -24,7 +24,7 @@ assessments.hasMany(user_assessments, { foreignKey: "assessment_id" });
 assessment_configurations.belongsTo(levels, { foreignKey: 'level_id' });
 assessment_configurations.hasMany(user_assessments, {  sourceKey: 'assessment_id', foreignKey: "assessment_id" });
 user_assessments.belongsTo(users, { foreignKey: "user_id" });
-
+user_assessment_responses.belongsTo(users, {foreignKey: 'user_id'});
 
 const createAssessment = async function (req, res) {
   let err, assessmentData, assessmentQuestionData, assessmentConfiguratonData;
@@ -861,6 +861,9 @@ let sendMailToUsers = async function (user_id, schoolData, inventoryType) {
     }
 }
 
+/* ====================================================
+For claculating scores, saving to db and mail for SINLGE user 
+=========================================================*/
 const setAssessmentAnalytics = async (req, res) => {
   let err, assessmentResultData;
   if (req.body && req.body.assessment_id == undefined) {
@@ -968,7 +971,6 @@ const calculateSkillScores = async (assessment_id, user_id) => {
   [err, questionData] = await to(questions.findAll({where: { id: { [Op.in]: questionIds }}, raw:true }));
   
   [err, skillsData ]= await to(skills.findAll({where:{ id: { [Op.in]: assessmentSkillId } }, raw:true, attributes:['id', 'name'] }));
-  
   let skillMap = {};
   let skillScores = {};
   if(skillsData) { 
@@ -1024,97 +1026,148 @@ const calculateSkillScores = async (assessment_id, user_id) => {
 const calculateScore = (config, skill, skillScores, subject, subjectScores) => {
   if(config.correct_score_answer) {
     skillScores[skill] += config.correct_score_answer;
-    if(skill=="Core Skill")
+    // TODO: fix CoreSkill Mapping here 
+    if(skill=="Core Skill" || skill == 45)
       subjectScores[subject] += config.correct_score_answer;
   }
 }
 
+/* ====================================================
+For claculating scores, saving to db and mail for MULTIPLE user 
+=========================================================*/
 const userAssessmentsResult = async function (req, res) {
   let err, assessmentsData;
   payload = req.body;
-
+  
   if(req.params && (req.params.assessment_id == undefined)) {
     return ReE(res, { message: "Assessment and user id is required." }, 422);
   }
-
+  if(req.query && (req.query.type == undefined)) {
+    return ReE(res, { message: "Assessment type is required in query parameter." }, 422);
+  }
+  if(req.query && (req.query.user_id == undefined)) {
+    return ReE(res, { message: "user_id is required in query parameter." }, 422);
+  }
+  
+  let assessment_type = req.query.type.toUpperCase();
+  let assessment_id   = req.params.assessment_id;
   let userAssessmentWhere = {}
   if(req.query && req.query.user_id) {
     userAssessmentWhere = { user_id: { [Op.in]: req.query.user_id.split(",") } }
   }
 
-  let assessmentConfig = {};
+  let whereAssessmentConfig = {};
   if(req.query && req.query.type) {
-    assessmentConfig = { assessment_type: req.query.type.toUpperCase() };
+    whereAssessmentConfig = { assessment_type: assessment_type };
   }
   
   [err, assessmentsData] = await to(assessments.findAll(
     {
       where: { id: req.params.assessment_id },
+      attributes: ['id','name'],
       include: [{
         model: assessment_configurations,
-        where: assessmentConfig
+        where: whereAssessmentConfig,
+        attributes: ['skill_distributions','total_no_of_questions', 'correct_score_answer', 'passing_criteria', 'assessment_type']
       },
       {
         model: user_assessment_responses,
-        where: userAssessmentWhere
+        where: userAssessmentWhere,
+        attributes: ['user_id','response_json'],
+        include: [{
+          model: users, attributes: ['id','first_name', 'email']
+        }]
       },
       {
         model: assessment_questions,
-        include: [ { model: questions }]
+        include: [ { 
+          model: questions, 
+          attributes : ['question_type', 'correct_answer', 'skill_id', 'subject_id', 'lo_ids'],
+          include: [
+            {model: subjects, attributes:['id','name']},
+            {model: skills, attributes:['id','name']}
+          ]
+        }],
+        attributes: ['question_id']
       }]
     }
   ));
 
   // return ReS(res, { data: assessmentsData }, 200);
 
+
+  let skillScores = {};
+  let subjectScores = {};
+  let userInfo = {};
+  let assessmentConfig;
+
   // Compare assessment type questions to assessment type answer
   let questionType, assessmentType, correct_qa;
   let assessmentResult = assessmentsData.map(ele => {
     let obj = {...ele.get({plain: true})};
     if(obj.user_assessment_responses.length > 0) {
-      let user_response = obj.user_assessment_responses[0].response_json;
-      user_response = JSON.parse(user_response);
+      assessmentConfig = obj.assessment_configurations[0];
       
       obj.user_assessment_responses.map(uar => {
+        let user_response = uar.response_json;
+        let user_id = uar.user_id;
+        user_response = JSON.parse(user_response);
+        userInfo[user_id] = {};
+        userInfo[user_id]['email'] = uar.user.email;
+        userInfo[user_id]['first_name'] = uar.user.first_name;
+
+        skillScores[user_id] = {};
+        subjectScores[user_id] = {};
         // uar.assessment_configurations = obj.assessment_configurations.find(e => uar.type == e.assessment_type);
         // build questions by user answered assessment type
         let questions = ele.assessment_questions.filter(as => {
           return as.type == uar.type;
         }).map(q => {
           if(q.question) {
+
+            let skill = q.question.skill.name;
+            let subject = q.question.subject ? q.question.subject.name : null;
+
+            skillScores[user_id][skill] = 0; // initalize skill based score
+            subjectScores[user_id][subject] = 0; // initalize subject based score
             questionType = q.question.question_type ? q.question.question_type : null ;
             correct_qa = q.question.correct_answer;
-            if(questionType == 'MULTIPLE_CHOICE') { correct_qa = q.question.correct_answer.toLowerCase().split(','); }
+            if(questionType == 'MULTIPLE_CHOICE') { correct_qa = q.question.correct_answer.split(','); }
             if(questionType == 'MATCH_THE_FOLLOWING') { 
               correct_qa = JSON.parse(q.question.correct_answer);
               correct_qa = lowercaseKeyValue(correct_qa);
+              // console.log("question match the following answer: corrected",q.question.correct_answer,correct_qa);
             }
+
+            return {id: q.question_id, correct_answer: correct_qa, type: questionType, 
+              skill: skill, subject: subject, lo_ids: q.question.lo_ids
+            };
           }
-          else { questionType = 'SINGLE_CHOICE'; correct_qa = null;}
+          // else { questionType = 'SINGLE_CHOICE'; correct_qa = null;}
           
           // questionType = (q.question && q.question.question_type) ? q.question.question_type : null ;
           // correct_qa = questionType == 'MULTIPLE_CHOICE' ? q.question.correct_answer.toLowerCase().split(',') : q.question.correct_answer;
-          return {id: q.question_id, correct_answer: correct_qa, type: questionType };
         });
+
         let ob = {};
         let score = 0;
-        console.log("question answer",questions);
+        // console.log("question answer",questions);
         questions.forEach(qe => {
           ob[qe.id] = qe.correct_answer;
-          if(qe.type == 'MULTIPLE_CHOICE'){
-            user_response[qe.id].map( ans => { qe.correct_answer.includes(ans) ? score++ : ''; } );
+          if(user_response[qe.id] && qe.type == 'MULTIPLE_CHOICE'){
+            user_response[qe.id].map( ans => { qe.correct_answer.includes(ans) ? calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]) : ''; } );
           }
-          else if(qe.type == 'MATCH_THE_FOLLOWING'){
+          else if(user_response[qe.id] && qe.type == 'MATCH_THE_FOLLOWING'){
             Object.keys(user_response[qe.id]).forEach(function(key, index) {
-              if(lowercaseKeyValue(user_response[qe.id])[key] == qe.correct_answer[key]) { score++; }
+              if(lowercaseKeyValue(user_response[qe.id])[key] == qe.correct_answer[key]) { calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]); }
             });
           }
           else {
-            if(user_response[qe.id].toLowerCase() == qe.correct_answer.toLowerCase()) { score++; }
+            if(user_response[qe.id] && user_response[qe.id].toLowerCase() == qe.correct_answer.toLowerCase()) { calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]); }
           }
+          // console.log("question type and response ",user_id, qe.id, qe.type, qe.skill_id, qe.correct_answer, user_response[qe.id]);
         });
         uar.questionAnswer = ob;
-        // console.log(JSON.parse(user_response));
         uar.score = score;
       });
       return obj;
@@ -1123,26 +1176,82 @@ const userAssessmentsResult = async function (req, res) {
     }
     return obj;
   }).filter(e => e != null);
+  
+  let [totalScore, userPercentile, result ] = await calculateFinalScores(skillScores, assessmentConfig);
 
-  // console.log(assessmentResult);
-  // let data = assessmentResult.map(async ele => {
-  //   return Promise.all(
-  //     ele.user_assessment_responses.map(async k => {
-  //     return await recursiveResultSend(k, req);
-  //     })
-  //   );
+//  console.log("1111111 ------------------ Result Skill score initaizlied obj",skillScores);
+//   console.log("2222222 ------------------ Result Subject score initaizlied obj",subjectScores);
+//  console.log("333333333 ------------------ Result total score",totalScore);
+//   console.log("444444444 ------------------ Result passed/failed",result);
+  
+  let resultPayload = { 
+    skill_scores: skillScores, 
+    subject_scores: subjectScores, 
+    total_scores: totalScore,
+    percentiles: userPercentile,
+    user_results: result,
+    type: assessment_type,
+    assessment_id: assessment_id,
+    user_info: userInfo
+  };
+
+  let insertResult = await saveScoreToDb(resultPayload);
+
+  return ReS(res, { data: resultPayload }, 200);
+  // assessmentResult.forEach(async ele => {
+  //   ele.user_assessment_responses.map(async k => {
+  //     let request = await axios.post(`${process.env.BASE_URL}/api/v1/admin/result/user_assessments/${req.query.type.toUpperCase()}`, k);
+  //   });
   // });
-
-
-  assessmentResult.forEach(async ele => {
-    ele.user_assessment_responses.map(async k => {
-      let request = await axios.post(`${process.env.BASE_URL}/api/v1/admin/result/user_assessments/${req.query.type.toUpperCase()}`, k);
-    });
-  });
-  return ReS(res, { data: assessmentResult }, 200);
+  // return ReS(res, { data: assessmentResult }, 200);
 }
 module.exports.userAssessmentsResult = userAssessmentsResult
 
+const saveScoreToDb = async(resultPayload) => {
+  let assessmentResultPayload = [];
+  Object.keys(resultPayload.skill_scores).map(user_id => {
+    let obj = {};
+    obj.user_id         = user_id;
+    obj.assessment_id   = resultPayload.assessment_id;
+    obj.type            = resultPayload.type;
+    obj.skill_scores    = resultPayload.skill_scores[user_id];
+    obj.subject_scores  = resultPayload.subject_scores[user_id];
+    obj.percentile      = resultPayload.percentiles[user_id];
+    obj.result          = resultPayload.user_results[user_id];
+    assessmentResultPayload.push(obj);
+  });
+  
+  console.log("assessment result payload for bulk insert ", assessmentResultPayload);
+  let resultLink =  process.env.FRONTEND_URL+`/#/assessment/${resultPayload.assessment_id}/${resultPayload.type.toLowerCase()}/result`;
+  let subject    = `${resultPayload.type == 'MAINS'? 'Mains' : 'Screening'} Assessment Result Notification - Access Your Results Now!`;
+
+  [err, assessmentResultData] = await to(assessment_results.bulkCreate(assessmentResultPayload));
+  if(err) { throw new Error(err); }
+  // return assessmentResultData;
+  // send mail
+  assessmentResultData.forEach(ele => {
+    sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
+  })
+}
+
+const calculateFinalScores = async (userSkillScores, assessmentConfigData) => {
+  let userTotal = {};
+  let userResult = {};
+  let userPercentile = {};
+  Object.keys(userSkillScores).map(user => {
+    let totalScored = 0;
+    Object.keys(userSkillScores[user]).forEach(ele => {
+      totalScored += userSkillScores[user][ele];
+    });
+    userTotal[user] = totalScored;
+
+    let percentile  = ((totalScored/(assessmentConfigData.correct_score_answer * assessmentConfigData.total_no_of_questions))*100).toFixed(2);
+    let result = percentile > parseFloat(assessmentConfigData.passing_criteria) ? 'PASSED' : 'FAILED' ;
+    userResult[user] = result;
+    userPercentile[user] = percentile;
+  })
+  return [userTotal, userPercentile, userResult];
+}
 
 let recursiveInventorySearch = async function (index, schoolInventory, type, blockType) {
   if(schoolInventory[index]) {
