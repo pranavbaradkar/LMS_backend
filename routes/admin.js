@@ -84,6 +84,7 @@ router.put("/role/users/:user_id",adminPassport.authenticate("jwt", { session: f
 router.delete("/role/users/:user_id", adminPassport.authenticate("jwt", { session: false }), AdminController.deleteRoleUser);
 
 // ********************* Standard user ROUTES **************************
+router.get("/users/recommendation",adminPassport.authenticate("jwt", { session: false }), UserController.getUserRecommendation);
 router.get("/users/:user_id",adminPassport.authenticate("jwt", { session: false }), UserController.getUserDetails);
 router.post("/users",adminPassport.authenticate("jwt", { session: false }), UserController.createUser);
 router.put("/users/:user_id",adminPassport.authenticate("jwt", { session: false }), UserController.updateUser);

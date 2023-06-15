@@ -1450,7 +1450,7 @@ const getUserDetails = async (req, res)=> {
     return ReE(res, "user id required in params", 422);
   }
   try {
-    let userData = '{"id":3975,"profile_pic":"","title":"Ms","first_name":"Kanhai","middle_name":"Lal","last_name":"Murmu","email":"kanhailal2010@gmail.com","user_type":"JOB_SEEKER","is_email_verified":true,"country_code":"","phone_no":"8956508033","is_phone_verified":true,"dob":"","gender":"","employee_code":"","teaching_interests":{"id":3975,"user_id":4943,"level_ids":[3],"school_ids":[132],"board_ids":"","subject_ids":[94]},"user_assessments":[{"skill_scores":{"Core Skill":7,"Communication Skills":3},"subject_scores":{"Mathematics":7,"null":0},"id":7,"user_id":3975,"assessment_id":8,"percentile":"95.00","type":"SCREENING","result":"PASSED"},{"skill_scores":{"Core Skill":7,"Communication Skills":3},"subject_scores":{"Mathematics":7,"null":0},"id":8,"user_id":3975,"assessment_id":8,"percentile":"25.00","type":"MAINS","result":"PASSED"}],"demo":{"video_link":"https://video.link","status":"recomended","demo_topic":"Newtons Laws","demo_description":"Topic description","scores":[{"knowledge_score":6,"total":10},{"confidence_score":6,"total":10},{"behavioral_score":6,"total":10},{"fluency_score":6,"total":10}]},"interview":{"status":"offer_letter","mode":"At_School","date_time":"dd/mm/YYYY h:i:s","room_no":333,"interviewer":"Aarav Patel","interview_remark":"Interview remark text","interview_notes":"Interview note text"}}';
+    let userData = '{"id":3975,"profile_pic":"","title":"Ms","first_name":"Kanhai","middle_name":"Lal","last_name":"Murmu","email":"kanhailal2010@gmail.com","user_type":"JOB_SEEKER","is_email_verified":true,"country_code":"","phone_no":"8956508033","is_phone_verified":true,"dob":"","gender":"","employee_code":"","teaching_interests":{"id":3975,"user_id":4943,"level_ids":[3],"school_ids":[132],"board_ids":"","subject_ids":[94]},"user_assessments":[{"skill_scores":{"Core Skill":7,"Communication Skills":3},"subject_scores":{"Mathematics":7,"null":0},"id":7,"user_id":3975,"assessment_id":8,"percentile":"95.00","type":"SCREENING","result":"PASSED"},{"skill_scores":{"Core Skill":7,"Communication Skills":3},"subject_scores":{"Mathematics":7,"null":0},"id":8,"user_id":3975,"assessment_id":8,"percentile":"25.00","type":"MAINS","result":"PASSED"}],"demo_video":{"video_link":"https://video.link","status":"recomended","demo_topic":"Newtons Laws","demo_description":"Topic description","scores":[{"knowledge_score":6,"total":10},{"confidence_score":6,"total":10},{"behavioral_score":6,"total":10},{"fluency_score":6,"total":10}]},"interview":{"status":"offer_letter","mode":"At_School","date_time":"dd/mm/YYYY h:i:s","room_no":333,"interviewer":"Aarav Patel","interview_remark":"Interview remark text","interview_notes":"Interview note text"}}';
     userData = JSON.parse(userData);
     return ReS(res, {data : userData }, 200);
   } catch (err) {
@@ -1458,3 +1458,14 @@ const getUserDetails = async (req, res)=> {
   }
 }
 module.exports.getUserDetails = getUserDetails;
+
+const getUserRecommendation = async (req, res) => {
+try {
+  let userData = '{"recommendation":[{"name":"Dhrumil","profile_image":"https://","level_ids":[1,2,3,4],"recommendation":"Grade 7","status":"PENDING","scores":[{"skill_scores":{"Core Skill":7,"Communication Skills":3},"subject_scores":{"Mathematics":7,"null":0},"id":7,"user_id":3975,"assessment_id":8,"percentile":"95.00","type":"SCREENING","score":70,"total_score":100,"result":"PASSED"},{"skill_scores":{"Core Skill":7,"Communication Skills":3},"subject_scores":{"Mathematics":7,"null":0},"id":7,"user_id":3975,"assessment_id":8,"percentile":"95.00","type":"MAINS","score":70,"total_score":100,"result":"PASSED"}],"demo_video":{"video_link":"https://video.link","status":"recomended","demo_topic":"Newtons Laws","demo_description":"Topic description","total_score":100,"scores":[{"knowledge_score":6,"total":10},{"confidence_score":6,"total":10},{"behavioral_score":6,"total":10},{"fluency_score":6,"total":10}]}}]}';
+  userData = JSON.parse(userData);
+  return ReS(res, {data : userData }, 200);
+} catch (err) {
+  return ReE(res, err, 422);
+}
+}
+module.exports.getUserRecommendation = getUserRecommendation;
