@@ -43,7 +43,7 @@ const getUserAssessmentSlot = async (req,res) => {
   let err, userAssessmentSlotData;
   try {
     [err, userAssessmentSlotData] = await to(user_assessment_slots.findOne({where: {user_id: req.user.id}}));
-    if (err) return ReE(res, err, 422);
+    if(!userAssessmentSlotData) { return ReE(res, err, 422); }
 
     return ReS(res, { data: userAssessmentSlotData }, 200);
   } catch (err) {
@@ -579,48 +579,85 @@ module.exports.logAssessment = logAssessment;
 const statusUserAssessment = async function (req, res) {
   let err, user_assessment_data_exist;
   payload = req.body;
+  if(req.body && (req.body.assessment_id == undefined)) {
+    return ReE(res, { message: "Assessment id is required." }, 422);
+  }
+
   payload.user_id = req.user.id;
   try {
-    [err, assessment_data] = await to(assessments.findOne({ where: { id: payload.assessment_id } }));
-    if(!assessment_data) { return ReE(res, "Assessment id not found.", 404); }
+    // [err, assessment_data] = await to(assessments.findOne({ where: { id: payload.assessment_id } }));
+    // if(!assessment_data) { return ReE(res, "Assessment id not found.", 404); }
 
-    let wherePayload = { user_id : req.user.id };
-    let screeningAssessmentIds = [];
+    let wherePayload = { user_id : req.user.id, assessment_id: payload.assessment_id };
+    let deleteAssessmentId = [];
     [err, userAssessmentData] = await to(user_assessments.findAll({ where: wherePayload, raw:true }));
     let allowedStatus = ['STARTED', 'PENDING', 'ABORTED', 'INPROGRESS'];
     let restrictedStatus = ['FINISHED', 'PASSED', 'FAILED'];
+
+    if(restrictedStatus.includes(payload.status)) {
+      return ReE(res, "This status cannot be set by user", 422);
+    }
+
     if(userAssessmentData) {
       userAssessmentData.map(row => {
-        if (restrictedStatus.includes(row.status)) {
-          if (row.type == 'MAINS'){
-            return ReE(res, "Already Appeared for Mains", 422);
-          } else {
-            return ReE(res, "Already appeared for Screening", 422);
-          }
+        if(row.type == 'MAINS' && restrictedStatus.includes(row.status)) {
+          if((payload.type).toUpperCase()=='MAINS')
+            return ReE(res, "Already Appeared for MAINS", 422);
+        }
+        else if (row.type == 'MAINS' && allowedStatus.includes(row.status)){
+          deleteAssessmentId.push(row.id);
+        }
+
+        if(row.type == 'SCREENING' && restrictedStatus.includes(row.status)) {
+          payload.screening_status = row.status;
+          if((payload.type).toUpperCase()=='SCREENING')
+            return ReE(res, 'Already Appeared for SCREENING');
+        }
+        else if(row.type=='SCREENING' && allowedStatus.includes(row.status)) {
+          deleteAssessmentId.push(row.id);
         }
         
-        if (row.type == 'SCREENING' && row.status == 'STARTED' && row.assessment_id == payload.assessment_id)
+        if (row.type == payload.type && row.status == 'STARTED' && row.assessment_id == payload.assessment_id)
           return ReE(res, "This assessment has started already", 422);
-        
-        if (row.type == 'SCREENING' && allowedStatus.includes(row.status))
-          screeningAssessmentIds.push(row.assessment_id);
-        
       });
     } 
 
+    payload.mains_status = null;
+    payload.screening_status = null;
+    if((payload.type).toUpperCase() == 'SCREENING') {
+      payload.screening_status = payload.status;
+      payload.mains_status = 'PENDING';
+    }
+
+    if((payload.type).toUpperCase() == 'MAINS') {
+      payload.mains_status = payload.status;
+      payload.screening_status = 'FINISHED';
+    }
+    
     // delete all filtered user_assessments 
-    if(screeningAssessmentIds.length > 0){
+    // if(deleteAssessmentId.length > 0){
+      // console.log("delete candidate ", deleteAssessmentId);
       [err, userAssessmentData] = await to(user_assessments.destroy({ 
         where: { 
-          user_id: req.user.id, type:"SCREENING",
-          assessment_id: { [Op.in]: screeningAssessmentIds }
+          user_id: req.user.id, type: payload.type,
+          status: { [Op.in]: allowedStatus }
         }, 
         force: true 
       }));
-    }   
+    // }   
+    
       
     [err, user_assessment_data] = await to(user_assessments.create(payload));
     if (err) return ReE(res, err, 422);
+
+    if(payload.type.toUpperCase() == 'MAINS'){
+      user_assessment_data.mains_status = user_assessment_data.status;
+      delete user_assessment_data.screening_status;
+    } else {
+      user_assessment_data.screening_status = user_assessment_data.status;
+      delete user_assessment_data.mains_status;
+    }
+    
     return ReS(res, { data: user_assessment_data }, 200);      
   } catch (err) {
     return ReE(res, err, 422);

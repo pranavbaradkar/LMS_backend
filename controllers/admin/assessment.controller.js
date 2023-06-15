@@ -25,6 +25,7 @@ assessment_configurations.belongsTo(levels, { foreignKey: 'level_id' });
 assessment_configurations.hasMany(user_assessments, {  sourceKey: 'assessment_id', foreignKey: "assessment_id" });
 user_assessments.belongsTo(users, { foreignKey: "user_id" });
 user_assessment_responses.belongsTo(users, {foreignKey: 'user_id'});
+assessment_results.belongsTo(users, {foreignKey: 'user_id'});
 
 const createAssessment = async function (req, res) {
   let err, assessmentData, assessmentQuestionData, assessmentConfiguratonData;
@@ -1243,7 +1244,7 @@ const userAssessmentsResult = async function (req, res) {
     user_info: userInfo
   };
 
-  let insertResult = await saveScoreToDb(resultPayload);
+  let insertResult = await saveToDbAndMail(resultPayload);
 
   return ReS(res, { data: resultPayload }, 200);
   // assessmentResult.forEach(async ele => {
@@ -1255,7 +1256,7 @@ const userAssessmentsResult = async function (req, res) {
 }
 module.exports.userAssessmentsResult = userAssessmentsResult
 
-const saveScoreToDb = async(resultPayload) => {
+const saveToDbAndMail = async(resultPayload) => {
   let err, assessmentResultData;
   let assessmentResultPayload = [];
   Object.keys(resultPayload.skill_scores).map(user_id => {
@@ -1271,20 +1272,39 @@ const saveScoreToDb = async(resultPayload) => {
   });
   
 
-  // console.log("assessment result payload for bulk insert ", assessmentResultPayload);
+  console.log("assessment result payload for bulk insert ", assessmentResultPayload);
   let resultLink =  process.env.FRONTEND_URL+`/#/assessment/${resultPayload.assessment_id}/${resultPayload.type.toLowerCase()}/result`;
   let subject    = `${resultPayload.type == 'MAINS'? 'Mains' : 'Screening'} Assessment Result Notification - Access Your Results Now!`;
 
-  [err, assessmentResultData] = await to(assessment_results.bulkCreate(assessmentResultPayload));
-  if(err) { throw new Error(err); }
-  // return assessmentResultData;
-  // send mail
-  assessmentResultData.forEach(ele => {
-    sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
-  })
+  // update user assessment status
+  let  userIds = Object.keys(resultPayload.user_results);
+  [err, userAssessmentData] = await to(user_assessments.findAll({
+    where: { user_id: {[Op.in]:userIds }, assessment_id: resultPayload.assessment_id }
+  }).then(rows=>{
+    rows.forEach(row => {
+      if(resultPayload.type == "SCREENING") {
+        row.screening_status = resultPayload.user_results[row.user_id];
+      }
+      if(resultPayload.type == "MAINS") {
+        row.mains_status = resultPayload.user_results[row.user_id];
+      }
+      row.status = resultPayload.user_results[row.user_id];
+      row.save();
+    });
+  }));
+
+  [err, assessmentResultData] = await to(assessment_results.bulkCreate(assessmentResultPayload).then(row => {
+    console.log("the inserted row ", row);
+    row.map(ele => {
+      // console.log("the inserted user id ", ele.user_id);
+      sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
+    })
+  }));
+
   return assessmentResultData;
 }
 
+// const updateUserResult
 const calculateFinalScores = async (userSkillScores, assessmentConfigData) => {
   let userTotal = {};
   let userResult = {};
