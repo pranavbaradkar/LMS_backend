@@ -439,17 +439,21 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
           }
           if(ele.name.toLowerCase() === 'pedagogy') {
             finalSubjectQuery = await getPedagogySkill(obj, assessment_configurations_data);
+           
           }
           if(ele.name.toLowerCase() === 'digital literacy') {
+            let arrayData = [{key: 'Digital content knowledge', limit: 5} ,{key: 'Digital application', limit: 5}, {key: 'Troubleshooting', limit: 2}];
+            [err, strandsData] = await to(strands.findAll({where: { strand_text : {
+              [Op.in]: arrayData.map(ele => { return ele.key })
+            } }, attributes: ['strand_text', 'id'], raw: true}));
             
-            finalSubjectQuery = await getPedagogySkill(obj, assessment_configurations_data);
+            finalSubjectQuery = await getDigitalSkill(obj,strandsData,arrayData, assessment_configurations_data);
+            console.log(finalSubjectQuery, strandsData);
           }
 
-          console.log("====*******=====", finalSubjectQuery);
+          // console.log("====*******=====", finalSubjectQuery);
           
         }
-
-
 
         obj.questions = await Promise.all( 
           finalSubjectQuery.map(async fq => {
@@ -563,22 +567,41 @@ async function getQuestions(ele, k, type, level_id) {
 
 async function getPedagogySkill(obj, assessment_configurations_data) {
   let oneFourthPart = Math.ceil(obj.no_of_questions / 3);
-  let matrixProblem  = [{ complex: 'P1'}, { complex: 'P2'}, { complex: 'P3'}];
+  let matrixProblem  = [
+    { complex: 'P1', bloom: 'UNDERSTAND', limit: 3}, 
+    { complex: 'P2', bloom: 'UNDERSTAND', limit: 2}, 
+    { complex: 'P3', bloom: 'UNDERSTAND', limit: 2}, 
+    { complex: 'P1', bloom: 'APPLY', limit: 3}, 
+    { complex: 'P2', bloom: 'APPLY', limit: 1}, 
+    { complex: 'P3', bloom: 'APPLY', limit: 1}, 
+    { complex: 'P1', bloom: 'ANALYZE', limit: 2}, 
+    { complex: 'P2', bloom: 'ANALYZE', limit: 1}, 
+    { complex: 'P3', bloom: 'ANALYZE', limit: 1}
+    ];
   let finalObjectValue = [];
 
   matrixProblem.forEach(e => {
     finalObjectValue.push({
       ...e,
       ...{
-        complex: e.complex
+        complex: e.complex,
+        limit: e.limit
       }
     });
   });
 
-  let highRatio = finalObjectValue;
-  let ratio2 = getRatioLimitValue(oneFourthPart, highRatio);
+  // let highRatio = finalObjectValue;
+  // let ratio2 = getRatioLimitValue(oneFourthPart, highRatio);
 
-  return [...[], ...ratio2];
+  return [...[], ...finalObjectValue];
+}
+async function getDigitalSkill(obj, strands, strandData, assessment_configurations_data) {
+  strandData  = strandData.map(ele => {
+    let findObje = strands.find(e => e.strand_text == ele.key);
+    ele.strand_id = findObje && findObje.id ? findObje.id : 0;
+    return ele;
+  })
+  return [...[], ...strandData];
 }
 
 async function getCommunicationSkill(obj, strands, assessment_configurations_data) {
