@@ -68,6 +68,7 @@ router.post("/questions/filter/:type",adminPassport.authenticate("jwt", { sessio
 router.post("/questions/import",adminPassport.authenticate("jwt", { session: false }), QuestionController.questionImport);
 router.delete("/bulk/questions", adminPassport.authenticate("jwt", { session: false }), QuestionController.deleteBulkQuestion); 
 router.post("/lo_bank/import",adminPassport.authenticate("jwt", { session: false }), QuestionController.loBankImport);
+router.post("/psychometry/import",adminPassport.authenticate("jwt", { session: false }), QuestionController.importPsychometry);
 
 // ********************* Roles ROUTES **************************
 router.post("/roles",adminPassport.authenticate("jwt", { session: false }), RoleController.createRole); 
