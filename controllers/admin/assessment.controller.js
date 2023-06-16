@@ -1,5 +1,5 @@
 const model = require('../../models');
-const { assessments,assessment_results, user_assessment_logs, assessment_questions, strands, sub_strands, campaign_assessments, questions, question_options, custom_attributes, assessment_configurations, skills, levels, user_assessments, users, inventory_blocks, user_assessment_responses, subjects } = require("../../models");
+const { psy_questions, psy_question_options, assessments,assessment_results, user_assessment_logs, assessment_questions, strands, sub_strands, campaign_assessments, questions, question_options, custom_attributes, assessment_configurations, skills, levels, user_assessments, users, inventory_blocks, user_assessment_responses, subjects } = require("../../models");
 const { to, ReE, ReS, requestQueryObject, lowercaseKeyValue } = require('../../services/util.service');
 const validator = require('validator');
 const mailer = require("../../helpers/mailer"); 
@@ -12,8 +12,12 @@ var _ = require('underscore');
 const axios = require('axios');
 
 assessment_questions.belongsTo(questions, { foreignKey: "question_id" });
+assessment_questions.belongsTo(psy_questions, { foreignKey: "question_id" });
+
 questions.hasMany(question_options, { foreignKey: "question_id" });
 questions.belongsTo(model.skills, { foreignKey: 'skill_id' });
+psy_questions.belongsTo(model.skills, { foreignKey: 'skill_id' });
+// psy_question_options.belongsTo(model.psy_questions, { foreignKey: 'psy_question_id' });
 questions.belongsTo(model.levels, { foreignKey: 'level_id' });
 questions.belongsTo(model.subjects, { foreignKey: 'subject_id' });
 
@@ -1059,6 +1063,7 @@ const calculateScore = (config, skill, skillScores, subject, subjectScores) => {
 /* ====================================================
 For claculating scores, saving to db and mail for MULTIPLE user 
 =========================================================*/
+// TODO: total calculation
 const userAssessmentsResult = async function (req, res) {
   let err, assessmentsData,userAssessmentData;
   payload = req.body;
@@ -1111,7 +1116,8 @@ const userAssessmentsResult = async function (req, res) {
     {
       where: { id: req.params.assessment_id },
       attributes: ['id','name'],
-      include: [{
+      include: [
+      {
         model: assessment_configurations,
         where: whereAssessmentConfig,
         attributes: ['skill_distributions','total_no_of_questions', 'correct_score_answer', 'passing_criteria', 'assessment_type']
@@ -1126,18 +1132,32 @@ const userAssessmentsResult = async function (req, res) {
       },
       {
         model: assessment_questions,
-        include: [ { 
+        attributes: ['question_id'],
+        include: [ 
+        {
+          model: psy_questions,
+          attributes: ['id', 'question_type', 'score_type'],
+          include:[
+            { model: skills, attributes:['id', 'name']},
+            { model: psy_question_options, as: 'options', attributes: ['id','option_key', 'score_value'] }
+          ]
+        },
+        { 
           model: questions, 
-          attributes : ['question_type', 'correct_answer', 'skill_id', 'subject_id', 'lo_ids'],
+          // where: { id : {[Op.lt]: 100000000 }},
+          attributes : ['id','question_type', 'correct_answer', 'skill_id', 'subject_id', 'lo_ids'],
           include: [
             {model: subjects, attributes:['id','name']},
             {model: skills, attributes:['id','name']}
           ]
-        }],
-        attributes: ['question_id']
-      }]
+        }
+      ],
+      }
+    ]
     }
   ));
+  if(err) return ReE(res, err, 422);
+
 
   // return ReS(res, { data: assessmentsData }, 200);
 
@@ -1189,30 +1209,46 @@ const userAssessmentsResult = async function (req, res) {
             }
 
             return {id: q.question_id, correct_answer: correct_qa, type: questionType, 
-              skill: skill, subject: subject, lo_ids: q.question.lo_ids
+              skill: skill, subject: subject, lo_ids: q.question.lo_ids, is_phycho: false
             };
           }
-          // else { questionType = 'SINGLE_CHOICE'; correct_qa = null;}
-          
-          // questionType = (q.question && q.question.question_type) ? q.question.question_type : null ;
-          // correct_qa = questionType == 'MULTIPLE_CHOICE' ? q.question.correct_answer.toLowerCase().split(',') : q.question.correct_answer;
+          // for pys_questions
+          else if(q.psy_question) {
+            let skill = q.psy_question.skill.name;
+            skillScores[user_id][skill] = 0;
+            let optMap = {};
+            q.psy_question.options.map(ele => {  optMap[ele.option_key] = ele.score_value; });
+            // console.log("the option map for qe",q.question_id, optMap);
+            return { 
+              is_phycho: true, id:q.question_id, set_number: q.psy_question.set_number, 
+              score_type: q.psy_question.score_type, optionsMap: optMap, skill: skill
+            };
+          }
+
         });
 
         let ob = {};
         let score = 0;
         // console.log("question answer",questions);
         questions.forEach(qe => {
-          ob[qe.id] = qe.correct_answer;
-          if(user_response[qe.id] && qe.type == 'MULTIPLE_CHOICE'){
-            user_response[qe.id].map( ans => { qe.correct_answer.includes(ans) ? calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]) : ''; } );
-          }
-          else if(user_response[qe.id] && qe.type == 'MATCH_THE_FOLLOWING'){
-            Object.keys(user_response[qe.id]).forEach(function(key, index) {
-              if(lowercaseKeyValue(user_response[qe.id])[key] == qe.correct_answer[key]) { calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]); }
-            });
+          if(!qe.is_phycho) {
+            ob[qe.id] = qe.correct_answer;
+            if(user_response[qe.id] && qe.type == 'MULTIPLE_CHOICE'){
+              let are_same = _.isEqual(qe.correct_answer.sort(), user_response[qe.id].sort());
+              are_same ? calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]) : '';
+            }
+            else if(user_response[qe.id] && qe.type == 'MATCH_THE_FOLLOWING'){
+              Object.keys(user_response[qe.id]).forEach(function(key, index) {
+                if(lowercaseKeyValue(user_response[qe.id])[key] == qe.correct_answer[key]) { calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]); }
+              });
+            }
+            else {
+              if(user_response[qe.id] && user_response[qe.id].toLowerCase() == qe.correct_answer.toLowerCase()) { calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]); }
+            }
           }
           else {
-            if(user_response[qe.id] && user_response[qe.id].toLowerCase() == qe.correct_answer.toLowerCase()) { calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]); }
+            // console.log("the psy options in qno", qe.id, qe.options);
+            calculatePschometricScore(skillScores[user_id], qe.skill, qe.optionsMap, user_response[qe.id]);
           }
           // console.log("question type and response ",user_id, qe.id, qe.type, qe.skill_id, qe.correct_answer, user_response[qe.id]);
         });
@@ -1255,6 +1291,11 @@ const userAssessmentsResult = async function (req, res) {
   // return ReS(res, { data: assessmentResult }, 200);
 }
 module.exports.userAssessmentsResult = userAssessmentsResult
+
+const calculatePschometricScore = async(skillScores, skill, optionMap, user_response) => {
+  // console.log(skill, user_response, optionMap[user_response]);
+  skillScores[skill] += optionMap[user_response];
+}
 
 const saveToDbAndMail = async(resultPayload) => {
   let err, assessmentResultData;
