@@ -1461,8 +1461,31 @@ module.exports.getUserDetails = getUserDetails;
 
 const getUserRecommendation = async (req, res) => {
 try {
-  let userData = '{"recommendation":[{"name":"Dhrumil","profile_image":"https://","level_ids":[1,2,3,4],"recommendation":"Grade 7","status":"PENDING","scores":[{"skill_scores":{"Core Skill":7,"Communication Skills":3},"subject_scores":{"Mathematics":7,"null":0},"id":7,"user_id":3975,"assessment_id":8,"percentile":"95.00","type":"SCREENING","score":70,"total_score":100,"result":"PASSED"},{"skill_scores":{"Core Skill":7,"Communication Skills":3},"subject_scores":{"Mathematics":7,"null":0},"id":7,"user_id":3975,"assessment_id":8,"percentile":"95.00","type":"MAINS","score":70,"total_score":100,"result":"PASSED"}],"demo_video":{"video_link":"https://video.link","status":"recomended","demo_topic":"Newtons Laws","demo_description":"Topic description","total_score":100,"scores":[{"knowledge_score":6,"total":10},{"confidence_score":6,"total":10},{"behavioral_score":6,"total":10},{"fluency_score":6,"total":10}]}}]}';
-  userData = JSON.parse(userData);
+  let userData = {
+    "rows": [
+      {
+        "name": "Dhrumil",
+        "profile_image": "https://",
+        "email": "test@test.com",
+        "level_ids": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "recommendation": "Grade 7",
+        "status": "PENDING",
+        "screening_score": 23,
+        "screening_total_score": 100,
+        "mains_score": 23,
+        "mains_total_score": 120,
+        "demo_score": 23,
+        "demo_total_score": 100,
+        "interview_score": 233,
+        "interview_total_score": 120
+      }
+    ]
+  };
   return ReS(res, {data : userData }, 200);
 } catch (err) {
   return ReE(res, err, 422);
