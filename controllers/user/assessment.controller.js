@@ -125,7 +125,7 @@ const getScreeningTestDetails = async function (req, res) {
               ]
             }
           ],
-          order: [['created_by', 'asc']]
+          order: [['id', 'asc']]
       }));
 
     if (err) return ReE(res, err, 422);
