@@ -1177,7 +1177,7 @@ const importPsychometry = async (req, res) => {
         excelRow = excelData[index];
         let obj = {
           psy_question_id   : row.id,
-          option_key        : key_code,
+          option_key        : key_code.toUpperCase(),
           option_value      : excelRow[`option_${key_code}`],
           score_value       : excelRow[`option_${key_code}s`],
         };
