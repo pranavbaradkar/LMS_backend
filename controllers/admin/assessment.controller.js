@@ -15,10 +15,13 @@ assessment_questions.belongsTo(questions, { foreignKey: "question_id" });
 assessment_questions.belongsTo(psy_questions, { foreignKey: "question_id" });
 
 questions.hasMany(question_options, { foreignKey: "question_id" });
+psy_questions.hasMany(model.psy_question_options, { foreignKey: 'psy_question_id' });
+
 questions.belongsTo(model.skills, { foreignKey: 'skill_id' });
+
 psy_questions.belongsTo(model.skills, { foreignKey: 'skill_id' });
-// psy_question_options.belongsTo(model.psy_questions, { foreignKey: 'psy_question_id' });
 questions.belongsTo(model.levels, { foreignKey: 'level_id' });
+psy_questions.belongsTo(model.levels, { foreignKey: 'level_id' });
 questions.belongsTo(model.subjects, { foreignKey: 'subject_id' });
 
 assessments.belongsTo(campaign_assessments, { foreignKey: "id", targetKey: "assessment_id",  as: 'campaign_details' });
@@ -446,6 +449,17 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
             finalSubjectQuery = await getPedagogySkill(obj, assessment_configurations_data);
            
           }
+          if(ele.name.toLowerCase() === 'psychometric') {
+            console.log("===================(()==================");
+            finalSubjectQuery = [{
+              level_id: assessment_configurations_data.level_id,
+              skill_id: obj.id,
+              limit: obj.no_of_questions,
+              set_number: 1,
+              isPsy: true
+            }];
+           
+          }
           if(ele.name.toLowerCase() === 'digital literacy') {
             let arrayData = [{key: 'Digital content knowledge', limit: 5} ,{key: 'Digital application', limit: 5}, {key: 'Troubleshooting', limit: 2}];
             [err, strandsData] = await to(strands.findAll({where: { strand_text : {
@@ -453,7 +467,7 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
             } }, attributes: ['strand_text', 'id'], raw: true}));
             
             finalSubjectQuery = await getDigitalSkill(obj,strandsData,arrayData, assessment_configurations_data);
-            console.log(finalSubjectQuery, strandsData);
+           // console.log(finalSubjectQuery, strandsData);
           }
 
           // console.log("====*******=====", finalSubjectQuery);
@@ -462,7 +476,12 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
 
         obj.questions = await Promise.all( 
           finalSubjectQuery.map(async fq => {
-            return await getQuestions(ele, fq, type, assessment_configurations_data.level_id);
+            if(fq && fq.isPsy) {
+              console.log(fq, "===============================");
+              return await getPsyQuestions(ele, fq, type, assessment_configurations_data.level_id);
+            } else {
+              return await getQuestions(ele, fq, type, assessment_configurations_data.level_id);
+            }
           })
         );
      // }
@@ -563,6 +582,34 @@ async function getQuestions(ele, k, type, level_id) {
     { model: model.skills, attributes: ['name'] },
     { model: model.levels, attributes: ['name'] },
     { model: model.subjects, attributes: ['name'] }],
+    order: Sequelize.literal('random()'),
+    limit: k.limit }));
+
+    return questionsData;
+  
+}
+
+async function getPsyQuestions(ele, k, type, level_id) {
+  let err, questionsData;
+
+    let where = { skill_id: ele.id };
+    
+    if(k.level_id) {
+      where.level_id = k.level_id;
+    }
+
+    if(k.set_number) {
+      where.set_number = k.set_number;
+    }
+    
+    console.log("where", where);
+    [err, questionsData] = await to(psy_questions.findAll({ 
+    where : where,
+    include: [{
+      model: psy_question_options
+    },
+    { model: model.skills, attributes: ['name'] },
+    { model: model.levels, attributes: ['name'] }],
     order: Sequelize.literal('random()'),
     limit: k.limit }));
 
