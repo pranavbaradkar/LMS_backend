@@ -231,6 +231,9 @@ const updateQuestion = async function (req, res) {
         [err, questionLoData] = await to(question_los.bulkCreate(questionLoDataObject));
         if (err) return ReE(res, err, 422);
       }
+      if(payload.lo_ids) {
+        delete payload.lo_ids;
+      }
       questionData.update(payload);
 
       if(payload.question_options && payload.question_options.length > 0) {

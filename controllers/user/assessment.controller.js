@@ -124,7 +124,8 @@ const getScreeningTestDetails = async function (req, res) {
                 { model: model.subjects, attributes: ['name'] }
               ]
             }
-          ]
+          ],
+          order: [['id', 'asc']]
       }));
 
     if (err) return ReE(res, err, 422);
