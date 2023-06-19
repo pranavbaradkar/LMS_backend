@@ -252,7 +252,7 @@ const getUserRecommendedAssessments = async function (req, res) {
         }]
       }],
       order: [
-        Sequelize.literal('random()')
+       ['level_id', 'desc']
       ],
       raw: true,
       nest: true

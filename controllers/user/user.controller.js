@@ -1055,6 +1055,7 @@ const isUserAuthorize = async (req, res) => {
   let err, result;
   try {
     let is_authorized = false;
+    console.log(`${process.env.AI_URL}/authorize`, req.body);
     result = await axios.post(`${process.env.AI_URL}/authorize`, req.body);
 
     if(result && result.data && result.data.message && result.data.message.facial_similarity && result.data.message.facial_similarity.indexOf('Matched') >= 0) {
