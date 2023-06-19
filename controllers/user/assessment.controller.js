@@ -260,7 +260,7 @@ const getUserRecommendedAssessments = async function (req, res) {
 
     let skillSpecificDataFound = assessments_screening.length;
    
-    console.log("======is fine assesemnt=======", assessments_screening, assessments_screening.length);
+    console.log("======is fine assesemnt=======", JSON.stringify(where), assessments_screening, JSON.stringify(assessments_screening.skill_distributions), assessments_screening.length);
     let isSubjectDataFoundOntoplevel = true;
     if(assessments_screening.length == 0) {
       isSubjectDataFoundOntoplevel = false;
