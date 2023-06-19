@@ -966,7 +966,7 @@ const getMainsSlot = async function(req, res) {
     
     var diff = endDate.diff(startDate, 'days');
     let slotDay = [];
-    let timeing =  ["10:00 am","12:00 pm","01:00 am","03:00 am","06:00 am"];
+    let timeing =  ["10:00 am", "12:00 pm", "01:00 pm", "03:00 pm", "06:00 pm"];
     for(i = 0; i < diff; i++) {
       var isDay  = moment().add(i, 'day').isoWeekday();
       if(isDay == 6 || isDay == 7) {
