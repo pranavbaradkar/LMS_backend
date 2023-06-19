@@ -1317,8 +1317,9 @@ const userAssessmentsResult = async function (req, res) {
     return obj;
   }).filter(e => e != null);
   
-  let [totalScore, userPercentile, result ] = await calculateFinalScores(skillScores, assessmentConfig);
+  let [totalScore, assessmentTotal, userPercentile, result ] = await calculateFinalScores(skillScores, assessmentConfig);
 
+  
 //  console.log("1111111 ------------------ Result Skill score initaizlied obj",skillScores);
 //   console.log("2222222 ------------------ Result Subject score initaizlied obj",subjectScores);
 //  console.log("333333333 ------------------ Result total score",totalScore);
@@ -1328,6 +1329,7 @@ const userAssessmentsResult = async function (req, res) {
     skill_scores: skillScores, 
     subject_scores: subjectScores, 
     total_scores: totalScore,
+    assessment_total: assessmentTotal,
     percentiles: userPercentile,
     user_results: result,
     type: assessment_type,
@@ -1348,7 +1350,7 @@ const userAssessmentsResult = async function (req, res) {
 module.exports.userAssessmentsResult = userAssessmentsResult
 
 const calculatePschometricScore = async(skillScores, skill, optionMap, user_response) => {
-  // console.log(skill, user_response, optionMap[user_response]);
+  // console.log(skill, user_response, optionMap);
   skillScores[skill] += optionMap[user_response];
 }
 
@@ -1405,19 +1407,39 @@ const calculateFinalScores = async (userSkillScores, assessmentConfigData) => {
   let userTotal = {};
   let userResult = {};
   let userPercentile = {};
+  let assessmentTotal = calculateAssessmentTotal(assessmentConfigData);
+
   Object.keys(userSkillScores).map(user => {
     let totalScored = 0;
     Object.keys(userSkillScores[user]).forEach(ele => {
       totalScored += userSkillScores[user][ele];
     });
     userTotal[user] = totalScored;
-
-    let percentile  = ((totalScored/(assessmentConfigData.correct_score_answer * assessmentConfigData.total_no_of_questions))*100).toFixed(2);
+    let percentile  = ((totalScored/(assessmentTotal))*100).toFixed(2);
     let result = percentile > parseFloat(assessmentConfigData.passing_criteria) ? 'PASSED' : 'FAILED' ;
     userResult[user] = result;
     userPercentile[user] = percentile;
   })
-  return [userTotal, userPercentile, userResult];
+  return [userTotal, assessmentTotal, userPercentile, userResult];
+}
+
+const calculateAssessmentTotal = (assessmentConfig) => {
+  let total = 0;
+  // console.log("skill distribution ",assessmentConfig.skill_distributions);
+  // console.log("Assessment ID ",assessmentConfig.assessment_id);
+  let skillDistribution = assessmentConfig.skill_distributions;
+  // let skillDistribution = JSON.parse(assessmentConfig.skill_distributions);
+  skillDistribution.forEach(ele => {
+    // console.log("the element ", ele);
+    if(ele.skill_id == 45) { // Core skill
+      total += ele.no_of_questions;
+    }
+    if(ele.skill_id == 48) {// Psychometric 
+      total += (ele.no_of_questions*4);
+    }
+  });
+
+  return total;
 }
 
 let recursiveInventorySearch = async function (index, schoolInventory, type, blockType) {

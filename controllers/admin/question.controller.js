@@ -987,9 +987,10 @@ const addToLoQuestion = async (req, res, excelObj, loBankData) => {
   };
 } 
 
+//TODO: Fix strands text, sub_strand text duplicates on loading new content
 const importPsychometry = async (req, res) => {
   let schema = {
-      "Question": {
+      "Question Statement": {
         prop: "question",
         type: String
       },
@@ -1025,6 +1026,7 @@ const importPsychometry = async (req, res) => {
         prop: 'option_e',
         type: String
       },
+      // if score title in excel is type [Option A score]
       "Option A score" : {
         prop: 'option_as',
         type: String
@@ -1045,6 +1047,27 @@ const importPsychometry = async (req, res) => {
         prop: 'option_es',
         type: String
       },
+      // if score title in excel is type [Score A]
+      "Score A" : {
+        prop: 'option_as',
+        type: String
+      },
+      "Score B" : {
+        prop: 'option_bs',
+        type: String
+      },
+      "Score C" : {
+        prop: 'option_cs',
+        type: String
+      },
+      "Score D" : {
+        prop: 'option_ds',
+        type: String
+      },
+      "Score E" : {
+        prop: 'option_es',
+        type: String
+      },
       "Scoring Type" : {
         prop: 'scoring_type',
         type: String
@@ -1059,6 +1082,7 @@ const importPsychometry = async (req, res) => {
   let level_id = req.body.level_id || -1;
   let skill_id = req.body.skill_id || -1;
   let grade_id = req.body.grade_id || -1;
+  let set_number = req.body.set_number || 1;
   let strandSet = new Set();
   let subs_strnadMap = {};
   let subStrandSet = new Set();
@@ -1100,6 +1124,7 @@ const importPsychometry = async (req, res) => {
       strandMap[code] = row.id;
     })
   }));
+  if(err) return ReE(res, err, 422);
   // console.log("strands map ", strandMap);
 
   // create sub_strands Payload
@@ -1120,6 +1145,7 @@ const importPsychometry = async (req, res) => {
       subStrandMap[code] = row.id;
     })
   }));
+  if(err) return ReE(res, err, 422);
   console.log("sub strand map ", subStrandMap);
 
 
@@ -1144,6 +1170,7 @@ const importPsychometry = async (req, res) => {
       topicMap[code] = row.id;
     })
   }));
+  if(err) return ReE(res, err, 422);
   // console.log("sub strand map ", topicMap);
 
   let questionPayload = [];
@@ -1156,9 +1183,9 @@ const importPsychometry = async (req, res) => {
     let subStrandId = subStrandMap[topic_subsMap[topCode]];
     let rowQ = {
       statement       : obj.question,
-      set_number      : 1,
+      set_number      : set_number,
       question_type   : 'SINGLE_CHOICE',
-      score_type      : obj.scoring_type,
+      score_type      : obj.scoring_type ? obj.scoring_type : 1,
       level_id        : level_id,
       grade_id        : grade_id,
       skill_id        : skill_id,
