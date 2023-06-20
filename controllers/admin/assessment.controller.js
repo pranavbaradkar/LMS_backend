@@ -1,5 +1,5 @@
 const model = require('../../models');
-const { psy_questions, psy_question_options, assessments,assessment_results, user_assessment_logs, assessment_questions, strands, sub_strands, campaign_assessments, questions, question_options, custom_attributes, assessment_configurations, skills, levels, user_assessments, users, inventory_blocks, user_assessment_responses, subjects } = require("../../models");
+const { psy_questions, psy_question_options, assessments,assessment_results, user_assessment_logs, assessment_questions, strands, sub_strands, campaign_assessments, questions, question_options, custom_attributes, assessment_configurations, skills, levels, user_assessments, user_recommendations, users, inventory_blocks, user_assessment_responses, subjects } = require("../../models");
 const { to, ReE, ReS, requestQueryObject, lowercaseKeyValue } = require('../../services/util.service');
 const validator = require('validator');
 const mailer = require("../../helpers/mailer"); 
@@ -1326,7 +1326,8 @@ const userAssessmentsResult = async function (req, res) {
     user_results: result,
     type: assessment_type,
     assessment_id: assessment_id,
-    user_info: userInfo
+    user_info: userInfo,
+    req_query : req.query
   };
 
   let insertResult = await saveToDbAndMail(resultPayload);
@@ -1349,8 +1350,11 @@ const calculatePschometricScore = async(skillScores, skill, optionMap, user_resp
 const saveToDbAndMail = async(resultPayload) => {
   let err, assessmentResultData;
   let assessmentResultPayload = [];
+  let userRecommendationPayload = {};
+  let userRecommendationUserIds = [];
   Object.keys(resultPayload.skill_scores).map(user_id => {
-    let obj = {};
+    let obj = {}; 
+    let urObj = {};
     obj.user_id         = user_id;
     obj.assessment_id   = resultPayload.assessment_id;
     obj.type            = resultPayload.type;
@@ -1359,15 +1363,26 @@ const saveToDbAndMail = async(resultPayload) => {
     obj.percentile      = resultPayload.percentiles[user_id];
     obj.result          = resultPayload.user_results[user_id];
     assessmentResultPayload.push(obj);
+    let type = (resultPayload.type).toLowerCase();
+    urObj[`${type}_score`] = resultPayload.total_scores[user_id];
+    urObj[`${type}_score_total`] = resultPayload.assessment_total;
+    urObj.user_id = user_id;
+    urObj.status = "PENDING";
+    userRecommendationPayload[user_id] = urObj;
+    userRecommendationUserIds.push(parseInt(user_id));
   });
   
-
-  console.log("assessment result payload for bulk insert ", assessmentResultPayload);
+  // console.log("user recommendation User IDS used for Update/Create ", userRecommendationUserIds);
+  // console.log("user recommendation payload for bulk insert ", userRecommendationPayload);
+  await saveToUserRecommendation(userRecommendationUserIds,userRecommendationPayload);
+  // throw new Error("work under process");
+  // console.log("assessment result payload for bulk insert ", assessmentResultPayload);
   let resultLink =  process.env.FRONTEND_URL+`/#/assessment/${resultPayload.assessment_id}/${resultPayload.type.toLowerCase()}/result`;
   let subject    = `${resultPayload.type == 'MAINS'? 'Mains' : 'Screening'} Assessment Result Notification - Access Your Results Now!`;
 
   // update user assessment status
   let  userIds = Object.keys(resultPayload.user_results);
+  let userAssessmentData;
   [err, userAssessmentData] = await to(user_assessments.findAll({
     where: { user_id: {[Op.in]:userIds }, assessment_id: resultPayload.assessment_id }
   }).then(rows=>{
@@ -1378,20 +1393,82 @@ const saveToDbAndMail = async(resultPayload) => {
       if(resultPayload.type == "MAINS") {
         row.mains_status = resultPayload.user_results[row.user_id];
       }
+      row.total_score = resultPayload.total_scores[row.user_id];
       row.status = resultPayload.user_results[row.user_id];
       row.save();
     });
   }));
 
-  [err, assessmentResultData] = await to(assessment_results.bulkCreate(assessmentResultPayload).then(row => {
-    console.log("the inserted row ", row);
+  // console.log(`find assessment result with type ${resultPayload.type} `);
+  // console.log("find assessment result with user ids ", userIds);
+  // update result 
+  let updatedAssessmentResultIds = [];
+  [err, assessmentResultData] = await to(assessment_results.findAll({ where: { user_id: { [Op.in]: userIds }, type: resultPayload.type } }) );
+  // console.log("the assessment result data", assessmentResultData);
+
+  if(assessmentResultData) {
+    assessmentResultData.forEach(row => {
+      // console.log("looping  assessmentResultData ", row.user_id);
+        updatedAssessmentResultIds.push(parseInt(row.user_id));
+        if(resultPayload.req_query && resultPayload.req_query.force_mail && resultPayload.req_query.force_mail == 1){
+          sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
+        }
+    });
+  }
+
+  // console.log("the updated assessment result user ids ",updatedAssessmentResultIds);
+  //filter payload (only insert which are not updated above)
+  let insertPayload = assessmentResultPayload.filter(ele => {
+    return !updatedAssessmentResultIds.includes(parseInt(ele.user_id));
+  });
+
+  // console.log("insert payload data for assessment result ", insertPayload);
+  // insert result
+  [err, assessmentResultData] = await to(assessment_results.bulkCreate(insertPayload).then(row => {
     row.map(ele => {
-      // console.log("the inserted user id ", ele.user_id);
+      // send mail on new row insert
       sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
     })
   }));
 
   return assessmentResultData;
+}
+
+const saveToUserRecommendation = async (userRecommendationUserIds,userRecommendationPayload) => {
+  
+  let err, userRecommendationData;
+  // userRecommendationUserIds.map(ele => parseInt(ele));
+  // console.log("user recommendation User IDS used for Update/Create ", userRecommendationUserIds);
+  let updatedUserRecommendationIds = [];
+  [err, userRecommendationData] = await to(user_recommendations.findAll({ where: { user_id: {[Op.in]: userRecommendationUserIds} }}) );
+
+  if(userRecommendationData) {
+    userRecommendationData.forEach(row => {
+        console.log("the user id in findAll user recommendation ",row.user_id);
+      if(userRecommendationPayload[row.user_id]) {
+        updatedUserRecommendationIds.push(row.user_id);
+        let urp = userRecommendationPayload[row.user_id];
+        Object.keys(urp).forEach(prop => { row[prop]= urp[prop]; })
+        row.save();
+      }
+    });
+  }
+  if(err) { throw new Error("failed to find records for user_recommendation"); }
+
+  // console.log("updated IDs ", updatedUserRecommendationIds);
+  
+  // find user Ids which are not updated(we have to create new rows for these userIds);
+  let insertPayload = [];
+  Object.keys(userRecommendationPayload).map(user_id => {
+    if(!updatedUserRecommendationIds.includes(parseInt(user_id))) {
+      insertPayload.push(userRecommendationPayload[user_id]);
+    }
+  });
+
+  // console.log("the insert payload is ", insertPayload);
+  if(insertPayload.length > 0) {
+    [err, userRecommendationData] = await to(user_recommendations.bulkCreate(insertPayload));
+  }
 }
 
 // const updateUserResult

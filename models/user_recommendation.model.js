@@ -1,6 +1,6 @@
 'use strict';
 module.exports = (sequelize, DataTypes) => {
-    var Model = sequelize.define('talukas', {
+    var Model = sequelize.define('user_recommendations', {
         id                         : { type: DataTypes.INTEGER(11), allowNull: false, autoIncrement: true, primaryKey: true },
         user_id                    : {type: DataTypes.INTEGER, allowNull: false },
         screening_score            : {type: DataTypes.INTEGER, allowNull: true},
@@ -15,6 +15,7 @@ module.exports = (sequelize, DataTypes) => {
         status                     : {type: DataTypes.ENUM('AGREE', 'DISAGREE', 'PENDING'), allowNull: true},
         deleted_at                 : { type: DataTypes.DATE, allowNull: true, defaultValue: null }
      },{
+        underscored: true,
         timestamps: true,
         paranoid: true,
         createdAt: 'created_at',
