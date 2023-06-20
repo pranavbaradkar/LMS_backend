@@ -16,6 +16,9 @@ const validator = require('validator');
 var moment = require("moment");
 const { object } = require("underscore");
 user_assessments.belongsTo(model.users, { foreignKey: 'user_id' });
+users.hasMany(model.assessment_results, { foreignKey: 'user_id' });
+user_teaching_interests.belongsTo(model.users, { foreignKey: 'user_id' });
+users.hasOne(model.user_teaching_interests, { foreignKey: 'user_id', as:'teaching_interests' });
 user_recommendations.belongsTo(model.users, { foreignKey: 'user_id' });
 user_assessments.belongsTo(model.professional_infos, {foreignKey: 'user_id', targetKey: 'user_id' });
 
@@ -1451,6 +1454,18 @@ const getUserDetails = async (req, res)=> {
     return ReE(res, "user id required in params", 422);
   }
   try {
+    let err, userDetails;
+    [err, userDetails] = await to(users.findOne({
+      where: { id: req.params.user_id },
+      attributes: ["id", "profile_pic", "title", "first_name", "middle_name", "last_name", "email", "user_type", "is_email_verified", "country_code", "phone_no", "is_phone_verified", "dob", "gender", "employee_code"],
+      include:[
+        { model: user_teaching_interests, as: 'teaching_interests', attributes:["id", "level_ids","school_ids","board_ids","subject_ids",] },
+        { model: assessment_results, attributes: ["id","assessment_id", "percentile", "type", "result", "skill_scores", "subject_scores"]}
+      ]
+    }));
+    
+    if(err) return ReE(res, err, 422);
+    // console.log(userDetails);
     let userData = '{"id":3975,"profile_pic":"","title":"Ms","first_name":"Kanhai","middle_name":"Lal","last_name":"Murmu","email":"kanhailal2010@gmail.com","user_type":"JOB_SEEKER","is_email_verified":true,"country_code":"","phone_no":"8956508033","is_phone_verified":true,"dob":"","gender":"","employee_code":"","teaching_interests":{"id":3975,"user_id":4943,"level_ids":[3],"school_ids":[132],"board_ids":"","subject_ids":[94]},"user_assessments":[{"skill_scores":{"Core Skill":7,"Communication Skills":3},"subject_scores":{"Mathematics":7,"null":0},"id":7,"user_id":3975,"assessment_id":8,"percentile":"95.00","type":"SCREENING","result":"PASSED"},{"skill_scores":{"Core Skill":7,"Communication Skills":3},"subject_scores":{"Mathematics":7,"null":0},"id":8,"user_id":3975,"assessment_id":8,"percentile":"25.00","type":"MAINS","result":"PASSED"}],"demo_video":{"video_link":"https://video.link","status":"recomended","demo_topic":"Newtons Laws","demo_description":"Topic description","scores":[{"knowledge_score":6,"total":10},{"confidence_score":6,"total":10},{"behavioral_score":6,"total":10},{"fluency_score":6,"total":10}]},"interview":{"status":"offer_letter","mode":"At_School","date_time":"dd/mm/YYYY h:i:s","room_no":333,"interviewer":"Aarav Patel","interview_remark":"Interview remark text","interview_notes":"Interview note text"}}';
     userData = JSON.parse(userData);
     return ReS(res, {data : userData }, 200);
