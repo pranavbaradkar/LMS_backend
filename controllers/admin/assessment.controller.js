@@ -1370,6 +1370,8 @@ const saveToDbAndMail = async(resultPayload) => {
     obj.subject_scores  = resultPayload.subject_scores[user_id];
     obj.percentile      = resultPayload.percentiles[user_id];
     obj.result          = resultPayload.user_results[user_id];
+    obj.total           = resultPayload.assessment_total;
+    obj.total_scored    = resultPayload.total_scores[user_id];
     assessmentResultPayload.push(obj);
     let type = (resultPayload.type).toLowerCase();
     urObj[`${type}_score`] = resultPayload.total_scores[user_id];
@@ -1411,7 +1413,7 @@ const saveToDbAndMail = async(resultPayload) => {
   // console.log("find assessment result with user ids ", userIds);
   // update result 
   let updatedAssessmentResultIds = [];
-  [err, assessmentResultData] = await to(assessment_results.findAll({ where: { user_id: { [Op.in]: userIds }, type: resultPayload.type } }) );
+  [err, assessmentResultData] = await to(assessment_results.findAll({ where: { user_id: { [Op.in]: userIds }, type: (resultPayload.type).toUpperCase() } }) );
   // console.log("the assessment result data", assessmentResultData);
 
   if(assessmentResultData) {
@@ -1438,6 +1440,7 @@ const saveToDbAndMail = async(resultPayload) => {
       sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
     })
   }));
+  if(err) throw new Error("Could not insert to assessment.result");
 
   return assessmentResultData;
 }
