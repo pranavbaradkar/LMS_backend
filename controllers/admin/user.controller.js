@@ -1,4 +1,4 @@
-const { roles,subjects, schools, levels, user_teaching_interests, users, user_assessments, assessment_results, academics, professional_infos, custom_attributes, school_inventories } = require("../../models");
+const { roles,subjects, schools, levels, user_teaching_interests, users, user_assessments, assessment_results, academics, professional_infos, custom_attributes, school_inventories, user_recommendations } = require("../../models");
 const model = require('../../models');
 const authService = require("../../services/auth.service");
 const { to, ReE, ReS, toSnakeCase, paginate, snakeToCamel, requestQueryObject, randomHash, getUUID } = require('../../services/util.service');
@@ -16,6 +16,7 @@ const validator = require('validator');
 var moment = require("moment");
 const { object } = require("underscore");
 user_assessments.belongsTo(model.users, { foreignKey: 'user_id' });
+user_recommendations.belongsTo(model.users, { foreignKey: 'user_id' });
 user_assessments.belongsTo(model.professional_infos, {foreignKey: 'user_id', targetKey: 'user_id' });
 
 const createUser = async function (req, res) {
@@ -1461,32 +1462,75 @@ module.exports.getUserDetails = getUserDetails;
 
 const getUserRecommendation = async (req, res) => {
 try {
-  let userData = {
-    "rows": [
-      {
-        "name": "Dhrumil",
-        "profile_image": "https://",
-        "email": "test@test.com",
-        "level_ids": [
-          1,
-          2,
-          3,
-          4
-        ],
-        "recommendation": "Grade 7",
-        "status": "PENDING",
-        "screening_score": 23,
-        "screening_total_score": 100,
-        "mains_score": 23,
-        "mains_total_score": 120,
-        "demo_score": 23,
-        "demo_total_score": 100,
-        "interview_score": 233,
-        "interview_total_score": 120
-      }
-    ]
-  };
-  return ReS(res, {data : userData }, 200);
+  let err, userData;
+  try {
+    let queryParams = {};
+    let orData = [];
+    console.log(req.query);
+
+    if(req.query && req.query.filter) {
+      Object.keys(req.query.filter).forEach(ele => {
+        let excludeKey = ['user_type'];
+        if(excludeKey.indexOf(ele) == -1) {
+          queryParams[ele] = req.query.filter[ele].toUpperCase();
+        }
+      })
+    }
+
+    let searchArray = ['email', 'phone_no']
+    if(req.query && req.query.search) {
+      searchArray.forEach(ele => {
+        let obj = {};
+        obj[ele] = { [Op.iLike]: `%${req.query.search}%`};
+        orData.push(obj);
+      })
+    }
+
+    if(orData.length > 0) {
+      queryParams = {...queryParams,...{[Op.or]: orData}}
+    } else {
+      queryParams = {...queryParams }
+    }
+
+   // user_type
+    let paginateData = {...requestQueryObject(req.query, queryParams)};
+    let userFilter = {}
+    if(req.query && req.query.filter && req.query.filter.user_type) {
+      userFilter.user_type = req.query.filter.user_type;
+    }
+
+
+    let userAttributes = ['first_name', 'email','phone_no', 'user_type'];
+    let userDetails = { 
+      model: users, 
+      as: 'user',
+      where: userFilter,
+      attributes: userAttributes
+    };
+     if(req.query && req.query.orderBy && userAttributes.indexOf(req.query.orderBy) >= 0) {
+
+      let sortBy = req.query && req.query.sortBy ? req.query.sortBy : 'desc';
+      paginateData.order = [[{model : users}, `${req.query.orderBy}`, sortBy]];
+      // userDetails.separate = false;
+      // delete paginateData.order;
+    }
+
+    paginateData.include = [userDetails];
+
+    console.log(paginateData);
+
+    [err, userData] = await to(user_recommendations.findAndCountAll(paginateData));
+    if (err) return ReE(res, err, 422);
+    
+    if (userData) {
+      return ReS(res, { data: userData }, 200);
+    } else {
+      return ReE(res, "No user data found", 404);
+    }
+  } catch (err) {
+    console.log(err);
+    return ReE(res, err, 422);
+  }
 } catch (err) {
   return ReE(res, err, 422);
 }
