@@ -1110,6 +1110,18 @@ const importPsychometry = async (req, res) => {
     topicSet.add(obj.topic);
   });
   
+
+  let strandsData, strandMap = {};
+  // to prevent duplicates on loading for diffrerent sets of pyschometric questions(delete from item from set to prevent insertPayload build)
+  [err, strandsData] = await to(strands.findAll({ where: { strand_text: {[Op.in]: Array.from(strandSet) }, level_id: level_id }  }));
+  if(strandsData) {
+    strandsData.forEach(row => {
+      strandSet.delete(row.strand_text);
+      let code = row.strand_text.replace(/ /g, "_").toLowerCase();
+      strandMap[code] = row.id;
+    });
+  }
+
   // create strands Payload
   let strandPayload = [];
   Array.from(strandSet).forEach(obj => {
@@ -1117,8 +1129,8 @@ const importPsychometry = async (req, res) => {
     strandPayload.push(rowS);
   });
   // insert strands
-  let strandsData, strandMap = {};
-  [err,strandsData] = await to(strands.bulkCreate(strandPayload).then(rows=>{
+  let strandsInsertData;
+  [err,strandsInsertData] = await to(strands.bulkCreate(strandPayload).then(rows=>{
     rows.forEach(row => {
       let code = row.strand_text.replace(/ /g, "_").toLowerCase();
       strandMap[code] = row.id;
@@ -1127,6 +1139,18 @@ const importPsychometry = async (req, res) => {
   if(err) return ReE(res, err, 422);
   // console.log("strands map ", strandMap);
 
+
+
+  let subStrandsData, subStrandMap = {};
+  // to prevent duplicates on loading for diffrerent sets of pyschometric questions(delete from item from set to prevent insertPayload build)
+  [err, subStrandsData] = await to(sub_strands.findAll({ where: { sub_strand_text: {[Op.in]: Array.from(subStrandSet) }, strand_id: {[Op.in]: Object.values(strandMap)} }  }));
+  if(subStrandsData) {
+    subStrandsData.forEach(row => {
+      subStrandSet.delete(row.sub_strand_text);
+      let code = row.sub_strand_text.replace(/ /g, "_").toLowerCase();
+      subStrandMap[code] = row.id;
+    });
+  }
   // create sub_strands Payload
   let subStrandPayload = [];
   Array.from(subStrandSet).forEach(obj => {
@@ -1138,17 +1162,32 @@ const importPsychometry = async (req, res) => {
   // console.log("the substrand payload ", subStrandPayload);
 
   // insert substrand 
-  let subStrandsData, subStrandMap = {};
-  [err,subStrandsData] = await to(sub_strands.bulkCreate(subStrandPayload).then(rows=>{
+  let subStrandsInsertedData;
+  [err,subStrandsInsertedData] = await to(sub_strands.bulkCreate(subStrandPayload).then(rows=>{
     rows.forEach(row => {
       let code = row.sub_strand_text.replace(/ /g, "_").toLowerCase();
       subStrandMap[code] = row.id;
     })
   }));
   if(err) return ReE(res, err, 422);
-  console.log("sub strand map ", subStrandMap);
+  // console.log("sub strand map ", subStrandMap);
 
 
+
+  let topicsData, topicMap = {};
+  // to prevent duplicates on loading for diffrerent sets of pyschometric questions(delete from item from set to prevent insertPayload build)
+  [err, topicsData] = await to(topics.findAll({ where: { 
+      topic_text: {[Op.in]: Array.from(topicSet) },
+      strand_id: {[Op.in]: Object.values(strandMap)},
+      sub_strand_id: {[Op.in]: Object.values(subStrandMap)} 
+  } }));
+  if(topicsData) {
+    topicsData.forEach(row => {
+      topicSet.delete(row.topic_text);
+      let code = row.topic_text.replace(/ /g, "_").toLowerCase();
+      topicMap[code] = row.id;
+    });
+  }
   // create topics Payload
   let topicPayload = [];
   Array.from(topicSet).forEach(obj => {
@@ -1163,8 +1202,8 @@ const importPsychometry = async (req, res) => {
   // console.log("the topic payload ", topicPayload);
 
   // insert topic 
-  let topicsData, topicMap = {};
-  [err,topicsData] = await to(topics.bulkCreate(topicPayload).then(rows=>{
+  let topicsInsertData;
+  [err,topicsInsertData] = await to(topics.bulkCreate(topicPayload).then(rows=>{
     rows.forEach(row => {
       let code = row.topic_text.replace(/ /g, "_").toLowerCase();
       topicMap[code] = row.id;
