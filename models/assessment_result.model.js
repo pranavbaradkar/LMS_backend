@@ -25,6 +25,8 @@ module.exports = (sequelize, DataTypes) => {
                          },
 
         percentile      : { type: DataTypes.DECIMAL, allowNull: false },
+        total           : { type: DataTypes.INTEGER, allowNull: false },
+        total_scored    : { type: DataTypes.INTEGER, allowNull: false },
         type            : { type: DataTypes.ENUM('SCREENING', 'MAINS'), allowNull: false },
         result          : { type: DataTypes.ENUM('PASSED', 'FAILED'), allowNull: false },
         deleted_at      : { type: DataTypes.DATE, allowNull: true, defaultValue: null }
