@@ -1,4 +1,4 @@
-const { roles,subjects, schools, levels, user_teaching_interests, users, user_assessments, assessment_results, academics, professional_infos, custom_attributes, school_inventories, user_recommendations } = require("../../models");
+const { roles,subjects, schools, levels, user_teaching_interests, users, user_assessments, assessment_results, academics, professional_infos, custom_attributes, school_inventories, user_recommendations, assessment_configurations } = require("../../models");
 const model = require('../../models');
 const authService = require("../../services/auth.service");
 const { to, ReE, ReS, toSnakeCase, paginate, snakeToCamel, requestQueryObject, randomHash, getUUID } = require('../../services/util.service');
@@ -15,8 +15,14 @@ const Op = Sequelize.Op;
 const validator = require('validator');
 var moment = require("moment");
 const { object } = require("underscore");
+
+user_assessments.hasMany(assessment_configurations, {  sourceKey: 'assessment_id', foreignKey: "assessment_id" });
+assessment_configurations.belongsTo(levels, { foreignKey: 'level_id' });
+
+model.users.hasMany(model.user_assessments, {foreignKey: 'user_id', targetKey: 'user_id'});
 user_assessments.belongsTo(model.users, { foreignKey: 'user_id' });
 user_recommendations.belongsTo(model.users, { foreignKey: 'user_id' });
+
 user_assessments.belongsTo(model.professional_infos, {foreignKey: 'user_id', targetKey: 'user_id' });
 
 const createUser = async function (req, res) {
@@ -1504,8 +1510,24 @@ try {
     let userDetails = { 
       model: users, 
       as: 'user',
-      where: userFilter,
-      attributes: userAttributes
+      attributes: userAttributes,
+      include: [{ 
+        model: user_assessments, 
+        require: false,
+        attributes: ['assessment_id', 'user_id'],
+        include: [
+          {
+            model: assessment_configurations,
+            require: false,
+            attributes: ['level_id'],
+            include: [{
+              model: levels,
+              attributes: ['name'],
+              require: false
+            }]
+          }
+        ]
+      }]
     };
      if(req.query && req.query.orderBy && userAttributes.indexOf(req.query.orderBy) >= 0) {
 
@@ -1515,7 +1537,9 @@ try {
       // delete paginateData.order;
     }
 
-    paginateData.include = [userDetails];
+    paginateData.include = [
+      userDetails
+    ];
 
     console.log(paginateData);
 
@@ -1523,6 +1547,18 @@ try {
     if (err) return ReE(res, err, 422);
     
     if (userData) {
+      userData.rows = userData.rows.map(ele => {
+        let obj = ele.get({plain: true})
+        if(obj.user && obj.user.user_assessments) {
+         let levels = obj.user.user_assessments.map(e => {
+            return e.assessment_configurations ? e.assessment_configurations.map(k => {
+                return k.level && k.level.name ? k.level.name  : null;
+            })[0] : [];
+         });
+         obj.levels = [...new Set(levels)];
+        }
+        return obj;
+      })
       return ReS(res, { data: userData }, 200);
     } else {
       return ReE(res, "No user data found", 404);
