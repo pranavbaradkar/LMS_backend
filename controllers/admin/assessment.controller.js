@@ -421,6 +421,8 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
         if(type.toLowerCase() == 'screening') {
           if(ele.name.toLowerCase() === 'core skill') {
             finalSubjectQuery = await getCoreSkillQuestions(obj, gradeIdsValues, assessment_configurations_data, subjectObjO);
+
+            console.log("core-skill", finalSubjectQuery);
           }
           if(ele.name.toLowerCase() === 'communication skills') {
 
@@ -503,6 +505,7 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
         }
         obj.questions = questionList;
         obj.questions_count = questionList.length;
+        obj.question_ids = questionList.map(ele => { return ele.id });
         if(questionList) {
           questionList.forEach(k => {
             question_ids.push(k.id);
@@ -559,6 +562,10 @@ async function getQuestions(ele, k, type, level_id) {
    
     if(k.complex) {
       where.complexity_level = k.complex;
+    }
+
+    if(k.grade_id) {
+      where.grade_id = k.grade_id;
     }
    
     if(k.bloom) {
@@ -740,6 +747,7 @@ async function getCoreSkillQuestions(obj, gradeIdsValues, assessment_configurati
         finalSubjectQuery.push({
           ...el,
           ...{
+            grade_id: e,
             subject_ids: subjectObjO.map(el => { return el.subject_id }),
             level_id: assessment_configurations_data.level_id,
             limit: finalLimit
