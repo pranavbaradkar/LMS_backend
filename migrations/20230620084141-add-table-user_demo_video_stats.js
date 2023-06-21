@@ -12,6 +12,10 @@ module.exports = {
         type: Sequelize.INTEGER, 
         allowNull: false
       },
+      assessment_id : { 
+        type: Sequelize.INTEGER, 
+        allowNull: false
+      },
       video_link : { 
         type: Sequelize.TEXT, 
         allowNull: true
@@ -30,7 +34,7 @@ module.exports = {
         defaultValue: '[{"knowledge_score":0,"total":10},{"confidence_score":0,"total":10},{"behavioral_score":0,"total":10},{"fluency_score":0,"total":10}]'
       },
       status : { 
-        type: Sequelize.ENUM('PENDING','NOT_RECOMMENDED', 'RECOMMENDED'), 
+        type: Sequelize.ENUM('PENDING', 'SUBMITTED', 'AI_STATUS_COMPLETED', 'MANUAL_STATUS_COMPLETED', 'PASSED', 'FAILED','NOT_RECOMMENDED', 'RECOMMENDED'), 
         defaultValue: 'PENDING'
       },
       created_at: {
@@ -49,6 +53,6 @@ module.exports = {
     });
   },
   down: (queryInterface, Sequelize) => {
-    return queryInterface.dropTable('psy_question_options');
+    return queryInterface.dropTable('demovideo_details');
   }
 };
