@@ -3,6 +3,7 @@ module.exports = (sequelize, DataTypes) => {
   var Model = sequelize.define('demovideo_details', {
     id               : { type: DataTypes.INTEGER, allowNull: false, autoIncrement: true, primaryKey: true },
     user_id          : { type: DataTypes.INTEGER, allowNull: false },
+    assessment_id    : { type: DataTypes.INTEGER, allowNull: false },
     video_link       : { type: DataTypes.STRING, allowNull: true },
     scores           : { type: DataTypes.STRING, allowNull: false, 
                         get: function() {  
