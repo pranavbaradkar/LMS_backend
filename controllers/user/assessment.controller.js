@@ -1,5 +1,5 @@
 const model = require('../../models');
-const { user_assessment_slots, assessment_results, question_pools, user_assessment_logs, user_assessments, assessments, assessment_questions,campaigns,campaign_assessments, assessment_configurations,levels, questions, question_options, question_mtf_answers, custom_attributes, professional_infos, user_assessment_responses, skills, users, user_teaching_interests, subjects } = require("../../models");
+const { psy_questions, psy_question_options, user_assessment_slots, assessment_results, question_pools, user_assessment_logs, user_assessments, assessments, assessment_questions,campaigns,campaign_assessments, assessment_configurations,levels, questions, question_options, question_mtf_answers, custom_attributes, professional_infos, user_assessment_responses, skills, users, user_teaching_interests, subjects } = require("../../models");
 const { to, ReE, ReS, toSnakeCase, returnObjectEmpty, uploadVideoOnS3 } = require('../../services/util.service');
 const { getLiveCampaignAssessments } = require('../../services/campaign.service');
 const validator = require('validator');
@@ -23,10 +23,14 @@ const NodeCache = require( "node-cache" );
 const { userInfo } = require('os');
 const assessmentCache = new NodeCache( { stdTTL: 0, checkperiod: ((3600*24)*7) } );
 
+
+
 questions.belongsTo(model.skills, { foreignKey: 'skill_id' });
 questions.belongsTo(model.levels, { foreignKey: 'level_id' });
 questions.belongsTo(model.subjects, { foreignKey: 'subject_id' });
 assessment_questions.belongsTo(questions, { foreignKey: "question_id" });
+assessment_questions.belongsTo(psy_questions, { foreignKey: "question_id" });
+
 assessment_configurations.belongsTo(assessments, { foreignKey: "assessment_id" });
 assessments.hasMany(assessment_configurations, { foreignKey: "assessment_id" });
 assessments.hasMany(user_assessment_responses, { foreignKey: "assessment_id" });
@@ -36,6 +40,11 @@ questions.hasMany(question_options, { foreignKey: "question_id" });
 questions.hasMany(question_mtf_answers, { foreignKey: 'question_id'});
 
 campaigns.hasMany(campaign_assessments, { foreignKey: "campaign_id" });
+
+
+psy_questions.hasMany(model.psy_question_options, { foreignKey: 'psy_question_id' });
+psy_questions.belongsTo(model.levels, { foreignKey: 'level_id' });
+psy_questions.belongsTo(model.skills, { foreignKey: 'skill_id' });
 
 assessment_configurations.belongsTo(levels, { foreignKey: 'level_id' });
 
@@ -123,6 +132,15 @@ const getScreeningTestDetails = async function (req, res) {
                 { model: model.levels, attributes: ['name'] },
                 { model: model.subjects, attributes: ['name'] }
               ]
+            },
+            {
+              model: psy_questions,
+              attributes:['id','question_type', 'set_number', 'score_type', 'statement', 'mime_type','hint','difficulty_level','complexity_level','knowledge_level','proficiency_level','blooms_taxonomy','skill_id','estimated_time','correct_answer_score','level_id','tags','subject_id', 'grade_id',  'topic_id', 'sub_strand_id', 'strand_id'],
+              include: [
+                { model: psy_question_options },
+                { model: model.levels, attributes: ['name'] },
+                { model: model.skills, attributes: ['name'] },
+              ]
             }
           ],
           order: [['id', 'asc']]
@@ -133,16 +151,19 @@ const getScreeningTestDetails = async function (req, res) {
       return ReE(res, "No questions data found", 404);
     } else {
 
-      console.log(skills_data);
+      console.log(assessmentQuestions);
       let skills_data_final = skills_data.map(ele => {
         let obj = { ...ele };
         obj.questions = assessmentQuestions.filter(e => {
-          return e.question && e.question.skill_id == ele.id;
+          console.log(e);
+          return e.question && e.question.skill_id == ele.id || e.psy_question && e.psy_question.skill_id == ele.id ;
         }).map(ele => {
-          let object = {...ele.question.get({plain: true})};
-          object.question_options = object.question_options.map(e => {
+          let object = ele.psy_question ? {...ele.psy_question.get({plain: true})} : {...ele.question.get({plain: true})} ;
+          object.question_options = object.psy_question_options ? object.psy_question_options.map(e => {
             return returnObjectEmpty(e);
-          })
+          }) : object.question_options.map(e => {
+            return returnObjectEmpty(e);
+          });
           return returnObjectEmpty(object);
         })
         return obj;
