@@ -1443,13 +1443,12 @@ if (req.params && req.params.assessment_id == undefined) {
 payload = req.body;
 console.log("payload", payload);
 try {
-  [err, demoData] = await to(demovideo_details.findOne({ where: {user_id: req.params.user_id, assessment_id: req.params.assessment_id } })
-  .then(row => {
-    row.scores = payload.scores;
-    row.save();
-  }
-  ));
+  [err, demoData] = await to(demovideo_details.findOne({ where: {user_id: req.params.user_id, assessment_id: req.params.assessment_id } }) );
   if(err) return ReE(res, err, 422);
+  if(demoData) {
+    demoData.scores = payload.scores;
+    demoData.save();
+  }
 
   return ReS(res, {data: demoData }, 200);
 } catch (err) {
