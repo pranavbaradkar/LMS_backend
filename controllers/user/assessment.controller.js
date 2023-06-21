@@ -22,7 +22,7 @@ const redis = new Redis({
 const NodeCache = require( "node-cache" );
 const { userInfo } = require('os');
 const assessmentCache = new NodeCache( { stdTTL: 0, checkperiod: ((3600*24)*7) } );
-
+const psychometric_skill_id = process.env.PSYCHOMETRIC_SKILL_ID || 48;
 
 
 questions.belongsTo(model.skills, { foreignKey: 'skill_id' });
@@ -1041,41 +1041,84 @@ const getAssessmentAnalytics = async (req, res) => {
     }))
     if (err) return ReE(res, err, 422);
     if(!assessmentConfig) { 
-      assessmentConfig = {};
-      assessmentConfig.total_no_of_questions = 40;
-      assessmentConfig.correct_score_answer = 1;
+      assessmentConfig = {"skill_distribution": [
+        { "skill_id": 49, "no_of_questions": 12 },
+        { "skill_id": 50, "no_of_questions": 20 }
+      ] };
     }
-    let totalScore = assessmentConfig.total_no_of_questions * assessmentConfig.correct_score_answer;
+    // console.log(`Assessment config for ${req.params.assessment_id} `)
+    // console.log(JSON.parse(JSON.stringify(assessmentConfig)));
+    // calculate total for psychometric question and other skills.
+    let psy_total = 0;
+    let totalScore = 0;
+    assessmentConfig.skill_distributions.forEach(row => {
+      if(row.skill_id == psychometric_skill_id) // 48 
+      { psy_total = row.no_of_questions * 4;}
+      else {
+        totalScore += parseInt(row.no_of_questions);
+      }
+    });
+
+    // console.log("psy Total ", psy_total);
+    // console.log("Total score of other skills", totalScore);
+    
     [err, assessmentResultData] = await to(assessment_results.findOne({ 
       where: { user_id: req.user.id, assessment_id: req.params.assessment_id },
       raw:true
     }));
-    if(assessmentResultData == null) //return ReE(res, "No results Found", 442);  
-    {
-      // set dummy scores
-      let dummy = {};
-      dummy.skill_scores = "";
-      dummy.skill_scores = JSON.stringify({"Pedagogy": 0, "Digital Skills": 0, "Language Skill": 0, "Communication Skill": 0, "Psychometry": 0});
-      dummy.percentile = 80;
-      assessmentResultData = dummy;
-      totalScore = 60;
-    }
+    // if(assessmentResultData == null) //return ReE(res, "No results Found", 442);  
+    // {
+    //   // set dummy scores
+    //   let dummy = {};
+    //   dummy.skill_scores = "";
+    //   dummy.skill_scores = JSON.stringify({"Pedagogy": 0, "Digital Skills": 0, "Language Skill": 0, "Communication Skill": 0, "Psychometry": 0});
+    //   dummy.percentile = 80;
+    //   assessmentResultData = dummy;
+    //   totalScore = 60;
+    // }
     
-    let skillScore = JSON.parse(assessmentResultData.skill_scores);
     resultData = {};
+    resultData.dataScore = {};
+    resultData.psychometric = {};
+    let skillScore = JSON.parse(assessmentResultData.skill_scores);
+    let psychometric_scores = 0;
+    
+    if(skillScore.Psychometric) { 
+      psychometric_scores = skillScore.Psychometric;
+      resultData.psychometric['score'] = psychometric_scores;
+      resultData.psychometric['grade'] = gradePsyScore(psychometric_scores);
+      resultData.psychometric['total'] = psy_total;
+      delete skillScore.Psychometric; 
+    }
+
     resultData.labels = Object.keys(skillScore);
     resultData.data = Object.values(skillScore);
-    resultData.dataScore = { 
-      'scored': Object.values(skillScore).reduce((a, b) => a+b), 
-      'total_score': totalScore 
-    };
-    resultData.percentage = assessmentResultData.percentile;
+    resultData.dataScore['scored'] =  Object.values(skillScore).reduce((a, b) => a+b), 
+    resultData.dataScore['total_score'] = totalScore ; 
+
+    resultData.percentage = ((resultData.dataScore.scored/totalScore)*100).toFixed(2);
     return ReS(res, {data: resultData }, 200);
   } catch (err) {
     return ReE(res,err,442);
   }
 }
 module.exports.getAssessmentAnalytics = getAssessmentAnalytics;
+
+const psychometric_grades = {
+  0: "Below average",
+  29: "Average",
+  57: "Appropriate",
+  84: "Excellent",
+};
+
+const gradePsyScore = (score) => {
+  for (const lower_bound in psychometric_grades) {
+    if (score >= lower_bound) {
+      return psychometric_grades[lower_bound];
+    }
+  }
+  return "Unknown";
+}
 
 const insertQuestions = async (req, res) => {
   let err, insertData;

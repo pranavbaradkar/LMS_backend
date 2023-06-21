@@ -10,6 +10,7 @@ var Sequelize = require("sequelize");
 const Op = Sequelize.Op;
 var _ = require('underscore');
 const axios = require('axios');
+const psychometric_skill_id = process.env.PSYCHOMETRIC_SKILL_ID || 48;
 
 assessment_questions.belongsTo(questions, { foreignKey: "question_id" });
 assessment_questions.belongsTo(psy_questions, { foreignKey: "question_id" });
@@ -1265,7 +1266,7 @@ const userAssessmentsResult = async function (req, res) {
             }
 
             return {id: q.question_id, correct_answer: correct_qa, type: questionType, 
-              skill: skill, subject: subject, lo_ids: q.question.lo_ids, is_phycho: false
+              skill: skill, subject: subject, lo_ids: q.question.lo_ids, is_psycho: false
             };
           }
           // for pys_questions
@@ -1276,7 +1277,7 @@ const userAssessmentsResult = async function (req, res) {
             q.psy_question.options.map(ele => {  optMap[ele.option_key] = ele.score_value; });
             // console.log("the option map for qe",q.question_id, optMap);
             return { 
-              is_phycho: true, id:q.question_id, set_number: q.psy_question.set_number, 
+              is_psycho: true, id:q.question_id, set_number: q.psy_question.set_number, 
               score_type: q.psy_question.score_type, optionsMap: optMap, skill: skill
             };
           }
@@ -1285,9 +1286,9 @@ const userAssessmentsResult = async function (req, res) {
 
         let ob = {};
         let score = 0;
-        // console.log("question answer",questions);
+        // console.log("=============== processed question ",JSON.parse(JSON.stringify(questions)));
         questions.forEach(qe => {
-          if(!qe.is_phycho) {
+          if(!qe.is_psycho) {
             ob[qe.id] = qe.correct_answer;
             if(user_response[qe.id] && qe.type == 'MULTIPLE_CHOICE'){
               let are_same = _.isEqual(qe.correct_answer.sort(), user_response[qe.id].sort());
