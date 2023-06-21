@@ -137,7 +137,9 @@ const getScreeningTestDetails = async function (req, res) {
               model: psy_questions,
               attributes:['id','question_type', 'set_number', 'score_type', 'statement', 'mime_type','hint','difficulty_level','complexity_level','knowledge_level','proficiency_level','blooms_taxonomy','skill_id','estimated_time','correct_answer_score','level_id','tags','subject_id', 'grade_id',  'topic_id', 'sub_strand_id', 'strand_id'],
               include: [
-                { model: psy_question_options },
+                { 
+                  model: psy_question_options,
+                },
                 { model: model.levels, attributes: ['name'] },
                 { model: model.skills, attributes: ['name'] },
               ]
@@ -151,11 +153,14 @@ const getScreeningTestDetails = async function (req, res) {
       return ReE(res, "No questions data found", 404);
     } else {
 
-      console.log(assessmentQuestions);
+      // console.log(assessmentQuestions);
       let skills_data_final = skills_data.map(ele => {
         let obj = { ...ele };
         obj.questions = assessmentQuestions.filter(e => {
-          console.log(e);
+          let ddd = e.get({plain: true});
+          // if(ddd.psy_question) {
+            console.log(ddd.psy_question);
+          //}
           return e.question && e.question.skill_id == ele.id || e.psy_question && e.psy_question.skill_id == ele.id ;
         }).map(ele => {
           let object = ele.psy_question ? {...ele.psy_question.get({plain: true})} : {...ele.question.get({plain: true})} ;
