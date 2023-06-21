@@ -1104,20 +1104,18 @@ const getAssessmentAnalytics = async (req, res) => {
 }
 module.exports.getAssessmentAnalytics = getAssessmentAnalytics;
 
-const psychometric_grades = {
-  0: "Below average",
-  29: "Average",
-  57: "Appropriate",
-  84: "Excellent",
-};
-
-const gradePsyScore = (score) => {
-  for (const lower_bound in psychometric_grades) {
-    if (score >= lower_bound) {
-      return psychometric_grades[lower_bound];
-    }
+function gradePsyScore(score) {
+  if (score >= 0 && score <= 28) {
+    return "Below average";
+  } else if (score >= 29 && score <= 56) {
+    return "Average";
+  } else if (score >= 57 && score <= 84) {
+    return "Appropriate";
+  } else if (score >= 85 && score <= 112) {
+    return "Excellent";
+  } else {
+    return "Invalid score";
   }
-  return "Unknown";
 }
 
 const insertQuestions = async (req, res) => {
