@@ -457,7 +457,7 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
               level_id: assessment_configurations_data.level_id,
               skill_id: obj.id,
               limit: obj.no_of_questions,
-              set_number: 1,
+              set_number: randomIntFromInterval(1, 3),
               isPsy: true
             }];
            
@@ -547,6 +547,7 @@ function getSubObj(dd, subjectObjO, subjectLength) {
 function randomIntFromInterval(min, max) { // min and max included 
   return Math.floor(Math.random() * (max - min + 1) + min)
 }
+
 
 async function getQuestions(ele, k, type, level_id) {
   let err, questionsData;
