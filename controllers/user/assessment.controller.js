@@ -1,5 +1,5 @@
 const model = require('../../models');
-const { psy_questions, psy_question_options, user_assessment_slots, assessment_results, question_pools, user_assessment_logs, user_assessments, assessments, assessment_questions,campaigns,campaign_assessments, assessment_configurations,levels, questions, question_options, question_mtf_answers, custom_attributes, professional_infos, user_assessment_responses, skills, users, user_teaching_interests, subjects } = require("../../models");
+const { demovideo_details, psy_questions, psy_question_options, user_assessment_slots, assessment_results, question_pools, user_assessment_logs, user_assessments, assessments, assessment_questions,campaigns,campaign_assessments, assessment_configurations,levels, questions, question_options, question_mtf_answers, custom_attributes, professional_infos, user_assessment_responses, skills, users, user_teaching_interests, subjects } = require("../../models");
 const { to, ReE, ReS, toSnakeCase, returnObjectEmpty, uploadVideoOnS3 } = require('../../services/util.service');
 const { getLiveCampaignAssessments } = require('../../services/campaign.service');
 const validator = require('validator');
@@ -1431,3 +1431,30 @@ const uploadVideoLiveStreaming = async function (req, res) {
   return ReS(res, { data: url });
 }
 module.exports.uploadVideoLiveStreaming = uploadVideoLiveStreaming;
+
+const setDemoScores = async (req, res) => {
+let err, demoData, payload;
+if (_.isEmpty(req.params.user_id) || _.isUndefined(req.params.user_id)) {
+  return ReE(res, "User ID is required in params", 422);
+}
+if (req.params && req.params.assessment_id == undefined) {
+  return ReE(res, { message: "assessment_id params is missing" }, 422);
+}
+payload = req.body;
+console.log("payload", payload);
+try {
+  [err, demoData] = await to(demovideo_details.findOne({ where: {user_id: req.params.user_id, assessment_id: req.params.assessment_id } })
+  .then(row => {
+    row.scores = payload.scores;
+    row.save();
+  }
+  ));
+  if(err) return ReE(res, err, 422);
+
+  return ReS(res, {data: demoData }, 200);
+} catch (err) {
+  return ReE(res, err, 422);
+}
+
+}
+module.exports.setDemoScores =setDemoScores;

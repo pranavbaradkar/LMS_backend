@@ -1471,7 +1471,7 @@ const getUserDetails = async (req, res)=> {
       include:[
         { model: user_teaching_interests, as: 'teaching_interests', attributes:["id", "level_ids","school_ids","board_ids","subject_ids",] },
         { model: assessment_results, attributes: ["id","assessment_id", "percentile", "type", "result", "skill_scores", "subject_scores","total_scored", "total"]},
-        { model: demovideo_details, as: 'demo_video', attributes:['id', 'video_link', 'demo_topic', 'demo_description', 'scores', 'status'] },
+        { model: demovideo_details, as: 'demo_video', attributes:['id','assessment_id', 'video_link', 'demo_topic', 'demo_description', 'scores', 'status'] },
 
         { model: user_interviews, as:'interview', attributes:["id", "date_time", "mode", "room_no", "status", "interviewer", "interview_notes", "interview_remark"] },
       ],
