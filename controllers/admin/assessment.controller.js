@@ -445,7 +445,7 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
               [Op.in]: ['Written Communication', 'Oral Communication', 'Effective Listening']
             } }, attributes: ['strand_text', 'id'], raw: true}));
             
-            finalSubjectQuery = await getCommunicationSkill(obj, strandsData, assessment_configurations_data);
+            finalSubjectQuery = await getCommunicationSkill(obj, strandsData, assessment_configurations_data, 'mains');
           }
           if(ele.name.toLowerCase() === 'pedagogy') {
             finalSubjectQuery = await getPedagogySkill(obj, assessment_configurations_data);
@@ -628,15 +628,15 @@ async function getPsyQuestions(ele, k, type, level_id) {
 async function getPedagogySkill(obj, assessment_configurations_data) {
   let oneFourthPart = Math.ceil(obj.no_of_questions / 3);
   let matrixProblem  = [
-    { complex: 'P1', bloom: 'UNDERSTAND', limit: 3}, 
-    { complex: 'P2', bloom: 'UNDERSTAND', limit: 2}, 
-    { complex: 'P3', bloom: 'UNDERSTAND', limit: 2}, 
-    { complex: 'P1', bloom: 'APPLY', limit: 3}, 
-    { complex: 'P2', bloom: 'APPLY', limit: 1}, 
-    { complex: 'P3', bloom: 'APPLY', limit: 1}, 
-    { complex: 'P1', bloom: 'ANALYZE', limit: 2}, 
-    { complex: 'P2', bloom: 'ANALYZE', limit: 1}, 
-    { complex: 'P3', bloom: 'ANALYZE', limit: 1}
+    { complex: 'P1', bloom: 'UNDERSTAND', limit: 3, level_id: assessment_configurations_data.level_id}, 
+    { complex: 'P2', bloom: 'UNDERSTAND', limit: 2, level_id: assessment_configurations_data.level_id}, 
+    { complex: 'P3', bloom: 'UNDERSTAND', limit: 2, level_id: assessment_configurations_data.level_id}, 
+    { complex: 'P1', bloom: 'APPLY', limit: 2, level_id: assessment_configurations_data.level_id}, 
+    { complex: 'P2', bloom: 'APPLY', limit: 1, level_id: assessment_configurations_data.level_id}, 
+    { complex: 'P3', bloom: 'APPLY', limit: 1, level_id: assessment_configurations_data.level_id}, 
+    { complex: 'P1', bloom: 'ANALYZE', limit: 2, level_id: assessment_configurations_data.level_id}, 
+    { complex: 'P2', bloom: 'ANALYZE', limit: 1, level_id: assessment_configurations_data.level_id}, 
+    { complex: 'P3', bloom: 'ANALYZE', limit: 1, level_id: assessment_configurations_data.level_id}
     ];
   let finalObjectValue = [];
 
@@ -664,7 +664,7 @@ async function getDigitalSkill(obj, strands, strandData, assessment_configuratio
   return [...[], ...strandData];
 }
 
-async function getCommunicationSkill(obj, strands, assessment_configurations_data) {
+async function getCommunicationSkill(obj, strands, assessment_configurations_data, type = 'screening') {
   let finalSubjectQuery = [];
   
   let isListening = strands.filter(ele => ele.strand_text == 'Effective Listening');
@@ -673,6 +673,9 @@ async function getCommunicationSkill(obj, strands, assessment_configurations_dat
   let first3rd = obj.no_of_questions - oneFourthPart;
  
   let matrixProblem  = [{ complex: 'P1'}, { complex: 'P2'}];
+  if(type == "mains") {
+    matrixProblem  = [{ complex: 'P1'}, { complex: 'P2'}, { complex: 'P3'}];
+  }
   let finalObjectValue = [];
 
   strands.forEach(ele => {
