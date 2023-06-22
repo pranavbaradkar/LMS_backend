@@ -513,7 +513,7 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
         if(diff > 0) {
 
           let strandsData = [];
-          
+
           [err, strandsData] = await to(strands.findAll({where: { strand_text : {
             [Op.in]: ['Written Communication', 'Oral Communication', 'Effective Listening']
           } }, attributes: ['strand_text', 'id'], raw: true}));
@@ -528,7 +528,7 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
 
       let finalData = await Promise.all(newData);
 
-      assessment_configurations_data.skill_questions_data = finalData.map(ele => {
+      assessment_configurations_data.skill_questions = finalData.map(ele => {
         let obj = {...ele};
         let questionList = [];
         if(obj.questions) {
