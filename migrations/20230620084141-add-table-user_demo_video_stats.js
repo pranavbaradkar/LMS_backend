@@ -14,7 +14,7 @@ module.exports = {
       },
       assessment_id : { 
         type: Sequelize.INTEGER, 
-        allowNull: false
+        allowNull: true
       },
       video_link : { 
         type: Sequelize.TEXT, 
