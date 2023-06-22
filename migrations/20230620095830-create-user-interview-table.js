@@ -56,6 +56,6 @@ module.exports = {
     });
   },
   down: (queryInterface, Sequelize) => {
-    return queryInterface.dropTable('psy_question_options');
+    return queryInterface.dropTable('user_interviews');
   }
 };
