@@ -1226,6 +1226,7 @@ const userAssessmentsResult = async function (req, res) {
   let subjectScores = {};
   let userInfo = {};
   let assessmentConfig;
+  let skillIdMap = {};
 
   // Compare assessment type questions to assessment type answer
   let questionType, assessmentType, correct_qa;
@@ -1257,6 +1258,7 @@ const userAssessmentsResult = async function (req, res) {
             let skill = q.question.skill.name;
             let subject = q.question.subject ? q.question.subject.name : null;
 
+            skillIdMap[q.question.skill.id] = skill;
             skillScores[user_id][skill] = 0; // initalize skill based score
             subjectScores[user_id][subject] = 0; // initalize subject based score
             questionType = q.question.question_type ? q.question.question_type : null ;
@@ -1268,32 +1270,39 @@ const userAssessmentsResult = async function (req, res) {
               // console.log("question match the following answer: corrected",q.question.correct_answer,correct_qa);
             }
 
-            return {id: q.question_id, correct_answer: correct_qa, type: questionType, 
+            return {id: q.question_id, correct_answer: correct_qa, type: questionType, level_id: q.question.level_id,
               skill: skill, subject: subject, lo_ids: q.question.lo_ids, is_psycho: false
             };
           }
           // for pys_questions
           else if(q.psy_question) {
             let skill = q.psy_question.skill.name;
+            skillIdMap[q.psy_question.skill.id] = skill;
             skillScores[user_id][skill] = 0;
             let optMap = {};
             q.psy_question.options.map(ele => {  optMap[ele.option_key] = ele.score_value; });
             // console.log("the option map for qe",q.question_id, optMap);
             return { 
-              is_psycho: true, id:q.question_id, set_number: q.psy_question.set_number, 
+              is_psycho: true, id:q.question_id, set_number: q.psy_question.set_number, level_id: q.psy_question.level_id,
               score_type: q.psy_question.score_type, optionsMap: optMap, skill: skill
             };
           }
+          else {
+            // console.log("===================================== unlinked questions ", JSON.parse(JSON.stringify(q)));
+          }
 
         });
-
+        // console.log("00000000 ------------------ Result Skill score initaizlied obj",skillScores);
         let ob = {};
         let score = 0;
         // console.log("=============== processed question ",JSON.parse(JSON.stringify(questions)));
         questions.forEach(qe => {
-          if(!qe.is_psycho) {
+          // console.log(`The question (${qe.id}) has level id [${qe.level_id}]`);
+          // console.log("the filtered question ",JSON.parse(JSON.stringify(questions)));
+          if(qe && !qe.is_psycho) {
             ob[qe.id] = qe.correct_answer;
             if(user_response[qe.id] && qe.type == 'MULTIPLE_CHOICE'){
+              // console.log(`The question (${qe.id}) of type MCQ and userresponse is [${user_response[qe.id]}]`);
               let are_same = _.isEqual(qe.correct_answer.sort(), user_response[qe.id].sort());
               are_same ? calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]) : '';
             }
@@ -1306,8 +1315,8 @@ const userAssessmentsResult = async function (req, res) {
               if(user_response[qe.id] && user_response[qe.id].toLowerCase() == qe.correct_answer.toLowerCase()) { calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]); }
             }
           }
-          else {
-            // console.log("the psy options in qno", qe.id, qe.options);
+          else if(qe && qe.is_psycho){
+            // console.log("the psy options in qno", qe.id, user_response[qe.id]);
             calculatePschometricScore(skillScores[user_id], qe.skill, qe.optionsMap, user_response[qe.id]);
           }
           // console.log("question type and response ",user_id, qe.id, qe.type, qe.skill_id, qe.correct_answer, user_response[qe.id]);
@@ -1322,11 +1331,11 @@ const userAssessmentsResult = async function (req, res) {
     return obj;
   }).filter(e => e != null);
   
-  let [totalScore, assessmentTotal, userPercentile, result ] = await calculateFinalScores(skillScores, assessmentConfig);
+  let [totalScore, assessmentTotal, userPercentile, result ] = await calculateFinalScores(skillScores, assessmentConfig, skillIdMap);
 
   
-//  console.log("1111111 ------------------ Result Skill score initaizlied obj",skillScores);
-//   console.log("2222222 ------------------ Result Subject score initaizlied obj",subjectScores);
+ console.log("1111111 ------------------ Result Skill score obj",skillScores);
+//   console.log("2222222 ------------------ Result Subject score obj",subjectScores);
 //  console.log("333333333 ------------------ Result total score",totalScore);
 //   console.log("444444444 ------------------ Result passed/failed",result);
   
@@ -1356,8 +1365,10 @@ const userAssessmentsResult = async function (req, res) {
 module.exports.userAssessmentsResult = userAssessmentsResult
 
 const calculatePschometricScore = async(skillScores, skill, optionMap, user_response) => {
+  // console.log("====================== calclulating psy score ");
   // console.log(skill, user_response, optionMap);
-  skillScores[skill] += optionMap[user_response];
+  if(user_response && optionMap[user_response])
+   {skillScores[skill] += optionMap[user_response];}
 }
 
 const saveToDbAndMail = async(resultPayload) => {
@@ -1488,7 +1499,8 @@ const saveToUserRecommendation = async (userRecommendationUserIds,userRecommenda
 }
 
 // const updateUserResult
-const calculateFinalScores = async (userSkillScores, assessmentConfigData) => {
+const calculateFinalScores = async (userSkillScores, assessmentConfigData, skillIdMap) => {
+  // console.log("====== Calculating for Assessment Type ", assessmentConfigData.assessment_type);
   let userTotal = {};
   let userResult = {};
   let userPercentile = {};
@@ -1502,6 +1514,43 @@ const calculateFinalScores = async (userSkillScores, assessmentConfigData) => {
     userTotal[user] = totalScored;
     let percentile  = ((totalScored/(assessmentTotal))*100).toFixed(2);
     let result = percentile > parseFloat(assessmentConfigData.passing_criteria) ? 'PASSED' : 'FAILED' ;
+    // passing criteria for mains
+
+    if(assessmentConfigData.assessment_type == "MAINS") {
+//       console.log("assessment config",assessmentConfigData);
+//       console.log("skill scores",userSkillScores[user]);
+//       console.log("skill mAP",skillIdMap);
+      
+//       let skillQuestionMap = {};
+//       assessmentConfigData.skill_distributions.map(row => skillQuestionMap[skillIdMap[row.skill_id]] = row.no_of_questions );
+//       console.log("skill Question MAP",skillQuestionMap);
+//       let skillPercent = {};
+//       let userSkill = userSkillScores[user];
+//       Object.keys(userSkill).forEach(skill => {
+//         let skillScore = userSkill[skill];
+//         let skillTotal = skillQuestionMap[skill];
+//         skillPercent[skill] = ((skillScore/skillTotal)*100).toFixed(2);
+//       });
+      
+//       console.log("skill percent ",skillPercent);
+// // Sample data representing user scores in different subjects
+// const scores = {
+//   math: 55,
+//   science: 70,
+//   english: 45,
+//   history: 50
+// };
+
+// // Check if user has scored more than 40 in every subject
+// const isPassed = Object.values(scores).every(score => score > 40);
+
+// if (isPassed) {
+//   console.log('User has passed in all subjects');
+// } else {
+//   console.log('User has not passed in all subjects');
+// }
+
+    }
     userResult[user] = result;
     userPercentile[user] = percentile;
   })
