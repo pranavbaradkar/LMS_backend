@@ -1319,6 +1319,7 @@ const userAssessmentsResult = async function (req, res) {
   let skillIdMap = {};
   let levelHeatMap = {};
   let gradeHeatMap = {};
+  let skillTotals = {};
 
   // Compare assessment type questions to assessment type answer
   let questionType, assessmentType, correct_qa;
@@ -1349,10 +1350,11 @@ const userAssessmentsResult = async function (req, res) {
         }).map(q => {
           if(q.question) {
 
-            let skill = q.question.skill.name;
-            let subject = q.question.subject ? q.question.subject.name : null;
-
-            skillIdMap[q.question.skill.id] = skill;
+            let skill             = q.question.skill.name;
+            let subject           = q.question.subject ? q.question.subject.name : null;
+            let skill_id          = q.question.skill.id;
+            skillIdMap[skill_id]  = skill;
+            skillTotals[skill]    = 0;
             skillScores[user_id][skill] = 0; // initalize skill based score
             subjectScores[user_id][subject] = 0; // initalize subject based score
             questionType = q.question.question_type ? q.question.question_type : null ;
@@ -1365,7 +1367,7 @@ const userAssessmentsResult = async function (req, res) {
             }
 
             return {id: q.question_id, correct_answer: correct_qa, type: questionType, level_id: q.question.level_id,
-              skill: skill, subject: subject, lo_ids: q.question.lo_ids, is_psycho: false, grade_id: q.question.grade_id
+              skill: skill, skill_id: skill_id,  subject: subject, lo_ids: q.question.lo_ids, is_psycho: false, grade_id: q.question.grade_id
             };
           }
           // for pys_questions
@@ -1395,6 +1397,7 @@ const userAssessmentsResult = async function (req, res) {
           // console.log(`The question (${qe.id}) has level id [${qe.level_id}]`);
           // console.log("the filtered question ",JSON.parse(JSON.stringify(questions)));
           if(qe && !qe.is_psycho) {
+            skillTotals[qe.skill] += 1;
             ob[qe.id] = qe.correct_answer;
             if(user_response[qe.id] && qe.type == 'MULTIPLE_CHOICE'){
               // console.log(`The question (${qe.id}) of type MCQ and userresponse is [${user_response[qe.id]}]`);
@@ -1441,6 +1444,7 @@ const userAssessmentsResult = async function (req, res) {
   
   let [totalScore, assessmentTotal, userPercentile, result ] = await calculateFinalScores(skillScores, assessmentConfig, skillIdMap);
 
+  // console.log(" skill totals ", skillTotals);
   // levelHeatMap = levelHeatMap.filter(ele => ele !== -1);
 
   // console.log(" Level Heat Map ", levelHeatMap);
@@ -1453,6 +1457,7 @@ const userAssessmentsResult = async function (req, res) {
 //   console.log("444444444 ------------------ Result passed/failed",result);
   
   let resultPayload = { 
+    skill_totals: skillTotals,
     skill_scores: skillScores, 
     subject_scores: subjectScores, 
     total_scores: totalScore,
@@ -1494,6 +1499,7 @@ const saveToDbAndMail = async(resultPayload) => {
   Object.keys(resultPayload.skill_scores).map(user_id => {
     let obj = {}; 
     let urObj = {};
+    let skill_totals = resultPayload.skill_totals;
     obj.user_id         = user_id;
     obj.assessment_id   = resultPayload.assessment_id;
     obj.type            = resultPayload.type;
@@ -1503,6 +1509,8 @@ const saveToDbAndMail = async(resultPayload) => {
     obj.result          = resultPayload.user_results[user_id];
     obj.total           = resultPayload.assessment_total;
     obj.total_scored    = resultPayload.total_scores[user_id];
+    // excluding psychometric
+    obj.skill_total     = Object.keys(resultPayload.skill_scores[user_id]).filter(skill => skill!=='Psychometric').map(skill => skill_totals[skill]);
     assessmentResultPayload.push(obj);
     let type = (resultPayload.type).toLowerCase();
     urObj[`${type}_score`] = resultPayload.total_scores[user_id];
@@ -1551,6 +1559,8 @@ const saveToDbAndMail = async(resultPayload) => {
   if(assessmentResultData) {
     assessmentResultData.forEach(row => {
       // console.log("looping  assessmentResultData ", row.user_id);
+      // row.skill_total = _.random(100,400);
+      // row.save();
         updatedAssessmentResultIds.push(parseInt(row.user_id));
         if(resultPayload.req_query && resultPayload.req_query.force_mail && resultPayload.req_query.force_mail == 1){
           sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
@@ -1571,7 +1581,7 @@ const saveToDbAndMail = async(resultPayload) => {
       // send mail on new row insert
       sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
     })
-  }));
+  }));  
   if(err) throw new Error("Could not insert to assessment.result");
 
   return assessmentResultData;
