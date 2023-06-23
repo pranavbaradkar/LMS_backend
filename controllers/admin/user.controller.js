@@ -21,16 +21,23 @@ assessment_configurations.belongsTo(levels, { foreignKey: 'level_id' });
 
 model.users.hasMany(model.user_assessments, {foreignKey: 'user_id', targetKey: 'user_id'});
 user_assessments.belongsTo(model.users, { foreignKey: 'user_id' });
-users.hasMany(model.assessment_results, { foreignKey: 'user_id' });
+
 user_teaching_interests.belongsTo(model.users, { foreignKey: 'user_id' });
 users.hasOne(model.user_teaching_interests, { foreignKey: 'user_id', as:'teaching_interests' });
 users.hasOne(model.user_interviews, { foreignKey: 'user_id', as:'interview' });
 demovideo_details.belongsTo(model.users,  { foreignKey: 'user_id' });
-users.hasOne(model.demovideo_details, { foreignKey: 'user_id', as:'demo_video' });
+users.hasMany(model.demovideo_details, { foreignKey: 'user_id', as:'demo_video' });
 
 user_recommendations.belongsTo(model.users, { foreignKey: 'user_id' });
 
 user_assessments.belongsTo(model.professional_infos, {foreignKey: 'user_id', targetKey: 'user_id' });
+
+model.users.hasMany(model.assessment_results, { foreignKey: 'user_id' });
+
+model.assessment_results.belongsTo(model.assessments, { foreignKey: 'assessment_id' });
+model.demovideo_details.belongsTo(model.assessments, { foreignKey: 'assessment_id' });
+
+
 
 const createUser = async function (req, res) {
   let err, roleData;
@@ -1469,13 +1476,33 @@ const getUserDetails = async (req, res)=> {
       where: { id: req.params.user_id },
       attributes: ["id", "profile_pic", "title", "first_name", "middle_name", "last_name", "email", "user_type", "is_email_verified", "country_code", "phone_no", "is_phone_verified", "dob", "gender", "employee_code"],
       include:[
-        { model: user_teaching_interests, as: 'teaching_interests', attributes:["id", "level_ids","school_ids","board_ids","subject_ids",] },
-        { model: assessment_results, attributes: ["id","assessment_id", "percentile", "type", "result", "skill_scores", "subject_scores","total_scored", "total"]},
-        { model: demovideo_details, as: 'demo_video', attributes:['id','assessment_id', 'video_link', 'demo_topic', 'demo_description', 'scores', 'status'] },
+        { 
+          model: user_teaching_interests, 
+          as: 'teaching_interests', 
+          attributes:["id", "level_ids","school_ids","board_ids","subject_ids"],
+        },
+        { 
+          model: assessment_results, 
+          attributes: ["id", "assessment_id", "percentile", "type", "result", "skill_scores", "subject_scores","total_scored", "total"],
+          include: [
+            { 
+              model: model.assessments,
+              attributes: ["name"]
+            } 
+          ]
 
+        },
+        { 
+          model: demovideo_details, as: 'demo_video', attributes:['id','assessment_id', 'video_link', 'demo_topic', 'demo_description', 'scores', 'status'],
+          include: [
+            { 
+              model: model.assessments,
+              attributes: ["name"]
+            } 
+          ]
+        },
         { model: user_interviews, as:'interview', attributes:["id", "date_time", "mode", "room_no", "status", "interviewer", "interview_notes", "interview_remark"] },
-      ],
-      raw: true, nest: true
+      ]
     }));
     if(err) return ReE(res, err, 422);
     if(!userDetails) {
@@ -1501,7 +1528,22 @@ const getUserDetails = async (req, res)=> {
       // userDetails.interview.interview_remark = userDetails.interview.interview_remark ? userDetails.interview.interview_remark : "";
     }
 
-    return ReS(res, {data : userDetails }, 200);
+    let levelData = [];
+    let subjectData = [];
+    let schoolData = [];
+    let objData = userDetails.get({plain: true});
+    
+    if(objData && objData.teaching_interests) {
+        // console.log("the ids obj ", interestIds);
+      [err, levelData] = await to(levels.findAll({ where: {id: objData.teaching_interests.level_ids }, attributes: ['id','name'], raw: true }));
+      [err, schoolData] = await to(schools.findAll({ where: {id: objData.teaching_interests.school_ids }, attributes: ['id','name'], raw: true }));
+      [err, subjectData] = await to(subjects.findAll({ where: {id: objData.teaching_interests.subject_ids }, attributes: ['id','name'], raw: true }));
+      objData.levelData = levelData.map(ele => { return ele.name });
+      objData.schoolData = schoolData.map(ele => { return ele.name });;
+      objData.subjectData = subjectData.map(ele => { return ele.name });;
+    }
+    
+    return ReS(res, {data : objData }, 200);
   } catch (err) {
     return ReE(res, err, 422);
   }

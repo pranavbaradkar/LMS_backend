@@ -489,14 +489,18 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
             }
           })
         );
-     // }
+
+        obj.filterData = finalSubjectQuery; 
+    // }
       
       return obj;
     });
 
     let question_ids = [];
-    Promise.all(skill_questions_data).then(function(values) {
-      assessment_configurations_data.skill_questions = values.map(ele => {
+    Promise.all(skill_questions_data).then(async function(values) {
+      
+      
+      let newData  = values.map(async ele => {
         let obj = {...ele};
         let questionList = [];
         if(obj.questions) {
@@ -507,8 +511,40 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
           });
         }
         obj.questions = questionList;
+        let diff = obj.no_of_questions - questionList.length;
+        if(diff > 0) {
+
+          let strandsData = [];
+
+          [err, strandsData] = await to(strands.findAll({where: { strand_text : {
+            [Op.in]: ['Written Communication', 'Oral Communication', 'Effective Listening']
+          } }, attributes: ['strand_text', 'id'], raw: true}));
+          
+
+          obj.question_remaining = await getQuestions({id: obj.id}, {level_id: assessment_configurations_data.level_id, limit: diff}, null, assessment_configurations_data.level_id, question_ids);
+        } else {
+          obj.question_remaining = [];
+        }
+        return obj; 
+      });
+
+      let finalData = await Promise.all(newData);
+
+      assessment_configurations_data.skill_questions = finalData.map(ele => {
+        let obj = {...ele};
+        let questionList = [];
+        if(obj.questions) {
+          //  obj.questions.forEach(e => {
+          //   questionList = questionList == undefined ? [] : questionList
+          //   e = e == undefined ? [] : e
+          //   questionList = [...e, ...questionList];
+          // });
+        }
+        obj.questions = [...obj.question_remaining,...obj.questions].filter(ele => ele != undefined);
+        questionList = obj.questions;
         obj.questions_count = questionList.length;
         obj.question_ids = questionList.map(ele => { return ele.id });
+        
         if(questionList) {
           questionList.forEach(k => {
             question_ids.push(k.id);
@@ -516,9 +552,10 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
         }
         return obj; 
       });
+
       assessment_configurations_data.question_ids = question_ids;
       assessment_configurations_data.total_questions = question_ids.length;
-      return ReS(res, { data: assessment_configurations_data  }, 200);
+      return ReS(res, { data: assessment_configurations_data }, 200);
     });
   } catch (err) {
     return ReE(res, err, 422);
@@ -552,7 +589,7 @@ function randomIntFromInterval(min, max) { // min and max included
 }
 
 
-async function getQuestions(ele, k, type, level_id) {
+async function getQuestions(ele, k = null, type, level_id, isQuestionList = []) {
   let err, questionsData;
 
     let where = { skill_id: ele.id };
@@ -560,31 +597,38 @@ async function getQuestions(ele, k, type, level_id) {
       where.subject_id = k.subject_id;
     }
    
-    if(k.subject_ids) {
+    if(k && k.subject_ids) {
       where.subject_id = { [Op.in]: k.subject_ids };
     }
    
-    if(k.complex) {
+    if(k && k.complex) {
       where.complexity_level = k.complex;
     }
 
-    if(k.grade_id) {
+    if(k && k.grade_id) {
       where.grade_id = k.grade_id;
     }
    
-    if(k.bloom) {
+    if(k && k.bloom) {
       where.blooms_taxonomy = k.bloom;
     }
     
-    if(k.level_id) {
+    if(k && k.level_id) {
       where.level_id = k.level_id;
     }
 
-    if(k.strand_id) {
+    if(k && k.strand_id) {
       where.strand_id = k.strand_id;
     }
     
     console.log("where", where);
+
+    if(isQuestionList.length > 0) {
+      where.id  = {
+        [Op.notIn]: isQuestionList
+      }; 
+    }
+
     [err, questionsData] = await to(questions.findAll({ 
     where : where,
     include: [{
