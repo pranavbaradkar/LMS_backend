@@ -2,6 +2,7 @@ const model = require('../../models');
 const { demovideo_details, psy_questions, psy_question_options, user_assessment_slots, assessment_results, question_pools, user_assessment_logs, user_assessments, assessments, assessment_questions,campaigns,campaign_assessments, assessment_configurations,levels, questions, question_options, question_mtf_answers, custom_attributes, professional_infos, user_assessment_responses, skills, users, user_teaching_interests, subjects } = require("../../models");
 const { to, ReE, ReS, toSnakeCase, returnObjectEmpty, uploadVideoOnS3 } = require('../../services/util.service');
 const { getLiveCampaignAssessments } = require('../../services/campaign.service');
+const { gradePsyScore } = require('../../services/assessment.service');
 const validator = require('validator');
 var moment = require("moment");
 var _ = require('underscore');
@@ -1089,16 +1090,7 @@ const getAssessmentAnalytics = async (req, res) => {
       where: { user_id: req.user.id, assessment_id: req.params.assessment_id },
       raw:true
     }));
-    // if(assessmentResultData == null) //return ReE(res, "No results Found", 442);  
-    // {
-    //   // set dummy scores
-    //   let dummy = {};
-    //   dummy.skill_scores = "";
-    //   dummy.skill_scores = JSON.stringify({"Pedagogy": 0, "Digital Skills": 0, "Language Skill": 0, "Communication Skill": 0, "Psychometry": 0});
-    //   dummy.percentile = 80;
-    //   assessmentResultData = dummy;
-    //   totalScore = 60;
-    // }
+    if(!assessmentResultData) return ReE(res, "Result not published for this assessment for this user", 442);  
     
     resultData = {};
     resultData.dataScore = {};
@@ -1118,6 +1110,7 @@ const getAssessmentAnalytics = async (req, res) => {
     resultData.data = Object.values(skillScore);
     resultData.dataScore['scored'] =  Object.values(skillScore).reduce((a, b) => a+b), 
     resultData.dataScore['total_score'] = totalScore ; 
+    resultData.skill_total = [ 22, 16,12,15]; 
 
     resultData.percentage = ((resultData.dataScore.scored/totalScore)*100).toFixed(2);
     return ReS(res, {data: resultData }, 200);
@@ -1126,20 +1119,6 @@ const getAssessmentAnalytics = async (req, res) => {
   }
 }
 module.exports.getAssessmentAnalytics = getAssessmentAnalytics;
-
-function gradePsyScore(score) {
-  if (score >= 0 && score <= 28) {
-    return "Below average";
-  } else if (score >= 29 && score <= 56) {
-    return "Average";
-  } else if (score >= 57 && score <= 84) {
-    return "Appropriate";
-  } else if (score >= 85 && score <= 112) {
-    return "Excellent";
-  } else {
-    return "Invalid score";
-  }
-}
 
 const insertQuestions = async (req, res) => {
   let err, insertData;
@@ -1521,3 +1500,22 @@ try {
 
 }
 module.exports.setDemoScores =setDemoScores;
+
+const getDemoDetails = async(req, res) => {
+  let err, demoData;
+  if (req.params && req.params.assessment_id == undefined) {
+    return ReE(res, { message: "assessment_id params is missing" }, 422);
+  }
+  try {
+    [err, demoData] = await to(demovideo_details.findOne({
+      where: { user_id: req.user.id, assessment_id: req.params.assessment_id }
+    }));
+    if(!demoData) return ReE(res, "No records found", 422);
+
+    return ReS(res, { data: demoData }, 200);
+    
+  } catch (err) {
+    return ReE(res, err, 422);
+  }
+}
+module.exports.getDemoDetails = getDemoDetails;

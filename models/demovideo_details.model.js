@@ -15,7 +15,15 @@ module.exports = (sequelize, DataTypes) => {
                         }
                       },
     demo_topic       : { type: DataTypes.STRING, allowNull: false },
-    demo_description : { type: DataTypes.TEXT, allowNull: true },
+    demo_description : { type: DataTypes.TEXT, allowNull: true, 
+                      get: function() {  
+                        let value = this.getDataValue('demo_description');
+                        return JSON.parse(value);
+                      },
+                      set: function(val) {
+                        this.setDataValue('demo_description', JSON.stringify(val));
+                      }
+                      },
     status           : { type: DataTypes.ENUM('PENDING', 'SUBMITTED', 'AI_STATUS_COMPLETED', 'MANUAL_STATUS_COMPLETED', 'PASSED', 'FAILED','NOT_RECOMMENDED', 'RECOMMENDED'), allowNull: false, defaultValue: 'PENDING' },
     deleted_at       : { type: DataTypes.DATE, allowNull: true, defaultValue: null }
   },{

@@ -1,6 +1,7 @@
 const model = require('../../models');
-const { psy_questions, psy_question_options, assessments,assessment_results, user_assessment_logs, assessment_questions, strands, sub_strands, campaign_assessments, questions, question_options, custom_attributes, assessment_configurations, skills, levels, user_assessments, user_recommendations, users, inventory_blocks, user_assessment_responses, subjects } = require("../../models");
-const { to, ReE, ReS, requestQueryObject, lowercaseKeyValue } = require('../../services/util.service');
+const { demovideo_details, psy_questions, psy_question_options, assessments,assessment_results, user_assessment_logs, assessment_questions, strands, sub_strands, campaign_assessments, questions, question_options, custom_attributes, assessment_configurations, skills, levels, user_assessments, user_recommendations, users, inventory_blocks, user_assessment_responses, subjects } = require("../../models");
+const { to, ReE, ReS, requestQueryObject, lowercaseKeyValue, getDemoTopicsFile, fetchTopicForDemo } = require('../../services/util.service');
+const { gradePsyScore, getHighestCount } = require('../../services/assessment.service');
 const validator = require('validator');
 const mailer = require("../../helpers/mailer"); 
 const fs = require("fs");
@@ -11,6 +12,7 @@ const Op = Sequelize.Op;
 var _ = require('underscore');
 const axios = require('axios');
 const psychometric_skill_id = process.env.PSYCHOMETRIC_SKILL_ID || 48;
+
 
 assessment_questions.belongsTo(questions, { foreignKey: "question_id" });
 assessment_questions.belongsTo(psy_questions, { foreignKey: "question_id" });
@@ -1164,6 +1166,48 @@ const calculateScore = (config, skill, skillScores, subject, subjectScores) => {
   }
 }
 
+const timeRanges = () => {
+  let num = _.random(2,4);
+  return "("+ num + '-' + (num+1) + ' minutes)';
+}
+
+const getTopicMap = csvData => {
+  const topicMap = new Map();
+
+  let section = 1;
+  for (const row of csvData) {
+    // section += 0.1;
+    const topic = row.topic;
+    const lessonNo = row.section_no;// section.toFixed(1);
+    const subtopic = row.subTopics;
+    const timing = timeRanges();
+
+    if (!topicMap.has(topic)) {
+      topicMap.set(topic, []);
+    }
+
+    // topicMap.get(topic).push([lessonNo, subtopic]);
+    topicMap.get(topic).push([subtopic, timing]);
+  }
+  return topicMap;
+}
+
+const s3Topic = async (grade, subject) => {
+    let jsonData = await fetchTopicForDemo(process.env.DEMO_TOPICS_BUCKET, `${grade}/${subject}/${subject}.csv`);
+    // console.log("no of rows", jsonData.length);
+    let chosenTopicNo = _.random(0,jsonData.length);
+    // console.log("chose random no ", chosenTopicNo);
+    let topicName = jsonData[chosenTopicNo].topic;
+    // console.log("topic name ", topicName);
+    
+    let topicMap = getTopicMap(jsonData);
+    let chosenTopic = topicMap.get(topicName);
+    chosenTopic.unshift(['Introduction', '(1-2 minutes)']);
+    chosenTopic.push(['Conclusion and wrap-up', '(1-2 minutes)']);
+
+    return { topic: topicName, description: chosenTopic };
+}
+
 /* ====================================================
 For claculating scores, saving to db and mail for MULTIPLE user 
 =========================================================*/
@@ -1240,19 +1284,21 @@ const userAssessmentsResult = async function (req, res) {
         include: [ 
         {
           model: psy_questions,
-          attributes: ['id', 'question_type', 'score_type'],
+          attributes: ['id', 'question_type', 'score_type','level_id', 'grade_id'],
           include:[
+            { model: psy_question_options, as: 'options', attributes: ['id','option_key', 'score_value'] },
             { model: skills, attributes:['id', 'name']},
-            { model: psy_question_options, as: 'options', attributes: ['id','option_key', 'score_value'] }
+            { model: levels, attributes:['id', 'name']}
           ]
         },
         { 
           model: questions, 
           // where: { id : {[Op.lt]: 100000000 }},
-          attributes : ['id','question_type', 'correct_answer', 'skill_id', 'subject_id', 'lo_ids'],
+          attributes : ['id','question_type', 'correct_answer', 'skill_id', 'level_id', 'grade_id', 'subject_id', 'lo_ids'],
           include: [
             {model: subjects, attributes:['id','name']},
-            {model: skills, attributes:['id','name']}
+            {model: skills, attributes:['id','name']},
+            {model: levels, attributes:['id','name']}
           ]
         }
       ],
@@ -1271,6 +1317,8 @@ const userAssessmentsResult = async function (req, res) {
   let userInfo = {};
   let assessmentConfig;
   let skillIdMap = {};
+  let levelHeatMap = {};
+  let gradeHeatMap = {};
 
   // Compare assessment type questions to assessment type answer
   let questionType, assessmentType, correct_qa;
@@ -1284,6 +1332,8 @@ const userAssessmentsResult = async function (req, res) {
         // console.log("the user response user", uar.user);
         let user_response = uar.response_json;
         let user_id = uar.user_id;
+        levelHeatMap[user_id] = [];
+        gradeHeatMap[user_id] = [];
         user_response = JSON.parse(user_response);
         userInfo[user_id] = {};
         userInfo[user_id]['email'] = uar.user.email;
@@ -1315,7 +1365,7 @@ const userAssessmentsResult = async function (req, res) {
             }
 
             return {id: q.question_id, correct_answer: correct_qa, type: questionType, level_id: q.question.level_id,
-              skill: skill, subject: subject, lo_ids: q.question.lo_ids, is_psycho: false
+              skill: skill, subject: subject, lo_ids: q.question.lo_ids, is_psycho: false, grade_id: q.question.grade_id
             };
           }
           // for pys_questions
@@ -1328,7 +1378,7 @@ const userAssessmentsResult = async function (req, res) {
             // console.log("the option map for qe",q.question_id, optMap);
             return { 
               is_psycho: true, id:q.question_id, set_number: q.psy_question.set_number, level_id: q.psy_question.level_id,
-              score_type: q.psy_question.score_type, optionsMap: optMap, skill: skill
+              score_type: q.psy_question.score_type, optionsMap: optMap, skill: skill, grade_id: q.psy_question.grade_id
             };
           }
           else {
@@ -1336,8 +1386,9 @@ const userAssessmentsResult = async function (req, res) {
           }
 
         });
-        // console.log("00000000 ------------------ Result Skill score initaizlied obj",skillScores);
+        console.log("00000000 ------------------ Result Skill score initaizlied obj",skillScores);
         let ob = {};
+        
         let score = 0;
         // console.log("=============== processed question ",JSON.parse(JSON.stringify(questions)));
         questions.forEach(qe => {
@@ -1348,15 +1399,26 @@ const userAssessmentsResult = async function (req, res) {
             if(user_response[qe.id] && qe.type == 'MULTIPLE_CHOICE'){
               // console.log(`The question (${qe.id}) of type MCQ and userresponse is [${user_response[qe.id]}]`);
               let are_same = _.isEqual(qe.correct_answer.sort(), user_response[qe.id].sort());
-              are_same ? calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]) : '';
+              if(are_same) {
+                levelHeatMap[user_id].push(qe.level_id);
+                gradeHeatMap[user_id].push(qe.grade_id);
+                calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]);
+              }
             }
             else if(user_response[qe.id] && qe.type == 'MATCH_THE_FOLLOWING'){
+              // FIXME: calculation is wrong (should check )
               Object.keys(user_response[qe.id]).forEach(function(key, index) {
+                levelHeatMap[user_id].push(qe.level_id);
+                gradeHeatMap[user_id].push(qe.grade_id);
                 if(lowercaseKeyValue(user_response[qe.id])[key] == qe.correct_answer[key]) { calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]); }
               });
             }
             else {
-              if(user_response[qe.id] && user_response[qe.id].toLowerCase() == qe.correct_answer.toLowerCase()) { calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]); }
+              if(user_response[qe.id] && user_response[qe.id].toLowerCase() == qe.correct_answer.toLowerCase()) { 
+                levelHeatMap[user_id].push(qe.level_id);
+                gradeHeatMap[user_id].push(qe.grade_id);
+                calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]); 
+              }
             }
           }
           else if(qe && qe.is_psycho){
@@ -1367,6 +1429,8 @@ const userAssessmentsResult = async function (req, res) {
         });
         uar.questionAnswer = ob;
         uar.score = score;
+        levelHeatMap[user_id] = levelHeatMap[user_id].filter(ele => ele !== -1);      
+        gradeHeatMap[user_id] = gradeHeatMap[user_id].filter(ele => ele !== -1);      
       });
       return obj;
     } else {
@@ -1377,8 +1441,13 @@ const userAssessmentsResult = async function (req, res) {
   
   let [totalScore, assessmentTotal, userPercentile, result ] = await calculateFinalScores(skillScores, assessmentConfig, skillIdMap);
 
-  
- console.log("1111111 ------------------ Result Skill score obj",skillScores);
+  // levelHeatMap = levelHeatMap.filter(ele => ele !== -1);
+
+  // console.log(" Level Heat Map ", levelHeatMap);
+  // console.log(" Grade Heat Map ", gradeHeatMap); 
+  // getHighestCount
+
+//  console.log("1111111 ------------------ Result Skill score obj",skillScores);
 //   console.log("2222222 ------------------ Result Subject score obj",subjectScores);
 //  console.log("333333333 ------------------ Result total score",totalScore);
 //   console.log("444444444 ------------------ Result passed/failed",result);
@@ -1393,7 +1462,9 @@ const userAssessmentsResult = async function (req, res) {
     type: assessment_type,
     assessment_id: assessment_id,
     user_info: userInfo,
-    req_query : req.query
+    req_query : req.query,
+    recommended_level: getHighestCount(levelHeatMap),
+    recommended_grade: getHighestCount(gradeHeatMap),
   };
 
   let insertResult = await saveToDbAndMail(resultPayload);
@@ -1445,6 +1516,7 @@ const saveToDbAndMail = async(resultPayload) => {
   // console.log("user recommendation User IDS used for Update/Create ", userRecommendationUserIds);
   // console.log("user recommendation payload for bulk insert ", userRecommendationPayload);
   await saveToUserRecommendation(userRecommendationUserIds,userRecommendationPayload);
+  await saveToDemoVideo(resultPayload);
   // throw new Error("work under process");
   // console.log("assessment result payload for bulk insert ", assessmentResultPayload);
   let resultLink =  process.env.FRONTEND_URL+`/#/assessment/${resultPayload.assessment_id}/${resultPayload.type.toLowerCase()}/result`;
@@ -1542,9 +1614,33 @@ const saveToUserRecommendation = async (userRecommendationUserIds,userRecommenda
   }
 }
 
+const saveToDemoVideo = async (payload) => {
+  let err, demoData;
+  let updatedIds = [];
+  let currentUserIds = Object.keys(payload.user_info).map(id => parseInt(id));
+  [err, demoData] = await to(demovideo_details.findAll({ 
+    where: {assessment_id: payload.assessment_id, user_id: {[Op.in]: currentUserIds } } 
+  }));
+  if(demoData) {
+    demoData.forEach(row => { updatedIds.push(row.user_id); });
+  }
+  const createIds = _.difference(currentUserIds, updatedIds);
+  let insertPayload = [];
+  let s3 = await s3Topic('Grade 6','English');
+  createIds.forEach(user_id => {
+    let obj = {};
+    obj.user_id = user_id;
+    obj.assessment_id = payload.assessment_id;
+    obj.demo_topic = s3.topic;
+    obj.demo_description = s3.description;
+    insertPayload.push(obj);
+  });
+  [err, demoData] = await to(demovideo_details.bulkCreate(insertPayload));
+}
+
 // const updateUserResult
 const calculateFinalScores = async (userSkillScores, assessmentConfigData, skillIdMap) => {
-  // console.log("====== Calculating for Assessment Type ", assessmentConfigData.assessment_type);
+  // console.log("====== Calculating for Assessment Type ", assessmentConfigData);
   let userTotal = {};
   let userResult = {};
   let userPercentile = {};
@@ -1561,39 +1657,31 @@ const calculateFinalScores = async (userSkillScores, assessmentConfigData, skill
     // passing criteria for mains
 
     if(assessmentConfigData.assessment_type == "MAINS") {
-//       console.log("assessment config",assessmentConfigData);
-//       console.log("skill scores",userSkillScores[user]);
-//       console.log("skill mAP",skillIdMap);
+      // console.log("assessment config",assessmentConfigData);
+      console.log("skill scores",userSkillScores[user]);
+      // console.log("skill mAP",skillIdMap);
       
-//       let skillQuestionMap = {};
-//       assessmentConfigData.skill_distributions.map(row => skillQuestionMap[skillIdMap[row.skill_id]] = row.no_of_questions );
-//       console.log("skill Question MAP",skillQuestionMap);
-//       let skillPercent = {};
-//       let userSkill = userSkillScores[user];
-//       Object.keys(userSkill).forEach(skill => {
-//         let skillScore = userSkill[skill];
-//         let skillTotal = skillQuestionMap[skill];
-//         skillPercent[skill] = ((skillScore/skillTotal)*100).toFixed(2);
-//       });
+      let skillQuestionMap = {};
+      assessmentConfigData.skill_distributions.map(row => skillQuestionMap[skillIdMap[row.skill_id]] = row.no_of_questions );
+      // console.log("skill Question MAP",skillQuestionMap);
+      let skillPercent = {};
+      let userSkill = userSkillScores[user];
+      Object.keys(userSkill).forEach(skill => {
+        let skillScore = userSkill[skill];
+        let skillTotal = skillQuestionMap[skill];
+        skillPercent[skill] = ((skillScore/skillTotal)*100).toFixed(2);
+      });
       
-//       console.log("skill percent ",skillPercent);
-// // Sample data representing user scores in different subjects
-// const scores = {
-//   math: 55,
-//   science: 70,
-//   english: 45,
-//   history: 50
-// };
+      isPsychoPass = userSkill.Psychometric < 57 ? false : true ;
+      console.log(user, " has passed psychometric ? ",  isPsychoPass);
 
-// // Check if user has scored more than 40 in every subject
-// const isPassed = Object.values(scores).every(score => score > 40);
+      // TODO: pyschometric key 
+      if(skillPercent.Psychometric) { delete skillPercent.Psychometric; }
+      // console.log("skill percent ",skillPercent);
 
-// if (isPassed) {
-//   console.log('User has passed in all subjects');
-// } else {
-//   console.log('User has not passed in all subjects');
-// }
-
+      // Check if user has scored more than passing_criteria in every subject
+      const isPassed = Object.values(skillPercent).every(score => parseInt(score) > assessmentConfigData.passing_criteria);
+      result = (isPassed && isPsychoPass) ? 'PASSED' : 'FAILED';
     }
     userResult[user] = result;
     userPercentile[user] = percentile;
@@ -1609,10 +1697,11 @@ const calculateAssessmentTotal = (assessmentConfig) => {
   // let skillDistribution = JSON.parse(assessmentConfig.skill_distributions);
   skillDistribution.forEach(ele => {
     // console.log("the element ", ele);
+    // TODO: core skill ID value
     if(ele.skill_id == 45) { // Core skill
       total += ele.no_of_questions;
     }
-    if(ele.skill_id == 48) {// Psychometric 
+    if(ele.skill_id == psychometric_skill_id) {// Psychometric 
       total += (ele.no_of_questions*4);
     }
   });

@@ -85,6 +85,9 @@ router.get("/assessments/:assessment_id/:type/questions-list",userPassport.authe
 router.get("/assessments/:assessment_id/:type/question",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.userAssessmentQuestion);
 router.post("/assessments/:assessment_id/:type/submit",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.testAnswersSubmit);
 
+// **************************** User Demo ***********************
+router.get("/users/demo/:assessment_id",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.getDemoDetails);
+
 // **************************** User Assessment ***********************
 router.post("/users/assessment_slot",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.userAssessmentSlot);
 router.get("/users/assessment_slot",userPassport.authenticate("jwt", { session: false }), UserAssessmentController.getUserAssessmentSlot);

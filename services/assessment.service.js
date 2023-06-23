@@ -64,3 +64,47 @@ module.exports.getStatus = async function(user_id) {
 
   return payloadStatus;
 }
+
+const gradePsyScore = (score) => {
+  if (score >= 0 && score <= 28) {
+    return "Below average";
+  } else if (score >= 29 && score <= 56) {
+    return "Average";
+  } else if (score >= 57 && score <= 84) {
+    return "Appropriate";
+  } else if (score >= 85 && score <= 112) {
+    return "Excellent";
+  } else {
+    return "Invalid score";
+  }
+}
+module.exports.gradePsyScore = gradePsyScore;
+
+const getHighestCount = (userOjbect) => {
+  let resObj = {};
+  Object.keys(userOjbect).forEach(user => {
+    resObj[user] = getHighestCountPerUser(userOjbect[user]);
+  })
+  return resObj;
+}
+module.exports.getHighestCount = getHighestCount;
+
+const getHighestCountPerUser = (array) => {
+  const count = {};
+  array.forEach(element => {
+  count[element] = (count[element] || 0) + 1;
+  });
+
+  let highestCount = 0;
+  let elementsWithHighestCount = [];
+
+  for (const element in count) {
+  if (count[element] > highestCount) {
+      highestCount = count[element];
+      elementsWithHighestCount = [element];
+  } else if (count[element] === highestCount) {
+      elementsWithHighestCount.push(element);
+  }
+  }
+  return elementsWithHighestCount;
+}
