@@ -23,6 +23,15 @@ module.exports = (sequelize, DataTypes) => {
                             this.setDataValue('subject_scores', JSON.stringify(val));
                             }
                          },
+        skill_total     : { type: DataTypes.TEXT, allowNull: false, 
+                            get: function() {  
+                            let value = this.getDataValue('skill_total');
+                            return JSON.parse(value);
+                            },
+                            set: function(val) {
+                            this.setDataValue('skill_total', JSON.stringify(val));
+                            }
+                         },
 
         percentile      : { type: DataTypes.DECIMAL, allowNull: false },
         total           : { type: DataTypes.INTEGER, allowNull: false },
