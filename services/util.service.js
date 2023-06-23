@@ -1,6 +1,7 @@
 const {to} = require('await-to-js');
 const pe = require('parse-error');
 const axios = require('axios');
+const csv = require('csv');
 var AWS = require('aws-sdk');
 var config = {
     accessKeyId: process.env.ACCESS_KEY,
@@ -274,6 +275,34 @@ module.exports.uploadVideoOnS3 = async (path, fileName, contentType, videoBlobSt
     });
     return uploadURL;
 }
+
+const fetchTopicForDemo = async (bucketName, key) => {
+  const params = {
+    Bucket: bucketName,
+    Key: key,
+  };
+
+  const csvData = await s3Client.getObject(params).promise();
+
+  const reader = csv.parse(csvData.Body.toString());
+
+  const jsonObjects = [];
+  for await (const row of reader) {
+    //[ 'Chapter_No', 'Chapters', 'Section_No', 'Sections' ]
+    const jsonObject = {};
+    for (const index in row) {
+      jsonObject.chapter_no = row[0];
+      jsonObject.topic = row[1];
+      jsonObject.section_no = row[2];
+      jsonObject.subTopics = row[3];
+    }
+    jsonObjects.push(jsonObject);
+  }
+
+  return jsonObjects;
+};
+module.exports.fetchTopicForDemo = fetchTopicForDemo;
+
 
 module.exports.returnObjectEmpty = function (response) {
     let object = {}
