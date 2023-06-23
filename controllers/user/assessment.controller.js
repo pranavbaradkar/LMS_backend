@@ -1110,6 +1110,7 @@ const getAssessmentAnalytics = async (req, res) => {
     resultData.data = Object.values(skillScore);
     resultData.dataScore['scored'] =  Object.values(skillScore).reduce((a, b) => a+b), 
     resultData.dataScore['total_score'] = totalScore ; 
+    resultData.skill_total = [ 22, 16,12,15]; 
 
     resultData.percentage = ((resultData.dataScore.scored/totalScore)*100).toFixed(2);
     return ReS(res, {data: resultData }, 200);
