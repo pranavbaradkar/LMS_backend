@@ -5,8 +5,28 @@ module.exports = (sequelize, DataTypes) => {
         id              : { type: DataTypes.INTEGER(11), autoIncrement: true, allowNull: false, primaryKey: true },
         user_id         : { type: DataTypes.INTEGER, allowNull: false },
         assessment_id   : { type: DataTypes.INTEGER, allowNull: false },
-        skill_scores    : { type: DataTypes.STRING, allowNull: false },
+        skill_scores    : { type: DataTypes.STRING, allowNull: false, 
+                            get: function() {  
+                            let value = this.getDataValue('skill_scores');
+                            return JSON.parse(value);
+                            },
+                            set: function(val) {
+                            this.setDataValue('skill_scores', JSON.stringify(val));
+                            }
+                         },
+        subject_scores  : { type: DataTypes.STRING, allowNull: false, 
+                            get: function() {  
+                            let value = this.getDataValue('subject_scores');
+                            return JSON.parse(value);
+                            },
+                            set: function(val) {
+                            this.setDataValue('subject_scores', JSON.stringify(val));
+                            }
+                         },
+
         percentile      : { type: DataTypes.DECIMAL, allowNull: false },
+        total           : { type: DataTypes.INTEGER, allowNull: false },
+        total_scored    : { type: DataTypes.INTEGER, allowNull: false },
         type            : { type: DataTypes.ENUM('SCREENING', 'MAINS'), allowNull: false },
         result          : { type: DataTypes.ENUM('PASSED', 'FAILED'), allowNull: false },
         deleted_at      : { type: DataTypes.DATE, allowNull: true, defaultValue: null }

@@ -5,7 +5,7 @@ module.exports = (sequelize, DataTypes) => {
   var Model = sequelize.define('user_assessment_slots', {
     id                        : { type: DataTypes.INTEGER(11), allowNull: false, autoIncrement: true, primaryKey: true },
     user_id                   : { type: DataTypes.INTEGER, allowNull: false },
-    slot                      : { type: DataTypes.DATE, allowNull: false },
+    slot                      : { type: DataTypes.DATE, allowNull: true },
     video_link                : { type: DataTypes.STRING, allowNull: true },
     padv_video_link           : { type: DataTypes.STRING, allowNull: true },
     demo_link                 : { type: DataTypes.STRING, allowNull: true },

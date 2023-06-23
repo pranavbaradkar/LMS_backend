@@ -1055,6 +1055,7 @@ const isUserAuthorize = async (req, res) => {
   let err, result;
   try {
     let is_authorized = false;
+    console.log(`${process.env.AI_URL}/authorize`, req.body);
     result = await axios.post(`${process.env.AI_URL}/authorize`, req.body);
 
     if(result && result.data && result.data.message && result.data.message.facial_similarity && result.data.message.facial_similarity.indexOf('Matched') >= 0) {
@@ -1074,3 +1075,21 @@ const isUserAuthorize = async (req, res) => {
   }
 }
 module.exports.isUserAuthorize = isUserAuthorize;
+
+const userScript = async(req, res) => {
+  let err, script;
+  if (req.params && req.params.script_type == undefined) {
+    return ReE(res, { message: "Script Type PADV/PADC is missing in params" }, 422);
+  }
+  let script_type = req.params.script_type;
+  try {
+    let scriptPadc = "";
+    let scriptPadv = "Hello, I am <Name> and the account is registered under my email address <email id>, my date of birth<DD/MM/YY>";
+    script = (script_type.toLowerCase() == "padv") ?  scriptPadv : scriptPadv;
+
+    return ReS(res, {data: { script: script, type: script_type.toUpperCase() }}, 200);
+  } catch (err) {
+    return ReE(res, err, 422);
+  }
+}
+module.exports.userScript = userScript;

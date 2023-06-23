@@ -1,5 +1,5 @@
 const model = require('../../models');
-const { user_assessment_slots, question_pools, user_assessment_logs, user_assessments, assessments, assessment_questions,campaigns,campaign_assessments, assessment_configurations,levels, questions, question_options, question_mtf_answers, custom_attributes, professional_infos, user_assessment_responses, skills, users, user_teaching_interests, subjects } = require("../../models");
+const { demovideo_details, psy_questions, psy_question_options, user_assessment_slots, assessment_results, question_pools, user_assessment_logs, user_assessments, assessments, assessment_questions,campaigns,campaign_assessments, assessment_configurations,levels, questions, question_options, question_mtf_answers, custom_attributes, professional_infos, user_assessment_responses, skills, users, user_teaching_interests, subjects } = require("../../models");
 const { to, ReE, ReS, toSnakeCase, returnObjectEmpty, uploadVideoOnS3 } = require('../../services/util.service');
 const { getLiveCampaignAssessments } = require('../../services/campaign.service');
 const validator = require('validator');
@@ -22,11 +22,15 @@ const redis = new Redis({
 const NodeCache = require( "node-cache" );
 const { userInfo } = require('os');
 const assessmentCache = new NodeCache( { stdTTL: 0, checkperiod: ((3600*24)*7) } );
+const psychometric_skill_id = process.env.PSYCHOMETRIC_SKILL_ID || 48;
+
 
 questions.belongsTo(model.skills, { foreignKey: 'skill_id' });
 questions.belongsTo(model.levels, { foreignKey: 'level_id' });
 questions.belongsTo(model.subjects, { foreignKey: 'subject_id' });
 assessment_questions.belongsTo(questions, { foreignKey: "question_id" });
+assessment_questions.belongsTo(psy_questions, { foreignKey: "question_id" });
+
 assessment_configurations.belongsTo(assessments, { foreignKey: "assessment_id" });
 assessments.hasMany(assessment_configurations, { foreignKey: "assessment_id" });
 assessments.hasMany(user_assessment_responses, { foreignKey: "assessment_id" });
@@ -37,13 +41,18 @@ questions.hasMany(question_mtf_answers, { foreignKey: 'question_id'});
 
 campaigns.hasMany(campaign_assessments, { foreignKey: "campaign_id" });
 
+
+psy_questions.hasMany(model.psy_question_options, { foreignKey: 'psy_question_id' });
+psy_questions.belongsTo(model.levels, { foreignKey: 'level_id' });
+psy_questions.belongsTo(model.skills, { foreignKey: 'skill_id' });
+
 assessment_configurations.belongsTo(levels, { foreignKey: 'level_id' });
 
 const getUserAssessmentSlot = async (req,res) => {
   let err, userAssessmentSlotData;
   try {
     [err, userAssessmentSlotData] = await to(user_assessment_slots.findOne({where: {user_id: req.user.id}}));
-    if (err) return ReE(res, err, 422);
+    if(!userAssessmentSlotData) { return ReE(res, err, 422); }
 
     return ReS(res, { data: userAssessmentSlotData }, 200);
   } catch (err) {
@@ -65,6 +74,24 @@ const userAssessmentSlot = async function(req, res) {
       [err, userAssessmentSlotData] = await to(user_assessment_slots.findOne({where: {user_id: req.user.id}}));
     }
 
+    // demoPaylod ( demo.topic and description will be set already)
+    let demoPayload = {};
+    demoPayload.video_link = payload.demo_link;
+    demoPayload.status = payload.demo_video_status;
+    demoPayload.demo_topic = "";
+    demoPayload.user_id = req.user.id;
+    // check if entry present for current user and assessment_id
+    [err, demoData] = await to(demovideo_details.findOne({ where: { user_id: req.user.id } }));
+    if(demoData) {
+      demoData.video_link = payload.demo_link;
+      demoData.status = payload.demo_video_status;
+      demoData.save();
+      // console.log("update demovideo details");
+    }
+    else {
+      // console.log("create demovideo details");
+      [err, demoData] = await to(demovideo_details.create(demoPayload));
+    }
     if (err) return ReE(res, err, 422);
     return ReS(res, { data: userAssessmentSlotData }, 200);
   } catch (err) {
@@ -123,8 +150,20 @@ const getScreeningTestDetails = async function (req, res) {
                 { model: model.levels, attributes: ['name'] },
                 { model: model.subjects, attributes: ['name'] }
               ]
+            },
+            {
+              model: psy_questions,
+              attributes:['id','question_type', 'set_number', 'score_type', 'statement', 'mime_type','hint','difficulty_level','complexity_level','knowledge_level','proficiency_level','blooms_taxonomy','skill_id','estimated_time','correct_answer_score','level_id','tags','subject_id', 'grade_id',  'topic_id', 'sub_strand_id', 'strand_id'],
+              include: [
+                { 
+                  model: psy_question_options,
+                },
+                { model: model.levels, attributes: ['name'] },
+                { model: model.skills, attributes: ['name'] },
+              ]
             }
-          ]
+          ],
+          order: [['id', 'asc']]
       }));
 
     if (err) return ReE(res, err, 422);
@@ -132,16 +171,22 @@ const getScreeningTestDetails = async function (req, res) {
       return ReE(res, "No questions data found", 404);
     } else {
 
-      console.log(skills_data);
+      // console.log(assessmentQuestions);
       let skills_data_final = skills_data.map(ele => {
         let obj = { ...ele };
         obj.questions = assessmentQuestions.filter(e => {
-          return e.question && e.question.skill_id == ele.id;
+          let ddd = e.get({plain: true});
+          // if(ddd.psy_question) {
+            console.log(ddd.psy_question);
+          //}
+          return e.question && e.question.skill_id == ele.id || e.psy_question && e.psy_question.skill_id == ele.id ;
         }).map(ele => {
-          let object = {...ele.question.get({plain: true})};
-          object.question_options = object.question_options.map(e => {
+          let object = ele.psy_question ? {...ele.psy_question.get({plain: true})} : {...ele.question.get({plain: true})} ;
+          object.question_options = object.psy_question_options ? object.psy_question_options.map(e => {
             return returnObjectEmpty(e);
-          })
+          }) : object.question_options.map(e => {
+            return returnObjectEmpty(e);
+          });
           return returnObjectEmpty(object);
         })
         return obj;
@@ -251,7 +296,7 @@ const getUserRecommendedAssessments = async function (req, res) {
         }]
       }],
       order: [
-        Sequelize.literal('random()')
+       ['level_id', 'desc']
       ],
       raw: true,
       nest: true
@@ -259,7 +304,7 @@ const getUserRecommendedAssessments = async function (req, res) {
 
     let skillSpecificDataFound = assessments_screening.length;
    
-    console.log("======is fine assesemnt=======", assessments_screening, assessments_screening.length);
+    console.log("======is fine assesemnt=======", JSON.stringify(where), assessments_screening, JSON.stringify(assessments_screening.skill_distributions), assessments_screening.length);
     let isSubjectDataFoundOntoplevel = true;
     if(assessments_screening.length == 0) {
       isSubjectDataFoundOntoplevel = false;
@@ -418,7 +463,7 @@ const getUserRecommendedAssessments = async function (req, res) {
           finalOutput.screening_status = finalOutput.user_assessments.status;
         } 
         if(type == 'MAINS') {
-          finalOutput.mains_status = finalOutput.user_assessments.mains_status;
+          finalOutput.mains_status = finalOutput.user_assessments.status;
         }
         delete finalOutput.user_assessments;
       } else {
@@ -579,48 +624,85 @@ module.exports.logAssessment = logAssessment;
 const statusUserAssessment = async function (req, res) {
   let err, user_assessment_data_exist;
   payload = req.body;
+  if(req.body && (req.body.assessment_id == undefined)) {
+    return ReE(res, { message: "Assessment id is required." }, 422);
+  }
+
   payload.user_id = req.user.id;
   try {
-    [err, assessment_data] = await to(assessments.findOne({ where: { id: payload.assessment_id } }));
-    if(!assessment_data) { return ReE(res, "Assessment id not found.", 404); }
+    // [err, assessment_data] = await to(assessments.findOne({ where: { id: payload.assessment_id } }));
+    // if(!assessment_data) { return ReE(res, "Assessment id not found.", 404); }
 
-    let wherePayload = { user_id : req.user.id };
-    let screeningAssessmentIds = [];
+    let wherePayload = { user_id : req.user.id, assessment_id: payload.assessment_id };
+    let deleteAssessmentId = [];
     [err, userAssessmentData] = await to(user_assessments.findAll({ where: wherePayload, raw:true }));
     let allowedStatus = ['STARTED', 'PENDING', 'ABORTED', 'INPROGRESS'];
     let restrictedStatus = ['FINISHED', 'PASSED', 'FAILED'];
+
+    if(restrictedStatus.includes(payload.status)) {
+      return ReE(res, "This status cannot be set by user", 422);
+    }
+
     if(userAssessmentData) {
       userAssessmentData.map(row => {
-        if (restrictedStatus.includes(row.status)) {
-          if (row.type == 'MAINS'){
-            return ReE(res, "Already Appeared for Mains", 422);
-          } else {
-            return ReE(res, "Already appeared for Screening", 422);
-          }
+        if(row.type == 'MAINS' && restrictedStatus.includes(row.status)) {
+          if((payload.type).toUpperCase()=='MAINS')
+            return ReE(res, "Already Appeared for MAINS", 422);
+        }
+        else if (row.type == 'MAINS' && allowedStatus.includes(row.status)){
+          deleteAssessmentId.push(row.id);
+        }
+
+        if(row.type == 'SCREENING' && restrictedStatus.includes(row.status)) {
+          payload.screening_status = row.status;
+          if((payload.type).toUpperCase()=='SCREENING')
+            return ReE(res, 'Already Appeared for SCREENING');
+        }
+        else if(row.type=='SCREENING' && allowedStatus.includes(row.status)) {
+          deleteAssessmentId.push(row.id);
         }
         
-        if (row.type == 'SCREENING' && row.status == 'STARTED' && row.assessment_id == payload.assessment_id)
+        if (row.type == payload.type && row.status == 'STARTED' && row.assessment_id == payload.assessment_id)
           return ReE(res, "This assessment has started already", 422);
-        
-        if (row.type == 'SCREENING' && allowedStatus.includes(row.status))
-          screeningAssessmentIds.push(row.assessment_id);
-        
       });
     } 
 
+    payload.mains_status = null;
+    payload.screening_status = null;
+    if((payload.type).toUpperCase() == 'SCREENING') {
+      payload.screening_status = payload.status;
+      payload.mains_status = 'PENDING';
+    }
+
+    if((payload.type).toUpperCase() == 'MAINS') {
+      payload.mains_status = payload.status;
+      payload.screening_status = 'FINISHED';
+    }
+    
     // delete all filtered user_assessments 
-    if(screeningAssessmentIds.length > 0){
+    // if(deleteAssessmentId.length > 0){
+      // console.log("delete candidate ", deleteAssessmentId);
       [err, userAssessmentData] = await to(user_assessments.destroy({ 
         where: { 
-          user_id: req.user.id, type:"SCREENING",
-          assessment_id: { [Op.in]: screeningAssessmentIds }
+          user_id: req.user.id, type: payload.type,
+          status: { [Op.in]: allowedStatus }
         }, 
         force: true 
       }));
-    }   
+    // }   
+    
       
     [err, user_assessment_data] = await to(user_assessments.create(payload));
     if (err) return ReE(res, err, 422);
+
+    if(payload.type.toUpperCase() == 'MAINS'){
+      user_assessment_data.mains_status = user_assessment_data.status;
+      delete user_assessment_data.screening_status;
+    } else {
+      user_assessment_data.screening_status = user_assessment_data.status;
+      delete user_assessment_data.mains_status;
+    }
+    
     return ReS(res, { data: user_assessment_data }, 200);      
   } catch (err) {
     return ReE(res, err, 422);
@@ -928,7 +1010,7 @@ const getMainsSlot = async function(req, res) {
     
     var diff = endDate.diff(startDate, 'days');
     let slotDay = [];
-    let timeing =  ["10:00 am","12:00 pm","01:00 am","03:00 am","06:00 am"];
+    let timeing =  ["10:00 am", "12:00 pm", "01:00 pm", "03:00 pm", "06:00 pm"];
     for(i = 0; i < diff; i++) {
       var isDay  = moment().add(i, 'day').isoWeekday();
       if(isDay == 6 || isDay == 7) {
@@ -982,41 +1064,82 @@ const getAssessmentAnalytics = async (req, res) => {
     }))
     if (err) return ReE(res, err, 422);
     if(!assessmentConfig) { 
-      assessmentConfig = {};
-      assessmentConfig.total_no_of_questions = 40;
-      assessmentConfig.correct_score_answer = 1;
+      assessmentConfig = {"skill_distribution": [
+        { "skill_id": 49, "no_of_questions": 12 },
+        { "skill_id": 50, "no_of_questions": 20 }
+      ] };
     }
-    let totalScore = assessmentConfig.total_no_of_questions * assessmentConfig.correct_score_answer;
+    // console.log(`Assessment config for ${req.params.assessment_id} `)
+    // console.log(JSON.parse(JSON.stringify(assessmentConfig)));
+    // calculate total for psychometric question and other skills.
+    let psy_total = 0;
+    let totalScore = 0;
+    assessmentConfig.skill_distributions.forEach(row => {
+      if(row.skill_id == psychometric_skill_id) // 48 
+      { psy_total = row.no_of_questions * 4;}
+      else {
+        totalScore += parseInt(row.no_of_questions);
+      }
+    });
+
+    // console.log("psy Total ", psy_total);
+    // console.log("Total score of other skills", totalScore);
+    
     [err, assessmentResultData] = await to(assessment_results.findOne({ 
       where: { user_id: req.user.id, assessment_id: req.params.assessment_id },
       raw:true
     }));
-    if(assessmentResultData == null) //return ReE(res, "No results Found", 442);  
-    {
-      // set dummy scores
-      let dummy = {};
-      dummy.skill_scores = "";
-      dummy.skill_scores = JSON.stringify({"Pedagogy": 0, "Digital Skills": 0, "Language Skill": 0, "Communication Skill": 0, "Psychometry": 0});
-      dummy.percentile = 80;
-      assessmentResultData = dummy;
-      totalScore = 60;
-    }
+    // if(assessmentResultData == null) //return ReE(res, "No results Found", 442);  
+    // {
+    //   // set dummy scores
+    //   let dummy = {};
+    //   dummy.skill_scores = "";
+    //   dummy.skill_scores = JSON.stringify({"Pedagogy": 0, "Digital Skills": 0, "Language Skill": 0, "Communication Skill": 0, "Psychometry": 0});
+    //   dummy.percentile = 80;
+    //   assessmentResultData = dummy;
+    //   totalScore = 60;
+    // }
     
-    let skillScore = JSON.parse(assessmentResultData.skill_scores);
     resultData = {};
+    resultData.dataScore = {};
+    resultData.psychometric = {};
+    let skillScore = JSON.parse(assessmentResultData.skill_scores);
+    let psychometric_scores = 0;
+    
+    if(skillScore.Psychometric) { 
+      psychometric_scores = skillScore.Psychometric;
+      resultData.psychometric['score'] = psychometric_scores;
+      resultData.psychometric['grade'] = gradePsyScore(psychometric_scores);
+      resultData.psychometric['total'] = psy_total;
+      delete skillScore.Psychometric; 
+    }
+
     resultData.labels = Object.keys(skillScore);
     resultData.data = Object.values(skillScore);
-    resultData.dataScore = { 
-      'scored': Object.values(skillScore).reduce((a, b) => a+b), 
-      'total_score': totalScore 
-    };
-    resultData.percentage = assessmentResultData.percentile;
+    resultData.dataScore['scored'] =  Object.values(skillScore).reduce((a, b) => a+b), 
+    resultData.dataScore['total_score'] = totalScore ; 
+
+    resultData.percentage = ((resultData.dataScore.scored/totalScore)*100).toFixed(2);
     return ReS(res, {data: resultData }, 200);
   } catch (err) {
     return ReE(res,err,442);
   }
 }
 module.exports.getAssessmentAnalytics = getAssessmentAnalytics;
+
+function gradePsyScore(score) {
+  if (score >= 0 && score <= 28) {
+    return "Below average";
+  } else if (score >= 29 && score <= 56) {
+    return "Average";
+  } else if (score >= 57 && score <= 84) {
+    return "Appropriate";
+  } else if (score >= 85 && score <= 112) {
+    return "Excellent";
+  } else {
+    return "Invalid score";
+  }
+}
 
 const insertQuestions = async (req, res) => {
   let err, insertData;
@@ -1372,3 +1495,29 @@ const uploadVideoLiveStreaming = async function (req, res) {
   return ReS(res, { data: url });
 }
 module.exports.uploadVideoLiveStreaming = uploadVideoLiveStreaming;
+
+const setDemoScores = async (req, res) => {
+let err, demoData, payload;
+if (_.isEmpty(req.params.user_id) || _.isUndefined(req.params.user_id)) {
+  return ReE(res, "User ID is required in params", 422);
+}
+if (req.params && req.params.assessment_id == undefined) {
+  return ReE(res, { message: "assessment_id params is missing" }, 422);
+}
+payload = req.body;
+console.log("payload", payload);
+try {
+  [err, demoData] = await to(demovideo_details.findOne({ where: {user_id: req.params.user_id, assessment_id: req.params.assessment_id } }) );
+  if(err) return ReE(res, err, 422);
+  if(demoData) {
+    demoData.scores = payload.scores;
+    demoData.save();
+  }
+
+  return ReS(res, {data: demoData }, 200);
+} catch (err) {
+  return ReE(res, err, 422);
+}
+
+}
+module.exports.setDemoScores =setDemoScores;

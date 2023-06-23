@@ -1,4 +1,4 @@
-const { roles,subjects, schools, levels, user_teaching_interests, users, user_assessments, academics, professional_infos, custom_attributes, school_inventories } = require("../../models");
+const { roles,subjects, schools, levels, user_teaching_interests, users, demovideo_details, user_interviews, user_assessments, assessment_results, academics, professional_infos, custom_attributes, school_inventories, user_recommendations, assessment_configurations } = require("../../models");
 const model = require('../../models');
 const authService = require("../../services/auth.service");
 const { to, ReE, ReS, toSnakeCase, paginate, snakeToCamel, requestQueryObject, randomHash, getUUID } = require('../../services/util.service');
@@ -15,8 +15,29 @@ const Op = Sequelize.Op;
 const validator = require('validator');
 var moment = require("moment");
 const { object } = require("underscore");
+
+user_assessments.hasMany(assessment_configurations, {  sourceKey: 'assessment_id', foreignKey: "assessment_id" });
+assessment_configurations.belongsTo(levels, { foreignKey: 'level_id' });
+
+model.users.hasMany(model.user_assessments, {foreignKey: 'user_id', targetKey: 'user_id'});
 user_assessments.belongsTo(model.users, { foreignKey: 'user_id' });
+
+user_teaching_interests.belongsTo(model.users, { foreignKey: 'user_id' });
+users.hasOne(model.user_teaching_interests, { foreignKey: 'user_id', as:'teaching_interests' });
+users.hasOne(model.user_interviews, { foreignKey: 'user_id', as:'interview' });
+demovideo_details.belongsTo(model.users,  { foreignKey: 'user_id' });
+users.hasMany(model.demovideo_details, { foreignKey: 'user_id', as:'demo_video' });
+
+user_recommendations.belongsTo(model.users, { foreignKey: 'user_id' });
+
 user_assessments.belongsTo(model.professional_infos, {foreignKey: 'user_id', targetKey: 'user_id' });
+
+model.users.hasMany(model.assessment_results, { foreignKey: 'user_id' });
+
+model.assessment_results.belongsTo(model.assessments, { foreignKey: 'assessment_id' });
+model.demovideo_details.belongsTo(model.assessments, { foreignKey: 'assessment_id' });
+
+
 
 const createUser = async function (req, res) {
   let err, roleData;
@@ -1444,3 +1465,194 @@ const getUsersAssessments = async function (req, res) {
   }
 };
 module.exports.getUsersAssessments = getUsersAssessments;
+
+const getUserDetails = async (req, res)=> {
+  if (_.isEmpty(req.params.user_id) || _.isUndefined(req.params.user_id)) {
+    return ReE(res, "user id required in params", 422);
+  }
+  try {
+    let err, userDetails;
+    [err, userDetails] = await to(users.findOne({
+      where: { id: req.params.user_id },
+      attributes: ["id", "profile_pic", "title", "first_name", "middle_name", "last_name", "email", "user_type", "is_email_verified", "country_code", "phone_no", "is_phone_verified", "dob", "gender", "employee_code"],
+      include:[
+        { 
+          model: user_teaching_interests, 
+          as: 'teaching_interests', 
+          attributes:["id", "level_ids","school_ids","board_ids","subject_ids"],
+        },
+        { 
+          model: assessment_results, 
+          attributes: ["id", "assessment_id", "percentile", "type", "result", "skill_scores", "subject_scores","total_scored", "total"],
+          include: [
+            { 
+              model: model.assessments,
+              attributes: ["name"]
+            } 
+          ]
+
+        },
+        { 
+          model: demovideo_details, as: 'demo_video', attributes:['id','assessment_id', 'video_link', 'demo_topic', 'demo_description', 'scores', 'status'],
+          include: [
+            { 
+              model: model.assessments,
+              attributes: ["name"]
+            } 
+          ]
+        },
+        { model: user_interviews, as:'interview', attributes:["id", "date_time", "mode", "room_no", "status", "interviewer", "interview_notes", "interview_remark"] },
+      ]
+    }));
+    if(err) return ReE(res, err, 422);
+    if(!userDetails) {
+      //TODO: remove this dummy data
+      userDetails = '{"id":3975,"profile_pic":"","title":"Ms","first_name":"Kanhai","middle_name":"Lal","last_name":"Murmu","email":"kanhailal2010@gmail.com","user_type":"JOB_SEEKER","is_email_verified":true,"country_code":"","phone_no":"8956508033","is_phone_verified":true,"dob":"","gender":"","employee_code":"","teaching_interests":{"id":3975,"user_id":4943,"level_ids":[3],"school_ids":[132],"board_ids":"","subject_ids":[94]},"user_assessments":[{"skill_scores":{"Core Skill":7,"Communication Skills":3},"subject_scores":{"Mathematics":7,"null":0},"id":7,"user_id":3975,"assessment_id":8,"percentile":"95.00","type":"SCREENING","result":"PASSED"},{"skill_scores":{"Core Skill":7,"Communication Skills":3},"subject_scores":{"Mathematics":7,"null":0},"id":8,"user_id":3975,"assessment_id":8,"percentile":"25.00","type":"MAINS","result":"PASSED"}],"demo_video":{"video_link":"https://video.link","status":"recomended","demo_topic":"Newtons Laws","demo_description":"Topic description","scores":[{"knowledge_score":6,"total":10},{"confidence_score":6,"total":10},{"behavioral_score":6,"total":10},{"fluency_score":6,"total":10}]},"interview":{"status":"offer_letter","mode":"At_School","date_time":"dd/mm/YYYY h:i:s","room_no":333,"interviewer":"Aarav Patel","interview_remark":"Interview remark text","interview_notes":"Interview note text"}}';
+      userDetails = JSON.parse(userDetails);
+    }
+    else {
+      // userDetails.demo_video.id = userDetails.demo_video.id? userDetails.demo_video.id : "";
+      // userDetails.demo_video.video_link = userDetails.demo_video.video_link? userDetails.demo_video.video_link : "";
+      // userDetails.demo_video.demo_topic = userDetails.demo_video.demo_topic? userDetails.demo_video.demo_topic : "";
+      // userDetails.demo_video.demo_description = userDetails.demo_video.demo_description? userDetails.demo_video.demo_description : "";
+      // userDetails.demo_video.scores = userDetails.demo_video.scores? userDetails.demo_video.scores : "";
+      // userDetails.demo_video.status = userDetails.demo_video.status? userDetails.demo_video.status : "";
+
+      // userDetails.interview.id = userDetails.interview.id ? userDetails.interview.id : "";
+      // userDetails.interview.date_time = userDetails.interview.date_time ? userDetails.interview.date_time : "";
+      // userDetails.interview.mode = userDetails.interview.mode ? userDetails.interview.mode : "";
+      // userDetails.interview.room_no = userDetails.interview.room_no ? userDetails.interview.room_no : "";
+      // userDetails.interview.status = userDetails.interview.status ? userDetails.interview.status : "";
+      // userDetails.interview.interviewer = userDetails.interview.interviewer ? userDetails.interview.interviewer : "";
+      // userDetails.interview.interview_notes = userDetails.interview.interview_notes ? userDetails.interview.interview_notes : "";
+      // userDetails.interview.interview_remark = userDetails.interview.interview_remark ? userDetails.interview.interview_remark : "";
+    }
+
+    let levelData = [];
+    let subjectData = [];
+    let schoolData = [];
+    let objData = userDetails.get({plain: true});
+    
+    if(objData && objData.teaching_interests) {
+        // console.log("the ids obj ", interestIds);
+      [err, levelData] = await to(levels.findAll({ where: {id: objData.teaching_interests.level_ids }, attributes: ['id','name'], raw: true }));
+      [err, schoolData] = await to(schools.findAll({ where: {id: objData.teaching_interests.school_ids }, attributes: ['id','name'], raw: true }));
+      [err, subjectData] = await to(subjects.findAll({ where: {id: objData.teaching_interests.subject_ids }, attributes: ['id','name'], raw: true }));
+      objData.levelData = levelData.map(ele => { return ele.name });
+      objData.schoolData = schoolData.map(ele => { return ele.name });;
+      objData.subjectData = subjectData.map(ele => { return ele.name });;
+    }
+    
+    return ReS(res, {data : objData }, 200);
+  } catch (err) {
+    return ReE(res, err, 422);
+  }
+}
+module.exports.getUserDetails = getUserDetails;
+
+const getUserRecommendation = async (req, res) => {
+try {
+  let err, userData;
+  try {
+    let queryParams = {};
+    let orData = [];
+    console.log(req.query);
+
+    if(req.query && req.query.filter) {
+      Object.keys(req.query.filter).forEach(ele => {
+        let excludeKey = ['user_type'];
+        if(excludeKey.indexOf(ele) == -1) {
+          queryParams[ele] = req.query.filter[ele].toUpperCase();
+        }
+      })
+    }
+
+    let searchArray = ['email', 'phone_no']
+    if(req.query && req.query.search) {
+      searchArray.forEach(ele => {
+        let obj = {};
+        obj[ele] = { [Op.iLike]: `%${req.query.search}%`};
+        orData.push(obj);
+      })
+    }
+
+    if(orData.length > 0) {
+      queryParams = {...queryParams,...{[Op.or]: orData}}
+    } else {
+      queryParams = {...queryParams }
+    }
+
+   // user_type
+    let paginateData = {...requestQueryObject(req.query, queryParams)};
+    let userFilter = {}
+    if(req.query && req.query.filter && req.query.filter.user_type) {
+      userFilter.user_type = req.query.filter.user_type;
+    }
+
+
+    let userAttributes = ['first_name', 'email','phone_no', 'user_type'];
+    let userDetails = { 
+      model: users, 
+      as: 'user',
+      attributes: userAttributes,
+      include: [{ 
+        model: user_assessments, 
+        require: false,
+        attributes: ['assessment_id', 'user_id'],
+        include: [
+          {
+            model: assessment_configurations,
+            require: false,
+            attributes: ['level_id'],
+            include: [{
+              model: levels,
+              attributes: ['name'],
+              require: false
+            }]
+          }
+        ]
+      }]
+    };
+     if(req.query && req.query.orderBy && userAttributes.indexOf(req.query.orderBy) >= 0) {
+
+      let sortBy = req.query && req.query.sortBy ? req.query.sortBy : 'desc';
+      paginateData.order = [[{model : users}, `${req.query.orderBy}`, sortBy]];
+      // userDetails.separate = false;
+      // delete paginateData.order;
+    }
+
+    paginateData.include = [
+      userDetails
+    ];
+
+    console.log(paginateData);
+
+    [err, userData] = await to(user_recommendations.findAndCountAll(paginateData));
+    if (err) return ReE(res, err, 422);
+    
+    if (userData) {
+      userData.rows = userData.rows.map(ele => {
+        let obj = ele.get({plain: true})
+        if(obj.user && obj.user.user_assessments) {
+         let levels = obj.user.user_assessments.map(e => {
+            return e.assessment_configurations ? e.assessment_configurations.map(k => {
+                return k.level && k.level.name ? k.level.name  : null;
+            })[0] : [];
+         });
+         obj.levels = [...new Set(levels)];
+        }
+        return obj;
+      })
+      return ReS(res, { data: userData }, 200);
+    } else {
+      return ReE(res, "No user data found", 404);
+    }
+  } catch (err) {
+    console.log(err);
+    return ReE(res, err, 422);
+  }
+} catch (err) {
+  return ReE(res, err, 422);
+}
+}
+module.exports.getUserRecommendation = getUserRecommendation;

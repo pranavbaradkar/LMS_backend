@@ -1,5 +1,5 @@
 const model = require('../../models');
-const { assessments,assessment_results, user_assessment_logs, assessment_questions, strands, sub_strands, campaign_assessments, questions, question_options, custom_attributes, assessment_configurations, skills, levels, user_assessments, users, inventory_blocks, user_assessment_responses, subjects } = require("../../models");
+const { psy_questions, psy_question_options, assessments,assessment_results, user_assessment_logs, assessment_questions, strands, sub_strands, campaign_assessments, questions, question_options, custom_attributes, assessment_configurations, skills, levels, user_assessments, user_recommendations, users, inventory_blocks, user_assessment_responses, subjects } = require("../../models");
 const { to, ReE, ReS, requestQueryObject, lowercaseKeyValue } = require('../../services/util.service');
 const validator = require('validator');
 const mailer = require("../../helpers/mailer"); 
@@ -10,11 +10,19 @@ var Sequelize = require("sequelize");
 const Op = Sequelize.Op;
 var _ = require('underscore');
 const axios = require('axios');
+const psychometric_skill_id = process.env.PSYCHOMETRIC_SKILL_ID || 48;
 
 assessment_questions.belongsTo(questions, { foreignKey: "question_id" });
+assessment_questions.belongsTo(psy_questions, { foreignKey: "question_id" });
+
 questions.hasMany(question_options, { foreignKey: "question_id" });
+psy_questions.hasMany(model.psy_question_options, { foreignKey: 'psy_question_id' });
+
 questions.belongsTo(model.skills, { foreignKey: 'skill_id' });
+
+psy_questions.belongsTo(model.skills, { foreignKey: 'skill_id' });
 questions.belongsTo(model.levels, { foreignKey: 'level_id' });
+psy_questions.belongsTo(model.levels, { foreignKey: 'level_id' });
 questions.belongsTo(model.subjects, { foreignKey: 'subject_id' });
 
 assessments.belongsTo(campaign_assessments, { foreignKey: "id", targetKey: "assessment_id",  as: 'campaign_details' });
@@ -24,7 +32,8 @@ assessments.hasMany(user_assessments, { foreignKey: "assessment_id" });
 assessment_configurations.belongsTo(levels, { foreignKey: 'level_id' });
 assessment_configurations.hasMany(user_assessments, {  sourceKey: 'assessment_id', foreignKey: "assessment_id" });
 user_assessments.belongsTo(users, { foreignKey: "user_id" });
-
+user_assessment_responses.belongsTo(users, {foreignKey: 'user_id'});
+assessment_results.belongsTo(users, {foreignKey: 'user_id'});
 
 const createAssessment = async function (req, res) {
   let err, assessmentData, assessmentQuestionData, assessmentConfiguratonData;
@@ -413,6 +422,8 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
         if(type.toLowerCase() == 'screening') {
           if(ele.name.toLowerCase() === 'core skill') {
             finalSubjectQuery = await getCoreSkillQuestions(obj, gradeIdsValues, assessment_configurations_data, subjectObjO);
+
+            console.log("core-skill", finalSubjectQuery);
           }
           if(ele.name.toLowerCase() === 'communication skills') {
 
@@ -435,35 +446,59 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
               [Op.in]: ['Written Communication', 'Oral Communication', 'Effective Listening']
             } }, attributes: ['strand_text', 'id'], raw: true}));
             
-            finalSubjectQuery = await getCommunicationSkill(obj, strandsData, assessment_configurations_data);
+            finalSubjectQuery = await getCommunicationSkill(obj, strandsData, assessment_configurations_data, 'mains');
           }
           if(ele.name.toLowerCase() === 'pedagogy') {
             finalSubjectQuery = await getPedagogySkill(obj, assessment_configurations_data);
+           
+          }
+          if(ele.name.toLowerCase() === 'psychometric') {
+            console.log("===================(()==================");
+            finalSubjectQuery = [{
+              level_id: assessment_configurations_data.level_id,
+              skill_id: obj.id,
+              limit: obj.no_of_questions,
+              set_number: randomIntFromInterval(1, 3),
+              isPsy: true
+            }];
+           
           }
           if(ele.name.toLowerCase() === 'digital literacy') {
+            let arrayData = [{key: 'Digital content knowledge', limit: 5} ,{key: 'Digital application', limit: 5}, {key: 'Troubleshooting', limit: 2}];
+            [err, strandsData] = await to(strands.findAll({where: { strand_text : {
+              [Op.in]: arrayData.map(ele => { return ele.key })
+            } }, attributes: ['strand_text', 'id'], raw: true}));
             
-            finalSubjectQuery = await getPedagogySkill(obj, assessment_configurations_data);
+            finalSubjectQuery = await getDigitalSkill(obj,strandsData,arrayData, assessment_configurations_data);
+           // console.log(finalSubjectQuery, strandsData);
           }
 
-          console.log("====*******=====", finalSubjectQuery);
+          // console.log("====*******=====", finalSubjectQuery);
           
         }
 
-
-
         obj.questions = await Promise.all( 
           finalSubjectQuery.map(async fq => {
-            return await getQuestions(ele, fq, type, assessment_configurations_data.level_id);
+            if(fq && fq.isPsy) {
+              console.log(fq, "===============================");
+              return await getPsyQuestions(ele, fq, type, assessment_configurations_data.level_id);
+            } else {
+              return await getQuestions(ele, fq, type, assessment_configurations_data.level_id);
+            }
           })
         );
-     // }
+
+        obj.filterData = finalSubjectQuery; 
+    // }
       
       return obj;
     });
 
     let question_ids = [];
-    Promise.all(skill_questions_data).then(function(values) {
-      assessment_configurations_data.skill_questions = values.map(ele => {
+    Promise.all(skill_questions_data).then(async function(values) {
+      
+      
+      let newData  = values.map(async ele => {
         let obj = {...ele};
         let questionList = [];
         if(obj.questions) {
@@ -474,7 +509,40 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
           });
         }
         obj.questions = questionList;
+        let diff = obj.no_of_questions - questionList.length;
+        if(diff > 0) {
+
+          let strandsData = [];
+
+          [err, strandsData] = await to(strands.findAll({where: { strand_text : {
+            [Op.in]: ['Written Communication', 'Oral Communication', 'Effective Listening']
+          } }, attributes: ['strand_text', 'id'], raw: true}));
+          
+
+          obj.question_remaining = await getQuestions({id: obj.id}, {level_id: assessment_configurations_data.level_id, limit: diff}, null, assessment_configurations_data.level_id, question_ids);
+        } else {
+          obj.question_remaining = [];
+        }
+        return obj; 
+      });
+
+      let finalData = await Promise.all(newData);
+
+      assessment_configurations_data.skill_questions = finalData.map(ele => {
+        let obj = {...ele};
+        let questionList = [];
+        if(obj.questions) {
+          //  obj.questions.forEach(e => {
+          //   questionList = questionList == undefined ? [] : questionList
+          //   e = e == undefined ? [] : e
+          //   questionList = [...e, ...questionList];
+          // });
+        }
+        obj.questions = [...obj.question_remaining,...obj.questions].filter(ele => ele != undefined);
+        questionList = obj.questions;
         obj.questions_count = questionList.length;
+        obj.question_ids = questionList.map(ele => { return ele.id });
+        
         if(questionList) {
           questionList.forEach(k => {
             question_ids.push(k.id);
@@ -482,9 +550,10 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
         }
         return obj; 
       });
+
       assessment_configurations_data.question_ids = question_ids;
       assessment_configurations_data.total_questions = question_ids.length;
-      return ReS(res, { data: assessment_configurations_data  }, 200);
+      return ReS(res, { data: assessment_configurations_data }, 200);
     });
   } catch (err) {
     return ReE(res, err, 422);
@@ -517,7 +586,8 @@ function randomIntFromInterval(min, max) { // min and max included
   return Math.floor(Math.random() * (max - min + 1) + min)
 }
 
-async function getQuestions(ele, k, type, level_id) {
+
+async function getQuestions(ele, k = null, type, level_id, isQuestionList = []) {
   let err, questionsData;
 
     let where = { skill_id: ele.id };
@@ -525,27 +595,38 @@ async function getQuestions(ele, k, type, level_id) {
       where.subject_id = k.subject_id;
     }
    
-    if(k.subject_ids) {
+    if(k && k.subject_ids) {
       where.subject_id = { [Op.in]: k.subject_ids };
     }
    
-    if(k.complex) {
+    if(k && k.complex) {
       where.complexity_level = k.complex;
     }
+
+    if(k && k.grade_id) {
+      where.grade_id = k.grade_id;
+    }
    
-    if(k.bloom) {
+    if(k && k.bloom) {
       where.blooms_taxonomy = k.bloom;
     }
     
-    if(k.level_id) {
+    if(k && k.level_id) {
       where.level_id = k.level_id;
     }
 
-    if(k.strand_id) {
+    if(k && k.strand_id) {
       where.strand_id = k.strand_id;
     }
     
     console.log("where", where);
+
+    if(isQuestionList.length > 0) {
+      where.id  = {
+        [Op.notIn]: isQuestionList
+      }; 
+    }
+
     [err, questionsData] = await to(questions.findAll({ 
     where : where,
     include: [{
@@ -561,27 +642,74 @@ async function getQuestions(ele, k, type, level_id) {
   
 }
 
+async function getPsyQuestions(ele, k, type, level_id) {
+  let err, questionsData;
+
+    let where = { skill_id: ele.id };
+    
+    if(k.level_id) {
+      where.level_id = k.level_id;
+    }
+
+    if(k.set_number) {
+      where.set_number = k.set_number;
+    }
+    
+    console.log("where", where);
+    [err, questionsData] = await to(psy_questions.findAll({ 
+    where : where,
+    include: [{
+      model: psy_question_options
+    },
+    { model: model.skills, attributes: ['name'] },
+    { model: model.levels, attributes: ['name'] }],
+    order: Sequelize.literal('random()'),
+    limit: k.limit }));
+
+    return questionsData;
+  
+}
+
 async function getPedagogySkill(obj, assessment_configurations_data) {
   let oneFourthPart = Math.ceil(obj.no_of_questions / 3);
-  let matrixProblem  = [{ complex: 'P1'}, { complex: 'P2'}, { complex: 'P3'}];
+  let matrixProblem  = [
+    { complex: 'P1', bloom: 'UNDERSTAND', limit: 3, level_id: assessment_configurations_data.level_id}, 
+    { complex: 'P2', bloom: 'UNDERSTAND', limit: 2, level_id: assessment_configurations_data.level_id}, 
+    { complex: 'P3', bloom: 'UNDERSTAND', limit: 2, level_id: assessment_configurations_data.level_id}, 
+    { complex: 'P1', bloom: 'APPLY', limit: 2, level_id: assessment_configurations_data.level_id}, 
+    { complex: 'P2', bloom: 'APPLY', limit: 1, level_id: assessment_configurations_data.level_id}, 
+    { complex: 'P3', bloom: 'APPLY', limit: 1, level_id: assessment_configurations_data.level_id}, 
+    { complex: 'P1', bloom: 'ANALYZE', limit: 2, level_id: assessment_configurations_data.level_id}, 
+    { complex: 'P2', bloom: 'ANALYZE', limit: 1, level_id: assessment_configurations_data.level_id}, 
+    { complex: 'P3', bloom: 'ANALYZE', limit: 1, level_id: assessment_configurations_data.level_id}
+    ];
   let finalObjectValue = [];
 
   matrixProblem.forEach(e => {
     finalObjectValue.push({
       ...e,
       ...{
-        complex: e.complex
+        complex: e.complex,
+        limit: e.limit
       }
     });
   });
 
-  let highRatio = finalObjectValue;
-  let ratio2 = getRatioLimitValue(oneFourthPart, highRatio);
+  // let highRatio = finalObjectValue;
+  // let ratio2 = getRatioLimitValue(oneFourthPart, highRatio);
 
-  return [...[], ...ratio2];
+  return [...[], ...finalObjectValue];
+}
+async function getDigitalSkill(obj, strands, strandData, assessment_configurations_data) {
+  strandData  = strandData.map(ele => {
+    let findObje = strands.find(e => e.strand_text == ele.key);
+    ele.strand_id = findObje && findObje.id ? findObje.id : 0;
+    return ele;
+  })
+  return [...[], ...strandData];
 }
 
-async function getCommunicationSkill(obj, strands, assessment_configurations_data) {
+async function getCommunicationSkill(obj, strands, assessment_configurations_data, type = 'screening') {
   let finalSubjectQuery = [];
   
   let isListening = strands.filter(ele => ele.strand_text == 'Effective Listening');
@@ -590,6 +718,9 @@ async function getCommunicationSkill(obj, strands, assessment_configurations_dat
   let first3rd = obj.no_of_questions - oneFourthPart;
  
   let matrixProblem  = [{ complex: 'P1'}, { complex: 'P2'}];
+  if(type == "mains") {
+    matrixProblem  = [{ complex: 'P1'}, { complex: 'P2'}, { complex: 'P3'}];
+  }
   let finalObjectValue = [];
 
   strands.forEach(ele => {
@@ -665,6 +796,7 @@ async function getCoreSkillQuestions(obj, gradeIdsValues, assessment_configurati
         finalSubjectQuery.push({
           ...el,
           ...{
+            grade_id: e,
             subject_ids: subjectObjO.map(el => { return el.subject_id }),
             level_id: assessment_configurations_data.level_id,
             limit: finalLimit
@@ -861,6 +993,9 @@ let sendMailToUsers = async function (user_id, schoolData, inventoryType) {
     }
 }
 
+/* ====================================================
+For claculating scores, saving to db and mail for SINLGE user 
+=========================================================*/
 const setAssessmentAnalytics = async (req, res) => {
   let err, assessmentResultData;
   if (req.body && req.body.assessment_id == undefined) {
@@ -873,23 +1008,30 @@ const setAssessmentAnalytics = async (req, res) => {
   let user_id = req.body.user_id;
 
   try {
-    [skillScores, totalScored, percentile, result, type] = await calculateSkillScores(assessment_id, user_id);
-    // console.log("Total skillScores[skill] now ",skillScores);
+    [skillScores, subjectScores, totalScored, percentile, result, type] = await calculateSkillScores(assessment_id, user_id);
+    
+    // skillScores.subjectScores = subjectScores; 
+    // throw new Error("working ");
     let assessmentResultPayload = {};
 
     assessmentResultPayload.user_id         = user_id;
     assessmentResultPayload.assessment_id   = assessment_id;
-    assessmentResultPayload.skill_scores    = JSON.stringify(skillScores);
+    assessmentResultPayload.skill_scores    = skillScores;
+    assessmentResultPayload.subject_scores  = subjectScores;
     assessmentResultPayload.percentile      = percentile;
     assessmentResultPayload.result          = result;
     assessmentResultPayload.type            = type;
-
+    
     let resultLink =  process.env.FRONTEND_URL+`/#/assessment/${assessment_id}/${type.toLowerCase()}/result`;
+    let subject    = `${type == 'MAINS'? 'Mains' : 'Screening'} Assessment Result Notification - Access Your Results Now!`;
+
     // get user info
     [err, userData] = await to(users.findOne({where : {id: user_id}, raw:true }));
     // console.log("the result link", userData);
     
     // console.log("assessmentResultPayload", assessmentResultPayload);
+    if(req.body.force_mail) sendResultMail(userData, resultLink, subject);
+
     [err, assessmentResultData] = await to(assessment_results.findOne({ 
       where: { user_id: user_id, assessment_id: assessment_id }
     }));
@@ -898,7 +1040,7 @@ const setAssessmentAnalytics = async (req, res) => {
       [err, assessmentResultData] = await to(assessment_results.create(assessmentResultPayload));
       if(err) return ReE(res, err, 422);
       if(assessmentResultData)
-        sendResultMail(userData, resultLink);
+        sendResultMail(userData, resultLink, subject);
     }
 
     return ReS(res, { data: assessmentResultData }, 200);
@@ -908,13 +1050,12 @@ const setAssessmentAnalytics = async (req, res) => {
 }
 module.exports.setAssessmentAnalytics = setAssessmentAnalytics;
 
-const sendResultMail = async (userInfo, resultLink ) => {
+const sendResultMail = async (userInfo, resultLink, subject ) => {
   parameters = { name: userInfo.first_name, result_link: resultLink };
   let html = await ejs.render(
     fs.readFileSync(__dirname + `/../../views/results.ejs`).toString(),
     parameters
   );
-  let subject = `Assessment Result Notification - Access Your Results Now!`;
   console.log(" here ", html);
   if(userInfo && userInfo.email) {
     try {
@@ -930,7 +1071,7 @@ const sendResultMail = async (userInfo, resultLink ) => {
 }
 
 const calculateSkillScores = async (assessment_id, user_id) => {
-  let err, assessmentConfigData, userResponseData, questionData, skillsData;
+  let err, assessmentConfigData, userResponseData, questionData, skillsData, subjectsData;
 
   [err, assessmentConfigData] = await to(assessment_configurations.findOne({
     where: { assessment_id: assessment_id }, raw:true
@@ -938,21 +1079,30 @@ const calculateSkillScores = async (assessment_id, user_id) => {
 
   // console.log("assessmentConfigData", assessmentConfigData);
 
-  let assessmentSkillId = assessmentConfigData.skill_distributions.map(obj => obj.skill_id );
-  
+  let assessmentSkillId = [];
+  let assessmentSubjectId = [];
+  assessmentConfigData.skill_distributions.map(obj => {
+    assessmentSkillId.push(obj.skill_id);
+    if(obj.subject_ids) {
+      obj.subject_ids.map(sobj => { assessmentSubjectId.push(sobj.subject_id); });
+    }
+  } );
+  // console.log("assessmentConfigData.skill_distributions", assessmentConfigData.skill_distributions);
   [err, userResponseData] = await to(user_assessment_responses.findOne({
     where: { user_id: user_id, assessment_id: assessment_id },
     raw: true
   }));
   let userResponse =  JSON.parse(userResponseData.response_json);
 
+  [err, assessmentQuestionData] = await to(assessment_questions.findAll({ where: { assessment_id: assessment_id}, attributes:['question_id'], raw:true }));
+  // console.log("assessmentQuestionData", assessmentQuestionData);
+  
   // get question and their skills data
-  let questionIds = Object.keys(userResponse);
+  let questionIds = assessmentQuestionData.map(ele => ele.question_id);
   // console.log("question ids ", questionIds);
   [err, questionData] = await to(questions.findAll({where: { id: { [Op.in]: questionIds }}, raw:true }));
   
-  [err, skillsData ]= await to(skills.findAll({where:{ id: { [Op.in]: assessmentSkillId } }, raw:true }));
-  
+  [err, skillsData ]= await to(skills.findAll({where:{ id: { [Op.in]: assessmentSkillId } }, raw:true, attributes:['id', 'name'] }));
   let skillMap = {};
   let skillScores = {};
   if(skillsData) { 
@@ -962,20 +1112,37 @@ const calculateSkillScores = async (assessment_id, user_id) => {
     });
   }
 
+  [err, subjectsData ]= await to(subjects.findAll({where:{ id: { [Op.in]: assessmentSubjectId } }, raw:true, attributes:['id', 'name'] }));
+  let subjectMap = {};
+  let subjectScores = {};
+  if(subjectsData) { 
+    subjectsData.forEach(ele => { 
+      subjectMap[ele.id] = ele.name; 
+      subjectScores[ele.name] = 0;
+    });
+  }
+
   questionData.forEach(qe => {
-    let skill = skillMap[qe.skill_id];
-    if(qe.type == 'MULTIPLE_CHOICE'){
-      userResponse[qe.id].map( ans => { qe.correct_answer.includes(ans) ? calculateScore(assessmentConfigData, skill, skillScores) : ''; } );
+    let skill     = skillMap[qe.skill_id];
+    let subject   = subjectMap[qe.subject_id];
+    if(userResponse[qe.id] && qe.question_type == 'MULTIPLE_CHOICE'){
+      userResponse[qe.id].map( ans => { qe.correct_answer.includes(ans) ? calculateScore(assessmentConfigData, skill, skillScores, subject, subjectScores) : ''; } );
     }
-    else if(qe.type == 'MATCH_THE_FOLLOWING'){
+    else if(userResponse[qe.id] && qe.question_type == 'MATCH_THE_FOLLOWING'){
       Object.keys(userResponse[qe.id]).forEach(function(key, index) {
-        if(lowercaseKeyValue(userResponse[qe.id])[key] == qe.correct_answer[key]) { calculateScore(assessmentConfigData, skill, skillScores); }
+        if(lowercaseKeyValue(userResponse[qe.id])[key] == qe.correct_answer[key]) { calculateScore(assessmentConfigData, skill, skillScores, subject, subjectScores); }
       });
     }
     else {
-      if(userResponse[qe.id].toLowerCase() == qe.correct_answer.toLowerCase()) { calculateScore(assessmentConfigData, skill, skillScores); }
+      if(userResponse[qe.id] && userResponse[qe.id].toLowerCase() == qe.correct_answer.toLowerCase()) { calculateScore(assessmentConfigData, skill, skillScores, subject, subjectScores); }
     }
+    // console.log("the question id is ",qe.question_type, qe.id);
   });
+
+  // console.log("the questions ", questionData);
+  // console.log("the score skill now ", skillScores);
+  // console.log("the score subject now ", subjectScores);
+  // throw new Error("work in progress");
 
   let totalScored = 0;
   Object.keys(skillScores).forEach(ele => {
@@ -985,102 +1152,220 @@ const calculateSkillScores = async (assessment_id, user_id) => {
   let percentile  = ((totalScored/(assessmentConfigData.correct_score_answer * assessmentConfigData.total_no_of_questions))*100).toFixed(2);
   // let totalScore = 
   let result = percentile > parseFloat(assessmentConfigData.passing_criteria) ? 'PASSED' : 'FAILED' ;
-  return [skillScores, totalScored, percentile, result, assessmentConfigData.assessment_type];
+  return [skillScores, subjectScores, totalScored, percentile, result, assessmentConfigData.assessment_type];
 }
 
-const calculateScore = (config, skill, skillScores) => {
+const calculateScore = (config, skill, skillScores, subject, subjectScores) => {
   if(config.correct_score_answer) {
     skillScores[skill] += config.correct_score_answer;
+    // TODO: fix CoreSkill Mapping here 
+    if(skill=="Core Skill" || skill == 45)
+      subjectScores[subject] += config.correct_score_answer;
   }
 }
 
-
+/* ====================================================
+For claculating scores, saving to db and mail for MULTIPLE user 
+=========================================================*/
+// TODO: total calculation
 const userAssessmentsResult = async function (req, res) {
-  let err, assessmentsData;
+  let err, assessmentsData,userAssessmentData;
   payload = req.body;
-
+  
   if(req.params && (req.params.assessment_id == undefined)) {
     return ReE(res, { message: "Assessment and user id is required." }, 422);
   }
-
-  let userAssessmentWhere = {}
-  if(req.query && req.query.user_id) {
-    userAssessmentWhere = { user_id: { [Op.in]: req.query.user_id.split(",") } }
+  if(req.query && (req.query.type == undefined)) {
+    return ReE(res, { message: "Assessment type is required in query parameter." }, 422);
   }
+  // if(req.query && (req.query.user_id == undefined)) {
+  //   return ReE(res, { message: "user_id is required in query parameter." }, 422);
+  // }
 
-  let assessmentConfig = {};
+  let assessment_type = req.query.type.toUpperCase();
+  let assessment_id   = req.params.assessment_id;
+
+  let userAssessmentWhere = {};
+  // if user_ids not provided
+  let assessmentUserIds = [];
+  if(req.query && (req.query.user_id == undefined)) {
+    // find users who [FINISHED, PASSED, FAILED] the assessment 
+    let userAssessmentStatus = ["FINISHED", "PASSED", "FAILED"];
+    [err, userAssessmentData] = await to(user_assessments.findAll({ 
+      where: { assessment_id: assessment_id, status: { [Op.in]: userAssessmentStatus} }, raw: true }));
+    if(userAssessmentData) {
+      userAssessmentData.map(adata => { 
+        // console.log("the assessmnet data ", adata);
+        assessmentUserIds.push(adata.user_id); 
+      });
+    }
+
+    console.log("elegible user for result ", assessmentUserIds);
+  }
+  else {
+    assessmentUserIds = req.query.user_id.split(",");
+  }
+  
+  userAssessmentWhere = { user_id: { [Op.in]: assessmentUserIds } };
+
+  // if(req.query && req.query.user_id) {
+  // }
+
+  let whereAssessmentConfig = {};
   if(req.query && req.query.type) {
-    assessmentConfig = { assessment_type: req.query.type.toUpperCase() };
+    whereAssessmentConfig = { assessment_type: assessment_type };
   }
   
   [err, assessmentsData] = await to(assessments.findAll(
     {
       where: { id: req.params.assessment_id },
-      include: [{
+      attributes: ['id','name'],
+      include: [
+      {
         model: assessment_configurations,
-        where: assessmentConfig
+        where: whereAssessmentConfig,
+        attributes: ['skill_distributions','total_no_of_questions', 'correct_score_answer', 'passing_criteria', 'assessment_type']
       },
       {
         model: user_assessment_responses,
-        where: userAssessmentWhere
+        where: userAssessmentWhere,
+        attributes: ['user_id','response_json'],
+        include: [{
+          model: users, attributes: ['id','first_name', 'email']
+        }]
       },
       {
         model: assessment_questions,
-        include: [ { model: questions }]
-      }]
+        attributes: ['question_id'],
+        include: [ 
+        {
+          model: psy_questions,
+          attributes: ['id', 'question_type', 'score_type'],
+          include:[
+            { model: skills, attributes:['id', 'name']},
+            { model: psy_question_options, as: 'options', attributes: ['id','option_key', 'score_value'] }
+          ]
+        },
+        { 
+          model: questions, 
+          // where: { id : {[Op.lt]: 100000000 }},
+          attributes : ['id','question_type', 'correct_answer', 'skill_id', 'subject_id', 'lo_ids'],
+          include: [
+            {model: subjects, attributes:['id','name']},
+            {model: skills, attributes:['id','name']}
+          ]
+        }
+      ],
+      }
+    ]
     }
   ));
+  if(err) return ReE(res, err, 422);
+
 
   // return ReS(res, { data: assessmentsData }, 200);
+
+
+  let skillScores = {};
+  let subjectScores = {};
+  let userInfo = {};
+  let assessmentConfig;
+  let skillIdMap = {};
 
   // Compare assessment type questions to assessment type answer
   let questionType, assessmentType, correct_qa;
   let assessmentResult = assessmentsData.map(ele => {
     let obj = {...ele.get({plain: true})};
     if(obj.user_assessment_responses.length > 0) {
-      let user_response = obj.user_assessment_responses[0].response_json;
-      user_response = JSON.parse(user_response);
+      assessmentConfig = obj.assessment_configurations[0];
       
       obj.user_assessment_responses.map(uar => {
+        if(!uar.user) return;
+        // console.log("the user response user", uar.user);
+        let user_response = uar.response_json;
+        let user_id = uar.user_id;
+        user_response = JSON.parse(user_response);
+        userInfo[user_id] = {};
+        userInfo[user_id]['email'] = uar.user.email;
+        userInfo[user_id]['first_name'] = uar.user.first_name;
+
+        // return ReS(res, { data: assessmentsData }, 200);
+        skillScores[user_id] = {};
+        subjectScores[user_id] = {};
         // uar.assessment_configurations = obj.assessment_configurations.find(e => uar.type == e.assessment_type);
         // build questions by user answered assessment type
         let questions = ele.assessment_questions.filter(as => {
           return as.type == uar.type;
         }).map(q => {
           if(q.question) {
+
+            let skill = q.question.skill.name;
+            let subject = q.question.subject ? q.question.subject.name : null;
+
+            skillIdMap[q.question.skill.id] = skill;
+            skillScores[user_id][skill] = 0; // initalize skill based score
+            subjectScores[user_id][subject] = 0; // initalize subject based score
             questionType = q.question.question_type ? q.question.question_type : null ;
             correct_qa = q.question.correct_answer;
-            if(questionType == 'MULTIPLE_CHOICE') { correct_qa = q.question.correct_answer.toLowerCase().split(','); }
+            if(questionType == 'MULTIPLE_CHOICE') { correct_qa = q.question.correct_answer.split(','); }
             if(questionType == 'MATCH_THE_FOLLOWING') { 
               correct_qa = JSON.parse(q.question.correct_answer);
               correct_qa = lowercaseKeyValue(correct_qa);
+              // console.log("question match the following answer: corrected",q.question.correct_answer,correct_qa);
             }
+
+            return {id: q.question_id, correct_answer: correct_qa, type: questionType, level_id: q.question.level_id,
+              skill: skill, subject: subject, lo_ids: q.question.lo_ids, is_psycho: false
+            };
           }
-          else { questionType = 'SINGLE_CHOICE'; correct_qa = null;}
-          
-          // questionType = (q.question && q.question.question_type) ? q.question.question_type : null ;
-          // correct_qa = questionType == 'MULTIPLE_CHOICE' ? q.question.correct_answer.toLowerCase().split(',') : q.question.correct_answer;
-          return {id: q.question_id, correct_answer: correct_qa, type: questionType };
-        });
-        let ob = {};
-        let score = 0;
-        console.log("question answer",questions);
-        questions.forEach(qe => {
-          ob[qe.id] = qe.correct_answer;
-          if(qe.type == 'MULTIPLE_CHOICE'){
-            user_response[qe.id].map( ans => { qe.correct_answer.includes(ans) ? score++ : ''; } );
-          }
-          else if(qe.type == 'MATCH_THE_FOLLOWING'){
-            Object.keys(user_response[qe.id]).forEach(function(key, index) {
-              if(lowercaseKeyValue(user_response[qe.id])[key] == qe.correct_answer[key]) { score++; }
-            });
+          // for pys_questions
+          else if(q.psy_question) {
+            let skill = q.psy_question.skill.name;
+            skillIdMap[q.psy_question.skill.id] = skill;
+            skillScores[user_id][skill] = 0;
+            let optMap = {};
+            q.psy_question.options.map(ele => {  optMap[ele.option_key] = ele.score_value; });
+            // console.log("the option map for qe",q.question_id, optMap);
+            return { 
+              is_psycho: true, id:q.question_id, set_number: q.psy_question.set_number, level_id: q.psy_question.level_id,
+              score_type: q.psy_question.score_type, optionsMap: optMap, skill: skill
+            };
           }
           else {
-            if(user_response[qe.id].toLowerCase() == qe.correct_answer.toLowerCase()) { score++; }
+            // console.log("===================================== unlinked questions ", JSON.parse(JSON.stringify(q)));
           }
+
+        });
+        // console.log("00000000 ------------------ Result Skill score initaizlied obj",skillScores);
+        let ob = {};
+        let score = 0;
+        // console.log("=============== processed question ",JSON.parse(JSON.stringify(questions)));
+        questions.forEach(qe => {
+          // console.log(`The question (${qe.id}) has level id [${qe.level_id}]`);
+          // console.log("the filtered question ",JSON.parse(JSON.stringify(questions)));
+          if(qe && !qe.is_psycho) {
+            ob[qe.id] = qe.correct_answer;
+            if(user_response[qe.id] && qe.type == 'MULTIPLE_CHOICE'){
+              // console.log(`The question (${qe.id}) of type MCQ and userresponse is [${user_response[qe.id]}]`);
+              let are_same = _.isEqual(qe.correct_answer.sort(), user_response[qe.id].sort());
+              are_same ? calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]) : '';
+            }
+            else if(user_response[qe.id] && qe.type == 'MATCH_THE_FOLLOWING'){
+              Object.keys(user_response[qe.id]).forEach(function(key, index) {
+                if(lowercaseKeyValue(user_response[qe.id])[key] == qe.correct_answer[key]) { calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]); }
+              });
+            }
+            else {
+              if(user_response[qe.id] && user_response[qe.id].toLowerCase() == qe.correct_answer.toLowerCase()) { calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]); }
+            }
+          }
+          else if(qe && qe.is_psycho){
+            // console.log("the psy options in qno", qe.id, user_response[qe.id]);
+            calculatePschometricScore(skillScores[user_id], qe.skill, qe.optionsMap, user_response[qe.id]);
+          }
+          // console.log("question type and response ",user_id, qe.id, qe.type, qe.skill_id, qe.correct_answer, user_response[qe.id]);
         });
         uar.questionAnswer = ob;
-        // console.log(JSON.parse(user_response));
         uar.score = score;
       });
       return obj;
@@ -1089,26 +1374,251 @@ const userAssessmentsResult = async function (req, res) {
     }
     return obj;
   }).filter(e => e != null);
+  
+  let [totalScore, assessmentTotal, userPercentile, result ] = await calculateFinalScores(skillScores, assessmentConfig, skillIdMap);
 
-  // console.log(assessmentResult);
-  // let data = assessmentResult.map(async ele => {
-  //   return Promise.all(
-  //     ele.user_assessment_responses.map(async k => {
-  //     return await recursiveResultSend(k, req);
-  //     })
-  //   );
+  
+ console.log("1111111 ------------------ Result Skill score obj",skillScores);
+//   console.log("2222222 ------------------ Result Subject score obj",subjectScores);
+//  console.log("333333333 ------------------ Result total score",totalScore);
+//   console.log("444444444 ------------------ Result passed/failed",result);
+  
+  let resultPayload = { 
+    skill_scores: skillScores, 
+    subject_scores: subjectScores, 
+    total_scores: totalScore,
+    assessment_total: assessmentTotal,
+    percentiles: userPercentile,
+    user_results: result,
+    type: assessment_type,
+    assessment_id: assessment_id,
+    user_info: userInfo,
+    req_query : req.query
+  };
+
+  let insertResult = await saveToDbAndMail(resultPayload);
+
+  return ReS(res, { data: resultPayload }, 200);
+  // assessmentResult.forEach(async ele => {
+  //   ele.user_assessment_responses.map(async k => {
+  //     let request = await axios.post(`${process.env.BASE_URL}/api/v1/admin/result/user_assessments/${req.query.type.toUpperCase()}`, k);
+  //   });
   // });
-
-
-  assessmentResult.forEach(async ele => {
-    ele.user_assessment_responses.map(async k => {
-      let request = await axios.post(`${process.env.BASE_URL}/api/v1/admin/result/user_assessments/${req.query.type.toUpperCase()}`, k);
-    });
-  });
-  return ReS(res, { data: assessmentResult }, 200);
+  // return ReS(res, { data: assessmentResult }, 200);
 }
 module.exports.userAssessmentsResult = userAssessmentsResult
 
+const calculatePschometricScore = async(skillScores, skill, optionMap, user_response) => {
+  // console.log("====================== calclulating psy score ");
+  // console.log(skill, user_response, optionMap);
+  if(user_response && optionMap[user_response])
+   {skillScores[skill] += optionMap[user_response];}
+}
+
+const saveToDbAndMail = async(resultPayload) => {
+  let err, assessmentResultData;
+  let assessmentResultPayload = [];
+  let userRecommendationPayload = {};
+  let userRecommendationUserIds = [];
+  Object.keys(resultPayload.skill_scores).map(user_id => {
+    let obj = {}; 
+    let urObj = {};
+    obj.user_id         = user_id;
+    obj.assessment_id   = resultPayload.assessment_id;
+    obj.type            = resultPayload.type;
+    obj.skill_scores    = resultPayload.skill_scores[user_id];
+    obj.subject_scores  = resultPayload.subject_scores[user_id];
+    obj.percentile      = resultPayload.percentiles[user_id];
+    obj.result          = resultPayload.user_results[user_id];
+    obj.total           = resultPayload.assessment_total;
+    obj.total_scored    = resultPayload.total_scores[user_id];
+    assessmentResultPayload.push(obj);
+    let type = (resultPayload.type).toLowerCase();
+    urObj[`${type}_score`] = resultPayload.total_scores[user_id];
+    urObj[`${type}_score_total`] = resultPayload.assessment_total;
+    urObj.user_id = user_id;
+    urObj.status = "PENDING";
+    userRecommendationPayload[user_id] = urObj;
+    userRecommendationUserIds.push(parseInt(user_id));
+  });
+  
+  // console.log("user recommendation User IDS used for Update/Create ", userRecommendationUserIds);
+  // console.log("user recommendation payload for bulk insert ", userRecommendationPayload);
+  await saveToUserRecommendation(userRecommendationUserIds,userRecommendationPayload);
+  // throw new Error("work under process");
+  // console.log("assessment result payload for bulk insert ", assessmentResultPayload);
+  let resultLink =  process.env.FRONTEND_URL+`/#/assessment/${resultPayload.assessment_id}/${resultPayload.type.toLowerCase()}/result`;
+  let subject    = `${resultPayload.type == 'MAINS'? 'Mains' : 'Screening'} Assessment Result Notification - Access Your Results Now!`;
+
+  // update user assessment status
+  let  userIds = Object.keys(resultPayload.user_results);
+  let userAssessmentData;
+  [err, userAssessmentData] = await to(user_assessments.findAll({
+    where: { user_id: {[Op.in]:userIds }, assessment_id: resultPayload.assessment_id }
+  }).then(rows=>{
+    rows.forEach(row => {
+      if(resultPayload.type == "SCREENING") {
+        row.screening_status = resultPayload.user_results[row.user_id];
+      }
+      if(resultPayload.type == "MAINS") {
+        row.mains_status = resultPayload.user_results[row.user_id];
+      }
+      row.total_score = resultPayload.total_scores[row.user_id];
+      row.status = resultPayload.user_results[row.user_id];
+      row.save();
+    });
+  }));
+
+  // console.log(`find assessment result with type ${resultPayload.type} `);
+  // console.log("find assessment result with user ids ", userIds);
+  // update result 
+  let updatedAssessmentResultIds = [];
+  [err, assessmentResultData] = await to(assessment_results.findAll({ where: { user_id: { [Op.in]: userIds }, type: (resultPayload.type).toUpperCase() } }) );
+  // console.log("the assessment result data", assessmentResultData);
+
+  if(assessmentResultData) {
+    assessmentResultData.forEach(row => {
+      // console.log("looping  assessmentResultData ", row.user_id);
+        updatedAssessmentResultIds.push(parseInt(row.user_id));
+        if(resultPayload.req_query && resultPayload.req_query.force_mail && resultPayload.req_query.force_mail == 1){
+          sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
+        }
+    });
+  }
+
+  // console.log("the updated assessment result user ids ",updatedAssessmentResultIds);
+  //filter payload (only insert which are not updated above)
+  let insertPayload = assessmentResultPayload.filter(ele => {
+    return !updatedAssessmentResultIds.includes(parseInt(ele.user_id));
+  });
+
+  // console.log("insert payload data for assessment result ", insertPayload);
+  // insert result
+  [err, assessmentResultData] = await to(assessment_results.bulkCreate(insertPayload).then(row => {
+    row.map(ele => {
+      // send mail on new row insert
+      sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
+    })
+  }));
+  if(err) throw new Error("Could not insert to assessment.result");
+
+  return assessmentResultData;
+}
+
+const saveToUserRecommendation = async (userRecommendationUserIds,userRecommendationPayload) => {
+  
+  let err, userRecommendationData;
+  // userRecommendationUserIds.map(ele => parseInt(ele));
+  // console.log("user recommendation User IDS used for Update/Create ", userRecommendationUserIds);
+  let updatedUserRecommendationIds = [];
+  [err, userRecommendationData] = await to(user_recommendations.findAll({ where: { user_id: {[Op.in]: userRecommendationUserIds} }}) );
+
+  if(userRecommendationData) {
+    userRecommendationData.forEach(row => {
+        console.log("the user id in findAll user recommendation ",row.user_id);
+      if(userRecommendationPayload[row.user_id]) {
+        updatedUserRecommendationIds.push(row.user_id);
+        let urp = userRecommendationPayload[row.user_id];
+        Object.keys(urp).forEach(prop => { row[prop]= urp[prop]; })
+        row.save();
+      }
+    });
+  }
+  if(err) { throw new Error("failed to find records for user_recommendation"); }
+
+  // console.log("updated IDs ", updatedUserRecommendationIds);
+  
+  // find user Ids which are not updated(we have to create new rows for these userIds);
+  let insertPayload = [];
+  Object.keys(userRecommendationPayload).map(user_id => {
+    if(!updatedUserRecommendationIds.includes(parseInt(user_id))) {
+      insertPayload.push(userRecommendationPayload[user_id]);
+    }
+  });
+
+  // console.log("the insert payload is ", insertPayload);
+  if(insertPayload.length > 0) {
+    [err, userRecommendationData] = await to(user_recommendations.bulkCreate(insertPayload));
+  }
+}
+
+// const updateUserResult
+const calculateFinalScores = async (userSkillScores, assessmentConfigData, skillIdMap) => {
+  // console.log("====== Calculating for Assessment Type ", assessmentConfigData.assessment_type);
+  let userTotal = {};
+  let userResult = {};
+  let userPercentile = {};
+  let assessmentTotal = calculateAssessmentTotal(assessmentConfigData);
+
+  Object.keys(userSkillScores).map(user => {
+    let totalScored = 0;
+    Object.keys(userSkillScores[user]).forEach(ele => {
+      totalScored += userSkillScores[user][ele];
+    });
+    userTotal[user] = totalScored;
+    let percentile  = ((totalScored/(assessmentTotal))*100).toFixed(2);
+    let result = percentile > parseFloat(assessmentConfigData.passing_criteria) ? 'PASSED' : 'FAILED' ;
+    // passing criteria for mains
+
+    if(assessmentConfigData.assessment_type == "MAINS") {
+//       console.log("assessment config",assessmentConfigData);
+//       console.log("skill scores",userSkillScores[user]);
+//       console.log("skill mAP",skillIdMap);
+      
+//       let skillQuestionMap = {};
+//       assessmentConfigData.skill_distributions.map(row => skillQuestionMap[skillIdMap[row.skill_id]] = row.no_of_questions );
+//       console.log("skill Question MAP",skillQuestionMap);
+//       let skillPercent = {};
+//       let userSkill = userSkillScores[user];
+//       Object.keys(userSkill).forEach(skill => {
+//         let skillScore = userSkill[skill];
+//         let skillTotal = skillQuestionMap[skill];
+//         skillPercent[skill] = ((skillScore/skillTotal)*100).toFixed(2);
+//       });
+      
+//       console.log("skill percent ",skillPercent);
+// // Sample data representing user scores in different subjects
+// const scores = {
+//   math: 55,
+//   science: 70,
+//   english: 45,
+//   history: 50
+// };
+
+// // Check if user has scored more than 40 in every subject
+// const isPassed = Object.values(scores).every(score => score > 40);
+
+// if (isPassed) {
+//   console.log('User has passed in all subjects');
+// } else {
+//   console.log('User has not passed in all subjects');
+// }
+
+    }
+    userResult[user] = result;
+    userPercentile[user] = percentile;
+  })
+  return [userTotal, assessmentTotal, userPercentile, userResult];
+}
+
+const calculateAssessmentTotal = (assessmentConfig) => {
+  let total = 0;
+  // console.log("skill distribution ",assessmentConfig.skill_distributions);
+  // console.log("Assessment ID ",assessmentConfig.assessment_id);
+  let skillDistribution = assessmentConfig.skill_distributions;
+  // let skillDistribution = JSON.parse(assessmentConfig.skill_distributions);
+  skillDistribution.forEach(ele => {
+    // console.log("the element ", ele);
+    if(ele.skill_id == 45) { // Core skill
+      total += ele.no_of_questions;
+    }
+    if(ele.skill_id == 48) {// Psychometric 
+      total += (ele.no_of_questions*4);
+    }
+  });
+
+  return total;
+}
 
 let recursiveInventorySearch = async function (index, schoolInventory, type, blockType) {
   if(schoolInventory[index]) {
@@ -1247,16 +1757,14 @@ module.exports.getAllUserAssessments = getAllUserAssessments;
 const getAssessmentConfigurationUsers = async function (req, res) {
   let assessment_id  = req.params.assessment_id;
   let assessment_type  = req.params.assessment_type.toUpperCase();
-  let attributes = ['screening_status', 'user_id', 'screening_result_notified', 'mains_result_notified'];
-  if(assessment_type == 'screening') {
-    attributes = ['mains_status', 'user_id', 'screening_result_notified', 'mains_result_notified'];
-  }
+  attributes = ['status', 'type', 'user_id', 'screening_result_notified', 'mains_result_notified'];
 
   try {
     [err, assessment_configurations_data] = await to(assessment_configurations.findOne({ 
       where: { assessment_id: assessment_id, assessment_type: assessment_type },
       include: [{
         model: user_assessments,
+        where: { type: assessment_type },
         attributes: attributes,
         include: [{
           model: users

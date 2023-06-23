@@ -68,6 +68,7 @@ router.post("/questions/filter/:type",adminPassport.authenticate("jwt", { sessio
 router.post("/questions/import",adminPassport.authenticate("jwt", { session: false }), QuestionController.questionImport);
 router.delete("/bulk/questions", adminPassport.authenticate("jwt", { session: false }), QuestionController.deleteBulkQuestion); 
 router.post("/lo_bank/import",adminPassport.authenticate("jwt", { session: false }), QuestionController.loBankImport);
+router.post("/psychometry/import",adminPassport.authenticate("jwt", { session: false }), QuestionController.importPsychometry);
 
 // ********************* Roles ROUTES **************************
 router.post("/roles",adminPassport.authenticate("jwt", { session: false }), RoleController.createRole); 
@@ -84,9 +85,10 @@ router.put("/role/users/:user_id",adminPassport.authenticate("jwt", { session: f
 router.delete("/role/users/:user_id", adminPassport.authenticate("jwt", { session: false }), AdminController.deleteRoleUser);
 
 // ********************* Standard user ROUTES **************************
+router.get("/users/recommendation",adminPassport.authenticate("jwt", { session: false }), UserController.getUserRecommendation);
+router.get("/users/details/:user_id",adminPassport.authenticate("jwt", { session: false }), UserController.getUserDetails);
 router.post("/users",adminPassport.authenticate("jwt", { session: false }), UserController.createUser);
 router.put("/users/:user_id",adminPassport.authenticate("jwt", { session: false }), UserController.updateUser);
-
 
 router.delete("/bulk/users", adminPassport.authenticate("jwt", { session: false }), UserController.bulkDeleteUser);
 

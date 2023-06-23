@@ -1,5 +1,5 @@
 const model = require('../../models');
-const { lo_banks, topics, strands, sub_strands, levels,grades,subjects, learning_objectives, questions, skills, question_options, question_mtf_answers, question_los } = require("../../models");
+const { psy_questions, psy_question_options,lo_banks, topics, strands, sub_strands, levels,grades,subjects, learning_objectives, questions, skills, question_options, question_mtf_answers, question_los } = require("../../models");
 const { to, ReE, ReS, toSnakeCase,cleanLoText, requestQueryObject } = require("../../services/util.service");
 
 const axios = require('axios');
@@ -230,6 +230,9 @@ const updateQuestion = async function (req, res) {
         if (err) return ReE(res, err, 422);
         [err, questionLoData] = await to(question_los.bulkCreate(questionLoDataObject));
         if (err) return ReE(res, err, 422);
+      }
+      if(payload.lo_ids) {
+        delete payload.lo_ids;
       }
       questionData.update(payload);
 
@@ -983,3 +986,282 @@ const addToLoQuestion = async (req, res, excelObj, loBankData) => {
     question_options: qOptionsData
   };
 } 
+
+//TODO: Fix strands text, sub_strand text duplicates on loading new content
+const importPsychometry = async (req, res) => {
+  let schema = {
+      "Question Statement": {
+        prop: "question",
+        type: String
+      },
+      "Strand":{
+        prop:'strand',
+        type: String
+      },
+      "Sub-strand": {
+        prop: 'sub_strand',
+        type: String
+      },
+      "Topic" : {
+        prop: 'topic',
+        type: String
+      },
+      "Option A" : {
+        prop: 'option_a',
+        type: String
+      },
+      "Option B" : {
+        prop: 'option_b',
+        type: String
+      },
+      "Option C" : {
+        prop: 'option_c',
+        type: String
+      },
+      "Option D" : {
+        prop: 'option_d',
+        type: String
+      },
+      "Option E" : {
+        prop: 'option_e',
+        type: String
+      },
+      // if score title in excel is type [Option A score]
+      "Option A score" : {
+        prop: 'option_as',
+        type: String
+      },
+      "Option B score" : {
+        prop: 'option_bs',
+        type: String
+      },
+      "Option C score" : {
+        prop: 'option_cs',
+        type: String
+      },
+      "Option D score" : {
+        prop: 'option_ds',
+        type: String
+      },
+      "Option E score" : {
+        prop: 'option_es',
+        type: String
+      },
+      // if score title in excel is type [Score A]
+      "Score A" : {
+        prop: 'option_as',
+        type: String
+      },
+      "Score B" : {
+        prop: 'option_bs',
+        type: String
+      },
+      "Score C" : {
+        prop: 'option_cs',
+        type: String
+      },
+      "Score D" : {
+        prop: 'option_ds',
+        type: String
+      },
+      "Score E" : {
+        prop: 'option_es',
+        type: String
+      },
+      "Scoring Type" : {
+        prop: 'scoring_type',
+        type: String
+      },
+    };
+
+ let excelData = await excelReader(fs.readFileSync( path.join(__dirname +  `/../../public/assets/${req.body.file_name}`) ), { schema }).then( async (rows, errors) => {
+    if (rows.errors.length === 0 && rows.rows.length > 0){
+      return rows.rows;
+    }
+  });
+  let level_id = req.body.level_id || -1;
+  let skill_id = req.body.skill_id || -1;
+  let grade_id = req.body.grade_id || -1;
+  let set_number = req.body.set_number || 1;
+  let strandSet = new Set();
+  let subs_strnadMap = {};
+  let subStrandSet = new Set();
+  let topic_strMap = {};
+  let topic_subsMap = {};
+  let topicSet = new Set();
+
+  
+  excelData.forEach(obj => {
+    // let key_code = String.fromCharCode(66).toLowerCase(); // Generate A,B,C,D
+    // let excelRow = excelData[0];
+    // let rowCode = `option_${key_code}`;
+    // let a = excelRow[`option_${key_code}`];
+    // console.log("the rowcode and value ", rowCode, a);
+    
+    // return ReE(res, "working ", 422);
+    let subCode = obj.sub_strand.replace(/ /g, "_").toLowerCase();
+    let strCode = obj.strand.replace(/ /g, "_").toLowerCase();
+    let topCode = obj.topic.replace(/ /g, "_").toLowerCase();
+    subs_strnadMap[subCode] = strCode;
+    topic_subsMap[topCode] = subCode;
+    topic_strMap[topCode] = strCode;
+    strandSet.add(obj.strand);
+    subStrandSet.add(obj.sub_strand);
+    topicSet.add(obj.topic);
+  });
+  
+
+  let strandsData, strandMap = {};
+  // to prevent duplicates on loading for diffrerent sets of pyschometric questions(delete from item from set to prevent insertPayload build)
+  [err, strandsData] = await to(strands.findAll({ where: { strand_text: {[Op.in]: Array.from(strandSet) }, level_id: level_id }  }));
+  if(strandsData) {
+    strandsData.forEach(row => {
+      strandSet.delete(row.strand_text);
+      let code = row.strand_text.replace(/ /g, "_").toLowerCase();
+      strandMap[code] = row.id;
+    });
+  }
+
+  // create strands Payload
+  let strandPayload = [];
+  Array.from(strandSet).forEach(obj => {
+    let rowS = { strand_text: obj, level_id : level_id, skill_id : skill_id, }
+    strandPayload.push(rowS);
+  });
+  // insert strands
+  let strandsInsertData;
+  [err,strandsInsertData] = await to(strands.bulkCreate(strandPayload).then(rows=>{
+    rows.forEach(row => {
+      let code = row.strand_text.replace(/ /g, "_").toLowerCase();
+      strandMap[code] = row.id;
+    })
+  }));
+  if(err) return ReE(res, err, 422);
+  // console.log("strands map ", strandMap);
+
+
+
+  let subStrandsData, subStrandMap = {};
+  // to prevent duplicates on loading for diffrerent sets of pyschometric questions(delete from item from set to prevent insertPayload build)
+  [err, subStrandsData] = await to(sub_strands.findAll({ where: { sub_strand_text: {[Op.in]: Array.from(subStrandSet) }, strand_id: {[Op.in]: Object.values(strandMap)} }  }));
+  if(subStrandsData) {
+    subStrandsData.forEach(row => {
+      subStrandSet.delete(row.sub_strand_text);
+      let code = row.sub_strand_text.replace(/ /g, "_").toLowerCase();
+      subStrandMap[code] = row.id;
+    });
+  }
+  // create sub_strands Payload
+  let subStrandPayload = [];
+  Array.from(subStrandSet).forEach(obj => {
+    let subCode = obj.replace(/ /g, "_").toLowerCase();
+    let strandId = strandMap[subs_strnadMap[subCode]];
+    let rowS = { sub_strand_text: obj, strand_id : strandId };
+    subStrandPayload.push(rowS);
+  })
+  // console.log("the substrand payload ", subStrandPayload);
+
+  // insert substrand 
+  let subStrandsInsertedData;
+  [err,subStrandsInsertedData] = await to(sub_strands.bulkCreate(subStrandPayload).then(rows=>{
+    rows.forEach(row => {
+      let code = row.sub_strand_text.replace(/ /g, "_").toLowerCase();
+      subStrandMap[code] = row.id;
+    })
+  }));
+  if(err) return ReE(res, err, 422);
+  // console.log("sub strand map ", subStrandMap);
+
+
+
+  let topicsData, topicMap = {};
+  // to prevent duplicates on loading for diffrerent sets of pyschometric questions(delete from item from set to prevent insertPayload build)
+  [err, topicsData] = await to(topics.findAll({ where: { 
+      topic_text: {[Op.in]: Array.from(topicSet) },
+      strand_id: {[Op.in]: Object.values(strandMap)},
+      sub_strand_id: {[Op.in]: Object.values(subStrandMap)} 
+  } }));
+  if(topicsData) {
+    topicsData.forEach(row => {
+      topicSet.delete(row.topic_text);
+      let code = row.topic_text.replace(/ /g, "_").toLowerCase();
+      topicMap[code] = row.id;
+    });
+  }
+  // create topics Payload
+  let topicPayload = [];
+  Array.from(topicSet).forEach(obj => {
+    let topCode = obj.replace(/ /g, "_").toLowerCase();
+    let strandId = strandMap[topic_strMap[topCode]];
+    let subStrandId = subStrandMap[topic_subsMap[topCode]];
+    let rowS = { topic_text: obj, level_id : level_id, skill_id : skill_id, grade_id: -1,
+      strand_id : strandId, sub_strand_id: subStrandId
+    };
+    topicPayload.push(rowS);
+  })
+  // console.log("the topic payload ", topicPayload);
+
+  // insert topic 
+  let topicsInsertData;
+  [err,topicsInsertData] = await to(topics.bulkCreate(topicPayload).then(rows=>{
+    rows.forEach(row => {
+      let code = row.topic_text.replace(/ /g, "_").toLowerCase();
+      topicMap[code] = row.id;
+    })
+  }));
+  if(err) return ReE(res, err, 422);
+  // console.log("sub strand map ", topicMap);
+
+  let questionPayload = [];
+  excelData.forEach(obj => {    
+    // let subCode = obj.sub_strand.replace(/ /g, "_").toLowerCase();
+    // let strCode = obj.strand.replace(/ /g, "_").toLowerCase();
+    let topCode = obj.topic.replace(/ /g, "_").toLowerCase();
+    let topicId = topicMap[topCode];
+    let strandId = strandMap[topic_strMap[topCode]];
+    let subStrandId = subStrandMap[topic_subsMap[topCode]];
+    let rowQ = {
+      statement       : obj.question,
+      set_number      : set_number,
+      question_type   : 'SINGLE_CHOICE',
+      score_type      : obj.scoring_type ? obj.scoring_type : 1,
+      level_id        : level_id,
+      grade_id        : grade_id,
+      skill_id        : skill_id,
+      strand_id       : strandId,
+      sub_strand_id   : subStrandId,
+      topic_id        : topicId,
+    };
+    questionPayload.push(rowQ);
+  });
+  // console.log("question payload ", questionPayload);
+  // insert questions 
+  let questionData, optionsPayload=[];
+  [err, questionData] = await to(psy_questions.bulkCreate(questionPayload).then(rows=>{
+    rows.forEach((row, index)=> {
+      // console.log(row.id);
+      for(i=65;i<70;i++){
+        let key_code = String.fromCharCode(i).toLowerCase(); // Generate A,B,C,D
+        // console.log("the key code ", key_code);
+        excelRow = excelData[index];
+        let obj = {
+          psy_question_id   : row.id,
+          option_key        : key_code.toUpperCase(),
+          option_value      : excelRow[`option_${key_code}`],
+          score_value       : excelRow[`option_${key_code}s`],
+        };
+        optionsPayload.push(obj);
+      }
+    });
+  }));
+  if(err) { return ReE(res, err, 422); }
+
+  // console.log("psy question options payload", optionsPayload);
+  // insert options Pay Load
+  let optionsData;
+  [err, optionsData] = await to(psy_question_options.bulkCreate(optionsPayload));
+  if(err) { return ReE(res, err, 422); }
+
+  return ReS(res, {data: excelData}, 200);
+}
+module.exports.importPsychometry = importPsychometry;
