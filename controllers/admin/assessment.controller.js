@@ -1167,7 +1167,8 @@ const calculateScore = (config, skill, skillScores, subject, subjectScores) => {
 }
 
 const timeRanges = () => {
-  return "("+_.random(1, 2) + '-' + _.random(3, 4)+ ' minutes)';
+  let num = _.random(2,4);
+  return "("+ num + '-' + (num+1) + ' minutes)';
 }
 
 const getTopicMap = csvData => {
@@ -1201,7 +1202,8 @@ const s3Topic = async (grade, subject) => {
     
     let topicMap = getTopicMap(jsonData);
     let chosenTopic = topicMap.get(topicName);
-    chosenTopic.unshift(['Introduction', timeRanges()]);
+    chosenTopic.unshift(['Introduction', '(1-2 minutes)']);
+    chosenTopic.push(['Conclusion and wrap-up', '(1-2 minutes)']);
 
     return { topic: topicName, description: chosenTopic };
 }
@@ -1620,7 +1622,7 @@ const saveToDemoVideo = async (payload) => {
     where: {assessment_id: payload.assessment_id, user_id: {[Op.in]: currentUserIds } } 
   }));
   if(demoData) {
-    demoData.forEach(row => { updatedIds.push(row.user_id); })
+    demoData.forEach(row => { updatedIds.push(row.user_id); });
   }
   const createIds = _.difference(currentUserIds, updatedIds);
   let insertPayload = [];
