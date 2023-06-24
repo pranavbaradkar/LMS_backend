@@ -1037,6 +1037,9 @@ const uploadVideoPacd = async function (req, res) {
   let userId = req.user.id;
   let payload = req.body;
   let path = `${payload.post_type}/${userId}`;
+  if(req.body && req.body.assessment_id) {
+    path = `${payload.post_type}/${req.body.assessment_id}/${userId}`;
+  }
   url = await uploadVideoOnS3(path, `${userId}.mp4`, req.files[0].mimetype, req.files[0].buffer, false);
   return ReS(res, { data: url });
 }
