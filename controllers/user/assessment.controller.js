@@ -164,7 +164,9 @@ const getScreeningTestDetails = async function (req, res) {
               ]
             }
           ],
-          order: [['id', 'asc']]
+          order: [
+            ['id', 'asc'], 
+          ]
       }));
 
     if (err) return ReE(res, err, 422);
@@ -188,6 +190,7 @@ const getScreeningTestDetails = async function (req, res) {
           }) : object.question_options.map(e => {
             return returnObjectEmpty(e);
           });
+          object.question_options = _.sortBy(object.question_options, 'option_key');
           return returnObjectEmpty(object);
         })
         return obj;

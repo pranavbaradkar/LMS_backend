@@ -9,6 +9,7 @@ const fs = require('fs');
 const WordExtractor = require("word-extractor");
 const excelReader = require('read-excel-file/node');
 const path = require("path");
+var _ = require('underscore');
 const { result, where } = require('underscore');
 const { serialize } = require('v8');
 questions.belongsTo(model.skills, { foreignKey: 'skill_id' });
@@ -40,6 +41,8 @@ const createQuestion = async function (req, res) {
     [err, skillData] = await to(skills.findOne({ where: { id: payload.skill_id } }));
     if (err) return ReE(res, err, 422);
     if (skillData !== null) {
+
+      payload.lo_ids = payload.lo_ids.join(",");
       [err, questionData] = await to(questions.create(payload));
       if (err) return ReE(res, err, 422);
 
@@ -72,7 +75,8 @@ const createQuestion = async function (req, res) {
 
       if (err) return ReE(res, err, 422);
       let questionLoDataObject = [];
-      if(payload.lo_ids) {
+      let questionLoData = [];
+      if(payload.lo_ids && payload.lo_ids.length > 0) {
         questionLoDataObject = payload.lo_ids.map(ele => {
           return {
             question_id: questionData.id,
@@ -83,8 +87,9 @@ const createQuestion = async function (req, res) {
         // return false;
         [err, questionLoData] = await to(question_los.bulkCreate(questionLoDataObject));
         if (err) return ReE(res, err, 422);
-  
-      }
+     }
+     
+      
       return ReS(res, { data: questionData, question_options: questionOptionData, lo: questionLoDataObject }, 200);
     } else {
       return ReE(res, "Skill not found with this id", 404);
@@ -159,6 +164,12 @@ const getAllQuestions = async function (req, res) {
     ));
     if (err) return ReE(res, err, 422);
     if (questionData) {
+      questionData.rows = questionData.rows.map(ele => {
+        let obj = {...ele.get({plain: true})};
+        obj.question_options = _.sortBy(obj.question_options, 'option_key');
+        obj.question_mtf_answers = _.sortBy(obj.question_mtf_answers, 'option_key');
+        return obj;
+      })
       return ReS(res, { data: questionData }, 200);
     } else {
       return ReE(res, "No questions data found", 404);
