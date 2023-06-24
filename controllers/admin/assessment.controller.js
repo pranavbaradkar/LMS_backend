@@ -1655,11 +1655,14 @@ const calculateFinalScores = async (userSkillScores, assessmentConfigData, skill
   let userResult = {};
   let userPercentile = {};
   let assessmentTotal = calculateAssessmentTotal(assessmentConfigData);
-
+  // console.log("The assessment total is excluding psychometric",assessmentTotal);
+  // console.log("User skill Scores ", userSkillScores);
   Object.keys(userSkillScores).map(user => {
     let totalScored = 0;
-    Object.keys(userSkillScores[user]).forEach(ele => {
-      totalScored += userSkillScores[user][ele];
+    Object.keys(userSkillScores[user]).forEach(skill => {
+      // console.log("the skill now is", skill);
+      if(skill !== 'Psychometric')
+        totalScored += userSkillScores[user][skill];
     });
     userTotal[user] = totalScored;
     let percentile  = ((totalScored/(assessmentTotal))*100).toFixed(2);
@@ -1701,18 +1704,21 @@ const calculateFinalScores = async (userSkillScores, assessmentConfigData, skill
 
 const calculateAssessmentTotal = (assessmentConfig) => {
   let total = 0;
-  // console.log("skill distribution ",assessmentConfig.skill_distributions);
+  console.log("skill distribution ",assessmentConfig.skill_distributions);
   // console.log("Assessment ID ",assessmentConfig.assessment_id);
   let skillDistribution = assessmentConfig.skill_distributions;
   // let skillDistribution = JSON.parse(assessmentConfig.skill_distributions);
   skillDistribution.forEach(ele => {
     // console.log("the element ", ele);
     // TODO: core skill ID value
-    if(ele.skill_id == 45) { // Core skill
-      total += ele.no_of_questions;
-    }
+    // if(ele.skill_id == 45) { // Core skill
+    //   total += ele.no_of_questions;
+    // }
     if(ele.skill_id == psychometric_skill_id) {// Psychometric 
-      total += (ele.no_of_questions*4);
+      // total += (ele.no_of_questions*4);
+    }
+    else {
+      total += ele.no_of_questions;
     }
   });
 
