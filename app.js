@@ -11,6 +11,7 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerDocument = require('./public/v1/documentation/api.json');
 const fs = require('fs');
 const path = require('path')
+require('dd-trace').init({ express })
 
 app.use(logger('dev'));
 app.use(bodyParser.json({limit:'50mb'}));

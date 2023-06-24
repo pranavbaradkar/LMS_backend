@@ -47,6 +47,7 @@
     "underscore": "^1.13.6",
     "uuidv4": "^6.2.13",
     "validator": "^13.9.0",
-    "word-extractor": "^1.0.4"
+    "word-extractor": "^1.0.4",
+    "dd-trace": "^4.2.0"
   }
 }
