@@ -1312,14 +1312,15 @@ const userAssessmentsResult = async function (req, res) {
   // return ReS(res, { data: assessmentsData }, 200);
 
 
-  let skillScores = {};
-  let subjectScores = {};
-  let userInfo = {};
+  let skillScores     = {};
+  let subjectScores   = {};
+  let userInfo        = {};
   let assessmentConfig;
-  let skillIdMap = {};
-  let levelHeatMap = {};
-  let gradeHeatMap = {};
-  let skillTotals = {};
+  let skillIdMap      = {};
+  let levelHeatMap    = {};
+  let gradeHeatMap    = {};
+  let subjectHeatMap  = {};
+  let skillTotals     = {};
 
   // Compare assessment type questions to assessment type answer
   let questionType, assessmentType, correct_qa;
@@ -1335,6 +1336,7 @@ const userAssessmentsResult = async function (req, res) {
         let user_id = uar.user_id;
         levelHeatMap[user_id] = [];
         gradeHeatMap[user_id] = [];
+        subjectHeatMap[user_id] = [];
         user_response = JSON.parse(user_response);
         userInfo[user_id] = {};
         userInfo[user_id]['email'] = uar.user.email;
@@ -1367,7 +1369,8 @@ const userAssessmentsResult = async function (req, res) {
             }
 
             return {id: q.question_id, correct_answer: correct_qa, type: questionType, level_id: q.question.level_id,
-              skill: skill, skill_id: skill_id,  subject: subject, lo_ids: q.question.lo_ids, is_psycho: false, grade_id: q.question.grade_id
+              skill: skill, skill_id: skill_id,  subject: subject, subject_id: q.question.subject_id,
+              lo_ids: q.question.lo_ids, is_psycho: false, grade_id: q.question.grade_id
             };
           }
           // for pys_questions
@@ -1405,6 +1408,7 @@ const userAssessmentsResult = async function (req, res) {
               if(are_same) {
                 levelHeatMap[user_id].push(qe.level_id);
                 gradeHeatMap[user_id].push(qe.grade_id);
+                subjectHeatMap[user_id].push(qe.subject_id);
                 calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]);
               }
             }
@@ -1413,6 +1417,7 @@ const userAssessmentsResult = async function (req, res) {
               Object.keys(user_response[qe.id]).forEach(function(key, index) {
                 levelHeatMap[user_id].push(qe.level_id);
                 gradeHeatMap[user_id].push(qe.grade_id);
+                subjectHeatMap[user_id].push(qe.subject_id);
                 if(lowercaseKeyValue(user_response[qe.id])[key] == qe.correct_answer[key]) { calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]); }
               });
             }
@@ -1420,6 +1425,7 @@ const userAssessmentsResult = async function (req, res) {
               if(user_response[qe.id] && user_response[qe.id].toLowerCase() == qe.correct_answer.toLowerCase()) { 
                 levelHeatMap[user_id].push(qe.level_id);
                 gradeHeatMap[user_id].push(qe.grade_id);
+                subjectHeatMap[user_id].push(qe.subject_id);
                 calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]); 
               }
             }
@@ -1432,8 +1438,9 @@ const userAssessmentsResult = async function (req, res) {
         });
         uar.questionAnswer = ob;
         uar.score = score;
-        levelHeatMap[user_id] = levelHeatMap[user_id].filter(ele => ele !== -1);      
-        gradeHeatMap[user_id] = gradeHeatMap[user_id].filter(ele => ele !== -1);      
+        levelHeatMap[user_id]   = levelHeatMap[user_id].filter(ele => ele !== -1);
+        gradeHeatMap[user_id]   = gradeHeatMap[user_id].filter(ele => ele !== -1);
+        subjectHeatMap[user_id] = subjectHeatMap[user_id].filter(ele => ele !== -1);
       });
       return obj;
     } else {
@@ -1449,6 +1456,7 @@ const userAssessmentsResult = async function (req, res) {
 
   // console.log(" Level Heat Map ", levelHeatMap);
   // console.log(" Grade Heat Map ", gradeHeatMap); 
+  // console.log(" Subject Heat Map ", subjectHeatMap); 
   // getHighestCount
 
 //  console.log("1111111 ------------------ Result Skill score obj",skillScores);
@@ -1470,6 +1478,7 @@ const userAssessmentsResult = async function (req, res) {
     req_query : req.query,
     recommended_level: getHighestCount(levelHeatMap),
     recommended_grade: getHighestCount(gradeHeatMap),
+    recommended_subject: getHighestCount(subjectHeatMap),
   };
 
   let insertResult = await saveToDbAndMail(resultPayload);
@@ -1639,10 +1648,14 @@ const saveToDemoVideo = async (payload) => {
   let s3 = await s3Topic('Grade 6','English');
   createIds.forEach(user_id => {
     let obj = {};
-    obj.user_id = user_id;
-    obj.assessment_id = payload.assessment_id;
-    obj.demo_topic = s3.topic;
+    obj.user_id         = user_id;
+    obj.assessment_id   = payload.assessment_id;
+    obj.demo_topic      = s3.topic;
     obj.demo_description = s3.description;
+    let randomSubject   = _.random(0, (payload.recommended_subject[user_id].length-1));
+    let randomGrade     = _.random(0, (payload.recommended_grade[user_id].length-1));
+    obj.subject_id      = payload.recommended_subject[user_id][randomSubject];
+    obj.grade_id        = payload.recommended_grade[user_id][randomGrade];
     insertPayload.push(obj);
   });
   [err, demoData] = await to(demovideo_details.bulkCreate(insertPayload));

@@ -4,6 +4,8 @@ module.exports = (sequelize, DataTypes) => {
     id               : { type: DataTypes.INTEGER, allowNull: false, autoIncrement: true, primaryKey: true },
     user_id          : { type: DataTypes.INTEGER, allowNull: false },
     assessment_id    : { type: DataTypes.INTEGER, allowNull: true },
+    subject_id       : { type: DataTypes.INTEGER, allowNull: true },
+    grade_id         : { type: DataTypes.INTEGER, allowNull: true },
     video_link       : { type: DataTypes.STRING, allowNull: true },
     scores           : { type: DataTypes.STRING, allowNull: true, 
                         get: function() {  
@@ -36,7 +38,8 @@ module.exports = (sequelize, DataTypes) => {
   });
 
   Model.associate = (models)=> {
-    // Model.belongsTo(models.sub_strands, {foreignKey: 'sub_strand_id'});
+    Model.belongsTo(models.subjects, {foreignKey: 'subject_id'});
+    Model.belongsTo(models.grades, {foreignKey: 'grade_id'});
   };
   return Model;
 };

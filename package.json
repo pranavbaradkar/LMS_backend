@@ -16,6 +16,7 @@
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "csv": "^6.3.1",
+    "dd-trace": "^4.3.0",
     "debug": "^4.3.4",
     "docx": "^7.8.2",
     "dotenv": "^16.0.3",
@@ -47,7 +48,6 @@
     "underscore": "^1.13.6",
     "uuidv4": "^6.2.13",
     "validator": "^13.9.0",
-    "word-extractor": "^1.0.4",
-    "dd-trace": "^4.2.0"
+    "word-extractor": "^1.0.4"
   }
 }
