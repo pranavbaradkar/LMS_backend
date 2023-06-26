@@ -492,6 +492,8 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
 
         obj.filterData = finalSubjectQuery; 
     // }
+
+        obj.subjectIds = subjectObjO;
       
       return obj;
     });
@@ -521,7 +523,11 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
           } }, attributes: ['strand_text', 'id'], raw: true}));
           
 
-          obj.question_remaining = await getQuestions({id: obj.id}, {level_id: assessment_configurations_data.level_id, limit: diff}, null, assessment_configurations_data.level_id, question_ids);
+          let filterObj = {level_id: assessment_configurations_data.level_id, limit: diff};
+          if(obj.subjectIds) {
+            filterObj.subject_ids = obj.subjectIds.map(ele => { return ele.subject_id; });
+          }
+          obj.question_remaining = await getQuestions({id: obj.id}, filterObj, null, assessment_configurations_data.level_id, question_ids);
         } else {
           obj.question_remaining = [];
         }
