@@ -1,6 +1,6 @@
 const model = require('../../models');
-const { demovideo_details, psy_questions, psy_question_options, assessments,assessment_results, user_assessment_logs, assessment_questions, strands, sub_strands, campaign_assessments, questions, question_options, custom_attributes, assessment_configurations, skills, levels, user_assessments, user_recommendations, users, inventory_blocks, user_assessment_responses, subjects } = require("../../models");
-const { to, ReE, ReS, requestQueryObject, lowercaseKeyValue, getDemoTopicsFile, fetchTopicForDemo } = require('../../services/util.service');
+const { demovideo_details, psy_questions, psy_question_options, assessments,assessment_results, user_assessment_logs, assessment_questions, strands, sub_strands, campaign_assessments, questions, question_options, custom_attributes, assessment_configurations, skills, levels, user_assessments, user_recommendations, users, inventory_blocks, user_assessment_responses, subjects, grades } = require("../../models");
+const { to, ReE, ReS, requestQueryObject, lowercaseKeyValue, getDemoTopicsFile, fetchSubjectTopic } = require('../../services/util.service');
 const { gradePsyScore, getHighestCount } = require('../../services/assessment.service');
 const validator = require('validator');
 const mailer = require("../../helpers/mailer"); 
@@ -26,6 +26,7 @@ psy_questions.belongsTo(model.skills, { foreignKey: 'skill_id' });
 questions.belongsTo(model.levels, { foreignKey: 'level_id' });
 psy_questions.belongsTo(model.levels, { foreignKey: 'level_id' });
 questions.belongsTo(model.subjects, { foreignKey: 'subject_id' });
+questions.belongsTo(model.grades, { foreignKey: 'grade_id' });
 
 assessments.belongsTo(campaign_assessments, { foreignKey: "id", targetKey: "assessment_id",  as: 'campaign_details' });
 
@@ -1198,15 +1199,18 @@ const getTopicMap = csvData => {
   return topicMap;
 }
 
-const s3Topic = async (grade, subject) => {
-    let jsonData = await fetchTopicForDemo(process.env.DEMO_TOPICS_BUCKET, `${grade}/${subject}/${subject}.csv`);
+const s3Topic = async (grade, subject, subject2) => {
+  
+    let jsonData = await fetchSubjectTopic(grade, subject, subject2);
+    jsonData.shift();
+    // console.log("The fetched s3 JSON Data", jsonData);
     // console.log("no of rows", jsonData.length);
-    let chosenTopicNo = _.random(0,jsonData.length);
+    let chosenTopicNo = _.random(0,(jsonData.length-1));
     // console.log("chose random no ", chosenTopicNo);
     let topicName = jsonData[chosenTopicNo].topic;
-    // console.log("topic name ", topicName);
     
     let topicMap = getTopicMap(jsonData);
+    // console.log("topic name MAP ", topicName);
     let chosenTopic = topicMap.get(topicName);
     chosenTopic.unshift(['Introduction', '(1-2 minutes)']);
     chosenTopic.push(['Conclusion and wrap-up', '(1-2 minutes)']);
@@ -1304,7 +1308,8 @@ const userAssessmentsResult = async function (req, res) {
           include: [
             {model: subjects, attributes:['id','name']},
             {model: skills, attributes:['id','name']},
-            {model: levels, attributes:['id','name']}
+            {model: levels, attributes:['id','name']},
+            {model: grades, attributes:['id','name']}
           ]
         }
       ],
@@ -1327,6 +1332,8 @@ const userAssessmentsResult = async function (req, res) {
   let gradeHeatMap    = {};
   let subjectHeatMap  = {};
   let skillTotals     = {};
+  let subjectsMap     = {};
+  let gradesMap       = {};
 
   // Compare assessment type questions to assessment type answer
   let questionType, assessmentType, correct_qa;
@@ -1363,8 +1370,11 @@ const userAssessmentsResult = async function (req, res) {
             let skill_id          = q.question.skill.id;
             skillIdMap[skill_id]  = skill;
             skillTotals[skill]    = 0;
-            skillScores[user_id][skill] = 0; // initalize skill based score
-            subjectScores[user_id][subject] = 0; // initalize subject based score
+            skillScores[user_id][skill]         = 0; // initalize skill based score
+            subjectScores[user_id][subject]     = 0; // initalize subject based score
+            subjectsMap[q.question.subject_id]  = subject;
+            gradesMap[q.question.grade_id]      = q.question.grade ? q.question.grade.name : null;
+
             questionType = q.question.question_type ? q.question.question_type : null ;
             correct_qa = q.question.correct_answer;
             if(questionType == 'MULTIPLE_CHOICE') { correct_qa = q.question.correct_answer.split(','); }
@@ -1374,6 +1384,7 @@ const userAssessmentsResult = async function (req, res) {
               // console.log("question match the following answer: corrected",q.question.correct_answer,correct_qa);
             }
 
+            // console.log("=============== processed question ",JSON.parse(JSON.stringify(q.question)));
             return {id: q.question_id, correct_answer: correct_qa, type: questionType, level_id: q.question.level_id,
               skill: skill, skill_id: skill_id,  subject: subject, subject_id: q.question.subject_id,
               lo_ids: q.question.lo_ids, is_psycho: false, grade_id: q.question.grade_id
@@ -1397,7 +1408,7 @@ const userAssessmentsResult = async function (req, res) {
           }
 
         });
-        console.log("00000000 ------------------ Result Skill score initaizlied obj",skillScores);
+        // console.log("00000000 ------------------ Result Skill score initaizlied obj",skillScores);
         let ob = {};
         
         let score = 0;
@@ -1463,6 +1474,8 @@ const userAssessmentsResult = async function (req, res) {
   // console.log(" Level Heat Map ", levelHeatMap);
   // console.log(" Grade Heat Map ", gradeHeatMap); 
   // console.log(" Subject Heat Map ", subjectHeatMap); 
+  // console.log(" Subject Map ", subjectsMap); 
+  // console.log(" Grades Map ", gradesMap); 
   // getHighestCount
 
 //  console.log("1111111 ------------------ Result Skill score obj",skillScores);
@@ -1482,9 +1495,9 @@ const userAssessmentsResult = async function (req, res) {
     assessment_id: assessment_id,
     user_info: userInfo,
     req_query : req.query,
-    recommended_level: getHighestCount(levelHeatMap),
-    recommended_grade: getHighestCount(gradeHeatMap),
-    recommended_subject: getHighestCount(subjectHeatMap),
+    // recommended_level: getHighestCount(levelHeatMap),
+    recommended_grade: getHighestCount(gradeHeatMap,gradesMap),
+    recommended_subject: getHighestCount(subjectHeatMap,subjectsMap),
   };
 
   let insertResult = await saveToDbAndMail(resultPayload);
@@ -1540,7 +1553,6 @@ const saveToDbAndMail = async(resultPayload) => {
   // console.log("user recommendation payload for bulk insert ", userRecommendationPayload);
   await saveToUserRecommendation(userRecommendationUserIds,userRecommendationPayload);
   await saveToDemoVideo(resultPayload);
-  // throw new Error("work under process");
   // console.log("assessment result payload for bulk insert ", assessmentResultPayload);
   let resultLink =  process.env.FRONTEND_URL+`/#/assessment/${resultPayload.assessment_id}/${resultPayload.type.toLowerCase()}/result`;
   let subject    = `${resultPayload.type == 'MAINS'? 'Mains' : 'Screening'} Assessment Result Notification - Access Your Results Now!`;
@@ -1612,7 +1624,7 @@ const saveToUserRecommendation = async (userRecommendationUserIds,userRecommenda
 
   if(userRecommendationData) {
     userRecommendationData.forEach(row => {
-        console.log("the user id in findAll user recommendation ",row.user_id);
+        // console.log("the user id in findAll user recommendation ",row.user_id);
       if(userRecommendationPayload[row.user_id]) {
         updatedUserRecommendationIds.push(row.user_id);
         let urp = userRecommendationPayload[row.user_id];
@@ -1651,20 +1663,25 @@ const saveToDemoVideo = async (payload) => {
   }
   const createIds = _.difference(currentUserIds, updatedIds);
   let insertPayload = [];
-  let s3 = await s3Topic('Grade 6','English');
-  createIds.forEach(user_id => {
-    let obj = {};
-    obj.user_id         = user_id;
-    obj.assessment_id   = payload.assessment_id;
-    obj.demo_topic      = s3.topic;
-    obj.demo_description = s3.description;
-    let randomSubject   = _.random(0, (payload.recommended_subject[user_id].length-1));
-    let randomGrade     = _.random(0, (payload.recommended_grade[user_id].length-1));
-    obj.subject_id      = payload.recommended_subject[user_id][randomSubject];
-    obj.grade_id        = payload.recommended_grade[user_id][randomGrade];
-    insertPayload.push(obj);
-  });
-  [err, demoData] = await to(demovideo_details.bulkCreate(insertPayload));
+
+    let s3data = {};
+    for(let index in createIds) {
+      let user_id = createIds[index];
+      let grade = payload.recommended_grade[user_id].name;
+      let subject = (payload.recommended_subject[user_id].name).replace(" ","_").trim();
+      s3data = await s3Topic(grade,subject, 'English'); // English is backup subject
+      let obj = {};
+      obj.user_id         = user_id;
+      obj.assessment_id   = payload.assessment_id;
+      obj.demo_topic      = s3data.topic;
+      obj.demo_description = s3data.description;
+      obj.subject_id      = payload.recommended_subject[user_id].id;
+      obj.grade_id        = payload.recommended_grade[user_id].id;
+      insertPayload.push(obj);
+    }
+    // console.log("Demo Insert Payload ", insertPayload);
+    [err, demoData] = await to(demovideo_details.bulkCreate(insertPayload));
+    if(err) { throw new Error("Could not create Demo topic/Description"); }
 }
 
 // const updateUserResult
@@ -1690,7 +1707,7 @@ const calculateFinalScores = async (userSkillScores, assessmentConfigData, skill
 
     if(assessmentConfigData.assessment_type == "MAINS") {
       // console.log("assessment config",assessmentConfigData);
-      console.log("skill scores",userSkillScores[user]);
+      // console.log("skill scores",userSkillScores[user]);
       // console.log("skill mAP",skillIdMap);
       
       let skillQuestionMap = {};
