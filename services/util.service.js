@@ -253,14 +253,23 @@ module.exports.uploadVideoOnS3 = async (path, fileName, contentType, videoBlobSt
         finalPath  =  `${process.env.BUCKET}/${path}`
         httpUrl = process.env.BUCKET;
     }
-
-    const s3Params = {
+    let s3Params = {
         Bucket: finalPath,
         Key: key,
         Body: videoBlobStream,
         ContentType: contentType
     };
+    if(contentType.includes('json')) {
+        console.log(videoBlobStream);
+        s3Params = {
+            Bucket: finalPath,
+            Key: key,
+            Body: videoBlobStream,
+            ContentType: contentType
+        }; 
+    } 
 
+    
     const uploadURL = await new Promise(function (resolve, reject) {
         s3Client.putObject(s3Params, function (err, url) {
             if (err) {

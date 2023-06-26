@@ -83,6 +83,7 @@ const userAssessmentSlot = async function(req, res) {
     demoPayload.user_id = req.user.id;
     // check if entry present for current user and assessment_id
     [err, demoData] = await to(demovideo_details.findOne({ where: { user_id: req.user.id } }));
+    
     if(demoData) {
       demoData.video_link = payload.demo_link;
       demoData.status = payload.demo_video_status;
@@ -1040,7 +1041,11 @@ const uploadVideoPacd = async function (req, res) {
   if(req.body && req.body.assessment_id) {
     path = `${payload.post_type}/${req.body.assessment_id}/${userId}`;
   }
-  url = await uploadVideoOnS3(path, `${userId}.mp4`, req.files[0].mimetype, req.files[0].buffer, false);
+  if(payload.file_type == 'videos') {
+    url = await uploadVideoOnS3(path, `${userId}.mp4`, req.files[0].mimetype, req.files[0].buffer, false);
+  } else if(payload.file_type == 'json') {
+    url = await uploadVideoOnS3(path, payload.file_name, 'application/json', payload.json_data, false);
+  }
   return ReS(res, { data: url });
 }
 module.exports.uploadVideoPacd = uploadVideoPacd;
