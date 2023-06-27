@@ -1552,7 +1552,8 @@ const saveToDbAndMail = async(resultPayload) => {
   // console.log("user recommendation User IDS used for Update/Create ", userRecommendationUserIds);
   // console.log("user recommendation payload for bulk insert ", userRecommendationPayload);
   await saveToUserRecommendation(userRecommendationUserIds,userRecommendationPayload);
-  await saveToDemoVideo(resultPayload);
+  if(resultPayload.type === 'MAINS') { await saveToDemoVideo(resultPayload); }
+  
   // console.log("assessment result payload for bulk insert ", assessmentResultPayload);
   let resultLink =  process.env.FRONTEND_URL+`/#/assessment/${resultPayload.assessment_id}/${resultPayload.type.toLowerCase()}/result`;
   let subject    = `${resultPayload.type == 'MAINS'? 'Mains' : 'Screening'} Assessment Result Notification - Access Your Results Now!`;
@@ -1667,8 +1668,9 @@ const saveToDemoVideo = async (payload) => {
     let s3data = {};
     for(let index in createIds) {
       let user_id = createIds[index];
-      let grade = payload.recommended_grade[user_id].name;
-      let subject = (payload.recommended_subject[user_id].name).replace(" ","_").trim();
+      let grade = payload.recommended_grade[user_id].name || 'Grade 6';
+      let subject = (payload.recommended_subject[user_id].name) || 'English';
+      subject = subject.replace(" ","_").trim();
       s3data = await s3Topic(grade,subject, 'English'); // English is backup subject
       let obj = {};
       obj.user_id         = user_id;
@@ -1677,7 +1679,10 @@ const saveToDemoVideo = async (payload) => {
       obj.demo_description = s3data.description;
       obj.subject_id      = payload.recommended_subject[user_id].id;
       obj.grade_id        = payload.recommended_grade[user_id].id;
-      insertPayload.push(obj);
+      if(payload.user_results[user_id] === 'PASSED') { 
+        // console.log(`the user id ${user_id} is ${payload.user_results[user_id]}`); 
+        insertPayload.push(obj);
+      }
     }
     // console.log("Demo Insert Payload ", insertPayload);
     [err, demoData] = await to(demovideo_details.bulkCreate(insertPayload));
