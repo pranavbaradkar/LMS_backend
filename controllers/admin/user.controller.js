@@ -1584,6 +1584,8 @@ try {
 
    // user_type
     let paginateData = {...requestQueryObject(req.query, queryParams)};
+    console.log(paginateData);
+
     let userFilter = {}
     if(req.query && req.query.filter && req.query.filter.user_type) {
       userFilter.user_type = req.query.filter.user_type;
@@ -1594,6 +1596,7 @@ try {
     let userDetails = { 
       model: users, 
       as: 'user',
+      where: userFilter,
       attributes: userAttributes,
       include: [{ 
         model: user_assessments, 
@@ -1613,6 +1616,8 @@ try {
         ]
       }]
     };
+
+    paginateData.order = [[`updated_at`, 'desc']];
      if(req.query && req.query.orderBy && userAttributes.indexOf(req.query.orderBy) >= 0) {
 
       let sortBy = req.query && req.query.sortBy ? req.query.sortBy : 'desc';
@@ -1624,6 +1629,8 @@ try {
     paginateData.include = [
       userDetails
     ];
+
+    paginateData.distinct = true;
 
     console.log(paginateData);
 
