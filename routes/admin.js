@@ -100,6 +100,8 @@ router.post("/users/invite/:user_id", adminPassport.authenticate("jwt", { sessio
 router.get("/users/:user_id/:details_type",adminPassport.authenticate("jwt", { session: false }), UserController.getUsersProfileDetails);
 router.put("/users/:user_id/academics/:academic_id",adminPassport.authenticate("jwt", { session: false }), UserController.updateUserAcademicDetails);
 router.put("/users/:user_id/professional-infos/:professional_info_id",adminPassport.authenticate("jwt", { session: false }), UserController.updateProfessionalInfoDetails);
+router.post("/user/:user_id/interview",adminPassport.authenticate("jwt", { session: false }), UserController.userInterview);
+
 // ********************* CAMPAIGN **************************
 router.post("/campaigns", adminPassport.authenticate("jwt", { session: false }), CampaignController.createCampaigns);
 router.get("/campaigns", adminPassport.authenticate("jwt", { session: false }), CampaignController.getAllUserCampaigns);

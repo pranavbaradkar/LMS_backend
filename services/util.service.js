@@ -285,7 +285,26 @@ module.exports.uploadVideoOnS3 = async (path, fileName, contentType, videoBlobSt
     return uploadURL;
 }
 
+const fetchSubjectTopic = async (grade, subject, subject2) => {
+  bucketName = process.env.DEMO_TOPICS_BUCKET;
+  try {
+    key = `${grade}/${subject}/${subject}.csv`;
+    return await fetchTopicForDemo(bucketName, key);
+  } catch (error) {
+    if (error.code == 'NoSuchKey') {
+      console.log("NoSuchKey error encountered: ", key);
+      key = `${grade}/${subject2}/${subject2}.csv`;
+      return await fetchTopicForDemo(bucketName, key);
+    }
+    else {
+      throw error;
+    }
+  }
+}
+module.exports.fetchSubjectTopic = fetchSubjectTopic;
+
 const fetchTopicForDemo = async (bucketName, key) => {
+  // console.log("fetching s3 file ",key);
   const params = {
     Bucket: bucketName,
     Key: key,

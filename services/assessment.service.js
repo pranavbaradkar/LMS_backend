@@ -2,6 +2,7 @@
 const { user_assessments, assessments, user_assessment_slots } = require("../models");
 const { to } = require('./util.service');
 const { Op } = require("sequelize");
+var _ = require('underscore');
 
 module.exports.getStatus = async function(user_id) {
   let userAssessmentSlotData, user_assessment_screening, user_assessment_mains, user_assessment_data_mains, user_assessment_data_screening;
@@ -80,18 +81,18 @@ const gradePsyScore = (score) => {
 }
 module.exports.gradePsyScore = gradePsyScore;
 
-const getHighestCount = (userOjbect) => {
+const getHighestCount = (userOjbect, userObjectMap) => {
   let resObj = {};
   Object.keys(userOjbect).forEach(user => {
-    resObj[user] = getHighestCountPerUser(userOjbect[user]);
+    resObj[user] = getHighestCountPerUser(userOjbect[user], userObjectMap);
   })
   return resObj;
 }
 module.exports.getHighestCount = getHighestCount;
 
-const getHighestCountPerUser = (array) => {
+const getHighestCountPerUser = (userObj, userObjectMap) => {
   const count = {};
-  array.forEach(element => {
+  userObj.forEach(element => {
   count[element] = (count[element] || 0) + 1;
   });
 
@@ -106,5 +107,7 @@ const getHighestCountPerUser = (array) => {
       elementsWithHighestCount.push(element);
   }
   }
-  return elementsWithHighestCount;
+  // select only one 
+  elementsWithHighestCount = elementsWithHighestCount[_.random(0, (elementsWithHighestCount.length-1))];
+  return {id:elementsWithHighestCount, name: userObjectMap[elementsWithHighestCount]};
 }

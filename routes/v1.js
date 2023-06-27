@@ -32,7 +32,7 @@ router.get("/", function(req, res, next) {
 router.get("/dash",userPassport.authenticate("jwt", { session: false }),HomeController.Dashboard);
 router.post("/account/verify", HomeController.accountVerify);
 
-router.post("/demo/scores/:user_id/:assessment_id", UserAssessmentController.setDemoScores);
+router.put("/demo/scores/:user_id/:assessment_id", UserAssessmentController.setDemoScores);
 // ********************* User ROUTES **************************
 router.post("/auth/generate-otp", UserController.generateOtp);
 router.post("/auth/validate-otp", UserController.verifyOtp);
