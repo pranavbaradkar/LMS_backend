@@ -16,6 +16,9 @@ const validator = require('validator');
 var moment = require("moment");
 const { object } = require("underscore");
 
+user_interviews.hasOne(user_interview_feedbacks, { foreignKey: 'user_id', sourceKey: 'user_id',  as: 'interview_feedback' });
+user_interview_feedbacks.belongsTo(user_interviews );
+
 user_assessments.hasMany(assessment_configurations, {  sourceKey: 'assessment_id', foreignKey: "assessment_id" });
 assessment_configurations.belongsTo(levels, { foreignKey: 'level_id' });
 
@@ -1657,7 +1660,7 @@ try {
 }
 module.exports.getUserRecommendation = getUserRecommendation;
 
-const userInterview = async (req, res) => {
+const userInterviewFeedback = async (req, res) => {
 let err, interviewData;
 let payload = req.body;
 
@@ -1672,4 +1675,26 @@ try {
 }
 
 }
-module.exports.userInterview = userInterview;
+module.exports.userInterviewFeedback = userInterviewFeedback;
+
+const getUserInterview = async (req, res) => {
+  let err, interviewData;
+  try {
+    [err, interviewData] = await to(user_interviews.findOne({ 
+      where: { user_id: req.params.user_id, assessment_id: req.params.assessment_id},
+      // attributes: ['id', 'user_id', 'assessment_id', 'interviewer'],
+      include: [ 
+        { model: user_interview_feedbacks, as: 'interview_feedback', 
+        attributes:["about_candidate","candidate_past","ctc_current", "ctc_expected","teaching_grades","teaching_boards","confidence_score","appearence_score","interview_notes","overall_rating","offer_selection"],
+        where: { assessment_id: req.params.assessment_id }
+       }
+      ]
+    }));
+    if(err) return ReE(res, err, 422);
+
+    return ReS(res, {data: interviewData}, 422);
+  } catch (err) {
+    return ReE(res, err, 422);
+  }
+}
+module.exports.getUserInterview = getUserInterview;

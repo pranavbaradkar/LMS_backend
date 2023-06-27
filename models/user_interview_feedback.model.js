@@ -26,7 +26,7 @@ module.exports = (sequelize, DataTypes) => {
   });
 
   Model.associate = (models)=> {
-    // Model.belongsTo(models.sub_strands, {foreignKey: 'sub_strand_id'});
+    // Model.belongsTo(models.user_interviews, {foreignKey: ['user_id', 'assessment_id']});
   };
   return Model;
 };

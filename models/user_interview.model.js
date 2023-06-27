@@ -3,6 +3,7 @@ module.exports = (sequelize, DataTypes) => {
   var Model = sequelize.define('user_interviews', {
     id               : { type: DataTypes.INTEGER, allowNull: false, autoIncrement: true, primaryKey: true },
     user_id          : { type: DataTypes.INTEGER, allowNull: false },
+    assessment_id    : { type: DataTypes.INTEGER, allowNull: false },
     date_time        : { type: 'TIMESTAMP', allowNull: true, defaultValue: null },
     mode             : { type: DataTypes.STRING, allowNull: true, defaultValue: null },
     room_no          : { type: DataTypes.STRING, allowNull: true, defaultValue: null },
@@ -22,7 +23,7 @@ module.exports = (sequelize, DataTypes) => {
   });
 
   Model.associate = (models)=> {
-    // Model.belongsTo(models.sub_strands, {foreignKey: 'sub_strand_id'});
+    // Model.belongsTo(models.user_interview_feedbacks, {foreignKey: ['user_id','assessment_id'], as: "interview_feedback"});
   };
   return Model;
 };
