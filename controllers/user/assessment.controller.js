@@ -1491,19 +1491,29 @@ module.exports.uploadVideoLiveStreaming = uploadVideoLiveStreaming;
 
 const setDemoScores = async (req, res) => {
 let err, demoData, payload;
+payload = req.body;
+console.log("payload", payload);
+console.log("payload total score", payload.total_score);
 if (_.isEmpty(req.params.user_id) || _.isUndefined(req.params.user_id)) {
   return ReE(res, "User ID is required in params", 422);
 }
 if (req.params && req.params.assessment_id == undefined) {
   return ReE(res, { message: "assessment_id params is missing" }, 422);
 }
-payload = req.body;
-console.log("payload", payload);
+if (_.isEmpty(payload.scores) || _.isUndefined(payload.scores)) {
+  return ReE(res, "scores required in json body", 422);
+}
+if (_.isUndefined(payload.total_score)) {
+  return ReE(res, "total_score required in json body", 422);
+}
 try {
   [err, demoData] = await to(demovideo_details.findOne({ where: {user_id: req.params.user_id, assessment_id: req.params.assessment_id } }) );
   if(err) return ReE(res, err, 422);
+
   if(demoData) {
-    demoData.scores = payload.scores;
+    // console.log("payload total score", payload.total_score);
+    demoData.scores       = payload.scores;
+    demoData.total_score = payload.total_score;
     demoData.save();
   }
 

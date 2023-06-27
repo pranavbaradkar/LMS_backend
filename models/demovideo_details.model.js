@@ -7,6 +7,7 @@ module.exports = (sequelize, DataTypes) => {
     subject_id       : { type: DataTypes.INTEGER, allowNull: true },
     grade_id         : { type: DataTypes.INTEGER, allowNull: true },
     video_link       : { type: DataTypes.STRING, allowNull: true },
+    total_score      : { type: DataTypes.INTEGER, allowNull: true },
     scores           : { type: DataTypes.STRING, allowNull: true, 
                         get: function() {  
                         let value = this.getDataValue('scores');
