@@ -1,4 +1,4 @@
-const { roles,subjects, schools, levels, user_teaching_interests, users, demovideo_details, user_interviews, user_assessments, assessment_results, academics, professional_infos, custom_attributes, school_inventories, user_recommendations, assessment_configurations } = require("../../models");
+const { roles,subjects, schools, levels, user_teaching_interests, users, demovideo_details, user_interviews, user_interview_feedbacks, user_assessments, assessment_results, academics, professional_infos, custom_attributes, school_inventories, user_recommendations, assessment_configurations } = require("../../models");
 const model = require('../../models');
 const authService = require("../../services/auth.service");
 const { to, ReE, ReS, toSnakeCase, paginate, snakeToCamel, requestQueryObject, randomHash, getUUID } = require('../../services/util.service');
@@ -1656,3 +1656,20 @@ try {
 }
 }
 module.exports.getUserRecommendation = getUserRecommendation;
+
+const userInterview = async (req, res) => {
+let err, interviewData;
+let payload = req.body;
+
+try {
+  payload.user_id = req.params.user_id;
+  [err, interviewData] = await to(user_interview_feedbacks.create(payload));
+  if(err) return ReE(res, err, 422);
+
+  return ReS(res, {data: interviewData}, 422);
+} catch (err) {
+  return ReE(res, err, 422)  ;
+}
+
+}
+module.exports.userInterview = userInterview;
