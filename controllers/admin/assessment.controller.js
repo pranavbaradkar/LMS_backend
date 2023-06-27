@@ -1429,15 +1429,15 @@ const userAssessmentsResult = async function (req, res) {
                 calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]);
               }
             }
-            else if(user_response[qe.id] && qe.type == 'MATCH_THE_FOLLOWING'){
-              // FIXME: calculation is wrong (should check )
-              Object.keys(user_response[qe.id]).forEach(function(key, index) {
-                levelHeatMap[user_id].push(qe.level_id);
-                gradeHeatMap[user_id].push(qe.grade_id);
-                subjectHeatMap[user_id].push(qe.subject_id);
-                if(lowercaseKeyValue(user_response[qe.id])[key] == qe.correct_answer[key]) { calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]); }
-              });
-            }
+            // else if(user_response[qe.id] && qe.type == 'MATCH_THE_FOLLOWING'){
+            //   // FIXME: calculation is wrong (should check )
+            //   Object.keys(user_response[qe.id]).forEach(function(key, index) {
+            //     levelHeatMap[user_id].push(qe.level_id);
+            //     gradeHeatMap[user_id].push(qe.grade_id);
+            //     subjectHeatMap[user_id].push(qe.subject_id);
+            //     if(lowercaseKeyValue(user_response[qe.id])[key] == qe.correct_answer[key]) { calculateScore(assessmentConfig, qe.skill, skillScores[user_id], qe.subject, subjectScores[user_id]); }
+            //   });
+            // }
             else {
               if(user_response[qe.id] && user_response[qe.id].toLowerCase() == qe.correct_answer.toLowerCase()) { 
                 levelHeatMap[user_id].push(qe.level_id);
