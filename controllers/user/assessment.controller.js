@@ -695,7 +695,7 @@ const statusUserAssessment = async function (req, res) {
           user_id: req.user.id, type: payload.type,
           status: { [Op.in]: allowedStatus }
         }, 
-        force: true 
+        // force: true 
       }));
     // }   
     
