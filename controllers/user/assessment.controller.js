@@ -65,6 +65,9 @@ module.exports.getUserAssessmentSlot = getUserAssessmentSlot;
 const userAssessmentSlot = async function(req, res) {
   let err, userAssessmentSlotData;
   let payload = req.body;
+  if (_.isEmpty(payload.demo_link) || _.isUndefined(payload.demo_link)) {
+    return ReE(res, "Demo Link id required in json data", 422);
+  }
   try {
     payload.user_id = req.user.id;
     [err, updated] = await to(user_assessment_slots.update(payload, {where: {user_id: req.user.id }}));
