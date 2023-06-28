@@ -17,7 +17,7 @@ var moment = require("moment");
 const { object } = require("underscore");
 
 user_interviews.hasOne(user_interview_feedbacks, { foreignKey: 'user_id', sourceKey: 'user_id',  as: 'interview_feedback' });
-user_interview_feedbacks.belongsTo(user_interviews );
+user_interview_feedbacks.belongsTo(user_interviews , { foreignKey: 'user_id', sourceKey: 'user_id'} );
 
 user_assessments.hasMany(assessment_configurations, {  sourceKey: 'assessment_id', foreignKey: "assessment_id" });
 assessment_configurations.belongsTo(levels, { foreignKey: 'level_id' });
@@ -1670,11 +1670,28 @@ module.exports.getUserRecommendation = getUserRecommendation;
 const userInterviewFeedback = async (req, res) => {
 let err, interviewData;
 let payload = req.body;
-
+if (_.isEmpty(req.params.user_id) || _.isUndefined(req.params.user_id)) {
+  return ReE(res, "user id required in params", 422);
+} 
 try {
   payload.user_id = req.params.user_id;
-  [err, interviewData] = await to(user_interview_feedbacks.create(payload));
+  [err, interviewData] = await to(user_interview_feedbacks.update(payload, { 
+    where: { user_id: req.params.user_id }
+  }));
   if(err) return ReE(res, err, 422);
+
+  if(interviewData && interviewData.length == 1 && interviewData[0] == 0) {
+    console.log("neee dto create new");
+      [err, interviewData] = await to(user_interview_feedbacks.create(payload));
+      if(err) return ReE(res, err, 422);
+  }
+  else {
+    [err, interviewData] = await to(user_interview_feedbacks.findOne({
+      where: { user_id: req.params.user_id }
+    })); 
+  }
+
+
 
   return ReS(res, {data: interviewData}, 422);
 } catch (err) {
@@ -1686,14 +1703,17 @@ module.exports.userInterviewFeedback = userInterviewFeedback;
 
 const getUserInterview = async (req, res) => {
   let err, interviewData;
+  if (_.isEmpty(req.params.user_id) || _.isUndefined(req.params.user_id)) {
+    return ReE(res, "user id required in params", 422);
+  } 
   try {
     [err, interviewData] = await to(user_interviews.findOne({ 
-      where: { user_id: req.params.user_id, assessment_id: req.params.assessment_id},
+      where: { user_id: req.params.user_id},
       // attributes: ['id', 'user_id', 'assessment_id', 'interviewer'],
       include: [ 
         { model: user_interview_feedbacks, as: 'interview_feedback', 
         attributes:["about_candidate","candidate_past","ctc_current", "ctc_expected","teaching_grades","teaching_boards","confidence_score","appearence_score","interview_notes","overall_rating","offer_selection"],
-        where: { assessment_id: req.params.assessment_id }
+        // where: { assessment_id: req.params.assessment_id }
        }
       ]
     }));

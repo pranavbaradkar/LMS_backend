@@ -3,7 +3,7 @@ module.exports = (sequelize, DataTypes) => {
   var Model = sequelize.define('user_interview_feedbacks', {
     id                      : { type: DataTypes.INTEGER, allowNull: false, autoIncrement: true, primaryKey: true },
     user_id                 : { type: DataTypes.INTEGER, allowNull: false },
-    assessment_id           : { type: DataTypes.INTEGER, allowNull: false },
+    // assessment_id           : { type: DataTypes.INTEGER, allowNull: false },
     about_candidate         : { type: DataTypes.TEXT, allowNull: true, defaultValue: null },
     candidate_past          : { type: DataTypes.TEXT, allowNull: true, defaultValue: null },
     ctc_current             : { type: DataTypes.STRING, allowNull: true, defaultValue: null },
