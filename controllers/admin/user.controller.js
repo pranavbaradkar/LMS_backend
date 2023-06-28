@@ -1475,6 +1475,7 @@ const getUserDetails = async (req, res)=> {
   }
   try {
     let err, userDetails;
+    // console.log("the user id ", req.params.user_id);
     [err, userDetails] = await to(users.findOne({
       where: { id: req.params.user_id },
       attributes: ["id", "profile_pic", "title", "first_name", "middle_name", "last_name", "email", "user_type", "is_email_verified", "country_code", "phone_no", "is_phone_verified", "dob", "gender", "employee_code"],
@@ -1508,29 +1509,8 @@ const getUserDetails = async (req, res)=> {
       ]
     }));
     if(err) return ReE(res, err, 422);
-    if(!userDetails) {
-      //TODO: remove this dummy data
-      userDetails = '{"id":3975,"profile_pic":"","title":"Ms","first_name":"Kanhai","middle_name":"Lal","last_name":"Murmu","email":"kanhailal2010@gmail.com","user_type":"JOB_SEEKER","is_email_verified":true,"country_code":"","phone_no":"8956508033","is_phone_verified":true,"dob":"","gender":"","employee_code":"","teaching_interests":{"id":3975,"user_id":4943,"level_ids":[3],"school_ids":[132],"board_ids":"","subject_ids":[94]},"user_assessments":[{"skill_scores":{"Core Skill":7,"Communication Skills":3},"subject_scores":{"Mathematics":7,"null":0},"id":7,"user_id":3975,"assessment_id":8,"percentile":"95.00","type":"SCREENING","result":"PASSED"},{"skill_scores":{"Core Skill":7,"Communication Skills":3},"subject_scores":{"Mathematics":7,"null":0},"id":8,"user_id":3975,"assessment_id":8,"percentile":"25.00","type":"MAINS","result":"PASSED"}],"demo_video":{"video_link":"https://video.link","status":"recomended","demo_topic":"Newtons Laws","demo_description":"Topic description","scores":[{"knowledge_score":6,"total":10},{"confidence_score":6,"total":10},{"behavioral_score":6,"total":10},{"fluency_score":6,"total":10}]},"interview":{"status":"offer_letter","mode":"At_School","date_time":"dd/mm/YYYY h:i:s","room_no":333,"interviewer":"Aarav Patel","interview_remark":"Interview remark text","interview_notes":"Interview note text"}}';
-      userDetails = JSON.parse(userDetails);
-    }
-    else {
-      // userDetails.demo_video.id = userDetails.demo_video.id? userDetails.demo_video.id : "";
-      // userDetails.demo_video.video_link = userDetails.demo_video.video_link? userDetails.demo_video.video_link : "";
-      // userDetails.demo_video.demo_topic = userDetails.demo_video.demo_topic? userDetails.demo_video.demo_topic : "";
-      // userDetails.demo_video.demo_description = userDetails.demo_video.demo_description? userDetails.demo_video.demo_description : "";
-      // userDetails.demo_video.scores = userDetails.demo_video.scores? userDetails.demo_video.scores : "";
-      // userDetails.demo_video.status = userDetails.demo_video.status? userDetails.demo_video.status : "";
 
-      // userDetails.interview.id = userDetails.interview.id ? userDetails.interview.id : "";
-      // userDetails.interview.date_time = userDetails.interview.date_time ? userDetails.interview.date_time : "";
-      // userDetails.interview.mode = userDetails.interview.mode ? userDetails.interview.mode : "";
-      // userDetails.interview.room_no = userDetails.interview.room_no ? userDetails.interview.room_no : "";
-      // userDetails.interview.status = userDetails.interview.status ? userDetails.interview.status : "";
-      // userDetails.interview.interviewer = userDetails.interview.interviewer ? userDetails.interview.interviewer : "";
-      // userDetails.interview.interview_notes = userDetails.interview.interview_notes ? userDetails.interview.interview_notes : "";
-      // userDetails.interview.interview_remark = userDetails.interview.interview_remark ? userDetails.interview.interview_remark : "";
-    }
-
+    // console.log("the user details ", userDetails);
     let levelData = [];
     let subjectData = [];
     let schoolData = [];
