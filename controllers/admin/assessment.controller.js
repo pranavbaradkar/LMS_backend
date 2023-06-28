@@ -1543,6 +1543,7 @@ const saveToDbAndMail = async(resultPayload) => {
     let type = (resultPayload.type).toLowerCase();
     urObj[`${type}_score`] = resultPayload.total_scores[user_id];
     urObj[`${type}_score_total`] = resultPayload.assessment_total;
+    // urObj[`${type}_assessment_id`] = resultPayload.assessment_id;
     urObj.user_id = user_id;
     urObj.status = "PENDING";
     userRecommendationPayload[user_id] = urObj;
@@ -1618,10 +1619,13 @@ const saveToDbAndMail = async(resultPayload) => {
 const saveToUserRecommendation = async (userRecommendationUserIds,userRecommendationPayload) => {
   
   let err, userRecommendationData;
+
   // userRecommendationUserIds.map(ele => parseInt(ele));
   // console.log("user recommendation User IDS used for Update/Create ", userRecommendationUserIds);
   let updatedUserRecommendationIds = [];
-  [err, userRecommendationData] = await to(user_recommendations.findAll({ where: { user_id: {[Op.in]: userRecommendationUserIds} }}) );
+  [err, userRecommendationData] = await to(user_recommendations.findAll({ 
+    where: { user_id: {[Op.in]: userRecommendationUserIds} }
+  }) );
 
   if(userRecommendationData) {
     userRecommendationData.forEach(row => {
@@ -1629,12 +1633,11 @@ const saveToUserRecommendation = async (userRecommendationUserIds,userRecommenda
       if(userRecommendationPayload[row.user_id]) {
         updatedUserRecommendationIds.push(row.user_id);
         let urp = userRecommendationPayload[row.user_id];
-        Object.keys(urp).forEach(prop => { row[prop]= urp[prop]; })
+        Object.keys(urp).forEach(prop => { row[prop]= urp[prop]; });
         row.save();
       }
     });
   }
-  if(err) { throw new Error("failed to find records for user_recommendation"); }
 
   // console.log("updated IDs ", updatedUserRecommendationIds);
   

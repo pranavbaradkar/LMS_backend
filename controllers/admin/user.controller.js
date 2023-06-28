@@ -1699,9 +1699,30 @@ const getUserInterview = async (req, res) => {
     }));
     if(err) return ReE(res, err, 422);
 
-    return ReS(res, {data: interviewData}, 422);
+    return ReS(res, {data: interviewData}, 200);
   } catch (err) {
     return ReE(res, err, 422);
   }
 }
 module.exports.getUserInterview = getUserInterview;
+
+module.exports.updateRecommendStatus = async (req, res) => {
+  let err, statusData;
+  let payload = req.body;
+  if (_.isEmpty(req.params.user_id) || _.isUndefined(req.params.user_id)) {
+    return ReE(res, "user id required in params", 422);
+  } 
+  if (_.isEmpty(payload.status) || _.isUndefined(payload.status)) {
+    return ReE(res, "status is required in payload", 422);
+  } 
+  try {
+    [err,statusData] = await to(user_recommendations.update(payload, { 
+      where: { user_id: req.params.user_id } 
+    }));
+    if(err) return ReE(res, err, 422);
+
+    return ReS(res, {data: statusData}, 200);
+  } catch (err) {
+    return ReE(res, err, 422);
+  }
+}

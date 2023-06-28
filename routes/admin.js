@@ -102,6 +102,7 @@ router.put("/users/:user_id/academics/:academic_id",adminPassport.authenticate("
 router.put("/users/:user_id/professional-infos/:professional_info_id",adminPassport.authenticate("jwt", { session: false }), UserController.updateProfessionalInfoDetails);
 router.post("/user/:user_id/interview",adminPassport.authenticate("jwt", { session: false }), UserController.userInterviewFeedback);
 router.get("/user/:user_id/interview/:assessment_id",adminPassport.authenticate("jwt", { session: false }), UserController.getUserInterview);
+router.put("/user/:user_id/recommend/status",adminPassport.authenticate("jwt", { session: false }), UserController.updateRecommendStatus);
 
 // ********************* CAMPAIGN **************************
 router.post("/campaigns", adminPassport.authenticate("jwt", { session: false }), CampaignController.createCampaigns);
