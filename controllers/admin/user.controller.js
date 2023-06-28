@@ -1726,6 +1726,27 @@ const getUserInterview = async (req, res) => {
 }
 module.exports.getUserInterview = getUserInterview;
 
+module.exports.getAllUserInterview = async (req, res) => {
+  let err, interviewData;
+  try {
+    [err, interviewData] = await to(user_interviews.findAll({ 
+      // where: { user_id: req.params.user_id},
+      // attributes: ['id', 'user_id', 'assessment_id', 'interviewer'],
+      include: [ 
+        { model: user_interview_feedbacks, as: 'interview_feedback', 
+        attributes:["about_candidate","candidate_past","ctc_current", "ctc_expected","teaching_grades","teaching_boards","confidence_score","appearence_score","interview_notes","overall_rating","offer_selection"],
+        // where: { assessment_id: req.params.assessment_id }
+       }
+      ]
+    }));
+    if(err) return ReE(res, err, 422);
+
+    return ReS(res, {data: interviewData}, 200);
+  } catch (err) {
+    return ReE(res, err, 422);
+  } 
+}
+
 module.exports.updateRecommendStatus = async (req, res) => {
   let err, statusData;
   let payload = req.body;
