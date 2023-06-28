@@ -1604,7 +1604,7 @@ try {
       include: [{ 
         model: user_assessments, 
         require: false,
-        attributes: ['assessment_id', 'user_id'],
+        attributes: ['assessment_id', 'user_id', 'status', 'type'],
         include: [
           {
             model: assessment_configurations,
@@ -1616,7 +1616,8 @@ try {
               require: false
             }]
           }
-        ]
+        ],
+        where: { status: { [Op.in] : ['FINISHED', 'PASSED', 'FAILED'] }, type: 'MAINS' }
       }]
     };
 
@@ -1651,7 +1652,7 @@ try {
          });
          obj.levels = [...new Set(levels)];
         }
-        return obj;
+         return obj;
       })
       return ReS(res, { data: userData }, 200);
     } else {
