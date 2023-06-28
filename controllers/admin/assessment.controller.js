@@ -1213,6 +1213,7 @@ const s3Topic = async (grade, subject, subject2) => {
     let topicMap = getTopicMap(jsonData);
     // console.log("topic name MAP ", topicName);
     let chosenTopic = topicMap.get(topicName);
+    chosenTopic = chosenTopic.slice(0, 4);
     chosenTopic.unshift(['Introduction', '(1-2 minutes)']);
     chosenTopic.push(['Conclusion and wrap-up', '(1-2 minutes)']);
 
@@ -1667,9 +1668,10 @@ const saveToDemoVideo = async (payload) => {
     demoData.forEach(row => { updatedIds.push(row.user_id); });
   }
   const createIds = _.difference(currentUserIds, updatedIds);
-  let insertPayload = [];
+  // console.log(updatedIds, currentUserIds, createIds);
 
-    let s3data = {};
+  let insertPayload = [];
+  let s3data = {};
     for(let index in createIds) {
       let user_id = createIds[index];
       let grade = payload.recommended_grade[user_id].name || 'Grade 6';
