@@ -219,17 +219,17 @@ const updateAssessment = async function (req, res) {
     if (assessmentData == null) {
       return ReE(res, "No assessment data found", 404);
     } else {
-      assessmentData.update(payload);
+      await assessmentData.update(payload);
 
 
-      let screenObject = payload.screening_question_ids.map(ele => {
+      let screenObject = payload.screening_question_ids ? payload.screening_question_ids.map(ele => {
         let newObject = {
           assessment_id: assessmentData.id,
           question_id: ele,
           type: 'SCREENING'
         }
         return newObject;
-      })
+      }) : []
       let mainsObject = payload.mains_question_ids.map(ele => {
         let newObject1 = {
           assessment_id: assessmentData.id,
@@ -528,6 +528,7 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
           if(obj.subjectIds) {
             filterObj.subject_ids = obj.subjectIds.map(ele => { return ele.subject_id; });
           }
+          let question_ids = questionList.map(ele => { return ele.id });
           obj.question_remaining = await getQuestions({id: obj.id}, filterObj, null, assessment_configurations_data.level_id, question_ids);
         } else {
           obj.question_remaining = [];
