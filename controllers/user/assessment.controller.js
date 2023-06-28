@@ -1,5 +1,5 @@
 const model = require('../../models');
-const { demovideo_details, psy_questions, psy_question_options, user_assessment_slots, assessment_results, question_pools, user_assessment_logs, user_assessments, assessments, assessment_questions,campaigns,campaign_assessments, assessment_configurations,levels, questions, question_options, question_mtf_answers, custom_attributes, professional_infos, user_assessment_responses, skills, users, user_teaching_interests, subjects, grades } = require("../../models");
+const { demovideo_details,user_recommendations, psy_questions, psy_question_options, user_assessment_slots, assessment_results, question_pools, user_assessment_logs, user_assessments, assessments, assessment_questions,campaigns,campaign_assessments, assessment_configurations,levels, questions, question_options, question_mtf_answers, custom_attributes, professional_infos, user_assessment_responses, skills, users, user_teaching_interests, subjects, grades } = require("../../models");
 const { to, ReE, ReS, toSnakeCase, returnObjectEmpty, uploadVideoOnS3 } = require('../../services/util.service');
 const { getLiveCampaignAssessments } = require('../../services/campaign.service');
 const { gradePsyScore } = require('../../services/assessment.service');
@@ -1491,8 +1491,7 @@ module.exports.uploadVideoLiveStreaming = uploadVideoLiveStreaming;
 const setDemoScores = async (req, res) => {
 let err, demoData, payload;
 payload = req.body;
-console.log("payload", payload);
-console.log("payload total score", payload.total_score);
+
 if (_.isEmpty(req.params.user_id) || _.isUndefined(req.params.user_id)) {
   return ReE(res, "User ID is required in params", 422);
 }
@@ -1509,7 +1508,17 @@ try {
   [err, demoData] = await to(demovideo_details.findOne({ where: {user_id: req.params.user_id, assessment_id: req.params.assessment_id } }) );
   if(err) return ReE(res, err, 422);
 
+  // console.log(`find user id ${req.params.user_id} with assessment id ${req.params.assessment_id}`);
+  // console.log("the demoData", JSON.parse(JSON.stringify(demoData)));
   if(demoData) {
+    // calculate the scores
+    let userRecommendData, scored = 0;
+    payload.scores.map(ele => { Object.keys(ele).map(prop => { if(prop != 'total') { scored += ele[prop]; } }); });
+    [err, userRecommendData] = await to(user_recommendations.findOne({ where: {user_id:req.params.user_id} }).then((rows)=>{
+      rows.demo_score = scored;
+      rows.demo_score_total = payload.total_score;
+      rows.save();
+    }));
     // console.log("payload total score", payload.total_score);
     demoData.scores       = payload.scores;
     demoData.total_score = payload.total_score;

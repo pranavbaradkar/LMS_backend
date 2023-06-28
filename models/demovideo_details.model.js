@@ -8,10 +8,10 @@ module.exports = (sequelize, DataTypes) => {
     grade_id         : { type: DataTypes.INTEGER, allowNull: true },
     video_link       : { type: DataTypes.STRING, allowNull: true },
     total_score      : { type: DataTypes.INTEGER, allowNull: true },
-    scores           : { type: DataTypes.STRING, allowNull: true, 
+    scores           : { type: DataTypes.JSONB, allowNull: true, 
                         get: function() {  
                         let value = this.getDataValue('scores');
-                        return JSON.parse(value);
+                        return value ? JSON.parse(value) : '';
                         },
                         set: function(val) {
                         this.setDataValue('scores', JSON.stringify(val));
