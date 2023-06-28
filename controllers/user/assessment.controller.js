@@ -197,7 +197,17 @@ const getScreeningTestDetails = async function (req, res) {
       });
 
       if(req.internal) return skills_data_final;
-      return ReS(res, { data: skills_data_final }, 200);
+
+      let orderByname = ["Psychometric", "Communication Skills", "Pedagogy", "Digital Literacy", "Core Skill"];
+      let finalData = [];
+      orderByname.forEach(ele => {
+        let objectFind = skills_data_final.find(e => e.name == ele);
+        if(objectFind) {
+          finalData.push(objectFind);
+        }
+      });
+
+      return ReS(res, { data: finalData }, 200);
     }
   } catch (err) {
     return ReE(res, err, 422);
@@ -1010,15 +1020,39 @@ const getMainsSlot = async function(req, res) {
   try {
 
     var startDate = moment(); 
-    var endDate  = moment().add(1, 'months');
+    // var endDate  = moment().add(1, 'months');
     
-    var diff = endDate.diff(startDate, 'days');
+    // var diff = endDate.diff(startDate, 'days');
     let slotDay = [];
     let timeing =  ["10:00 am", "12:00 pm", "01:00 pm", "03:00 pm", "06:00 pm"];
-    for(i = 0; i < diff; i++) {
-      var isDay  = moment().add(i, 'day').isoWeekday();
-      if(isDay == 6 || isDay == 7) {
-        var day = moment().add(i, 'day').format("Do MMM, YY");
+      
+    for(i = 0; i < 7; i++) {
+      timeing =  ["10:00 am", "12:00 pm", "01:00 pm", "03:00 pm", "06:00 pm"];
+      var isDay  = moment().add(i, 'day');
+      // if(isDay == 6 || isDay == 7) {
+        
+      // }
+
+      var day = moment().add(i, 'day').format("Do MMM, YY");
+      let daysDiff = isDay.diff(startDate, 'days');
+
+      if(daysDiff == 0) {
+        let time = isDay.format('hh:mm a');
+        console.log(time);
+        let timeData = [];
+        timeing.forEach(ele => {
+          var startTime = moment(ele, "hh:mm a");
+          var endTime = moment(time, "hh:mm a");
+          var difTime = moment.duration(startTime.diff(endTime));
+          if(difTime.minutes() > 0 && difTime.hours()) {
+            timeData.push(ele);
+          }
+        });
+        timeing = timeData;
+      } 
+
+      //console.log(daysDiff);
+      if(timeing.length > 0) {
         let dayData = {
           day: day,
           timeing: timeing
