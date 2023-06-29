@@ -1032,12 +1032,12 @@ const getMainsSlot = async function(req, res) {
       
     for(i = 0; i < 7; i++) {
       timeing =  ["10:00 am", "12:00 pm", "01:00 pm", "03:00 pm", "06:00 pm"];
-      var isDay  = moment().add(i, 'day');
+      var isDay  = moment().utcOffset("+05:30").add(i, 'day');
       // if(isDay == 6 || isDay == 7) {
         
       // }
 
-      var day = moment().add(i, 'day').format("Do MMM, YY");
+      var day = moment().utcOffset("+05:30").add(i, 'day').format("Do MMM, YY");
       let daysDiff = isDay.diff(startDate, 'days');
 
       if(daysDiff == 0) {
