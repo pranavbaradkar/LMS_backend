@@ -1512,7 +1512,8 @@ const getUserDetails = async (req, res)=> {
     }));
     if(err) return ReE(res, err, 422);
 
-    // console.log("the user details ", userDetails);
+    if(!userDetails) { return ReE(res, `User not found with id ${req.params.user_id}`, ); }
+
     let levelData = [];
     let subjectData = [];
     let schoolData = [];
