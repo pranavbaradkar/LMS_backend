@@ -1507,7 +1507,7 @@ const getUserDetails = async (req, res)=> {
             } 
           ]
         },
-        { model: user_interviews, as:'interview', attributes:["id", "date_time", "mode", "room_no", "status", "interviewer", "interview_notes", "interview_remark"] },
+        { model: user_interviews, as:'interview', attributes:["id", "interview_slot", "mode", "room_no", "status", "interviewer", "interview_notes", "interview_remark"] },
       ]
     }));
     if(err) return ReE(res, err, 422);
