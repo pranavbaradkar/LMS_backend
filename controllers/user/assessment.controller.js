@@ -79,27 +79,17 @@ const userAssessmentSlot = async function(req, res) {
       [err, userAssessmentSlotData] = await to(user_assessment_slots.findOne({where: {user_id: req.user.id}}));
     }
 
-    // demoPaylod ( demo.topic and description will be set already)
-    let demoPayload = {};
+    // only create update when payload contains demo_link
     if(payload.demo_link && payload.demo_link !== ""){
-      demoPayload.video_link = payload.demo_link;
-    }
-    demoPayload.status = "PENDING";
-    demoPayload.demo_topic = "";
-    demoPayload.user_id = req.user.id;
-    // check if entry present for current user and assessment_id
     [err, demoData] = await to(demovideo_details.findOne({ where: { user_id: req.user.id } }));
     
     if(demoData) {
       demoData.video_link = payload.demo_link;
-      demoData.status = "PENDING";
+      demoData.status = "SUBMITTED";
       demoData.save();
       console.log("update demovideo details");
     }
-    else {
-      // console.log("create demovideo details");
-      [err, demoData] = await to(demovideo_details.create(demoPayload));
-    }
+  }
     if (err) return ReE(res, err, 422);
     return ReS(res, { data: userAssessmentSlotData }, 200);
   } catch (err) {
