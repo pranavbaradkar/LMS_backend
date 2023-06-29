@@ -82,18 +82,9 @@ const userAssessmentSlot = async function(req, res) {
     
     if(demoData) {
       demoData.video_link = payload.demo_link;
-      demoData.status = "PENDING";
+      demoData.status = "SUBMITTED";
       demoData.save();
       console.log("update demovideo details");
-    }
-    else {
-          // demoPaylod ( demo.topic and description will be set already)
-      let demoPayload = {};
-      demoPayload.video_link = payload.demo_link;
-      demoPayload.status = "PENDING";
-      demoPayload.demo_topic = "";
-      demoPayload.user_id = req.user.id;
-      [err, demoData] = await to(demovideo_details.create(demoPayload));      
     }
   }
     if (err) return ReE(res, err, 422);
