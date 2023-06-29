@@ -1762,6 +1762,28 @@ module.exports.getAllUserInterview = async (req, res) => {
     return ReE(res, err, 422);
   } 
 }
+module.exports.setUserInterview = async (req, res) => {
+  let err, interviewData;
+  if (_.isEmpty(req.params.user_id) || _.isUndefined(req.params.user_id)) {
+    return ReE(res, "user id required in params", 422);
+  }
+  try {
+    let levelMap = {};
+    [err, levelData] = await to(levels.findAll({attributes:['id', 'name']}));
+    levelData.map(ele => { levelMap[ele.name] = ele.id; } );
+    let payload = req.body;
+    payload.user_id = req.params.user_id;
+    if(payload.recommended_level && payload.recommended_level != '') {
+      payload.recommended_level = levelMap[payload.recommended_level];
+    }
+    [err, interviewData] = await to(user_interviews.create(payload));
+    if(err) return ReE(res, err, 422);
+
+    return ReS(res, {data: interviewData}, 200);
+  } catch (err) {
+    return ReE(res, err, 422);
+  }
+}
 
 module.exports.updateRecommendStatus = async (req, res) => {
   let err, statusData;
