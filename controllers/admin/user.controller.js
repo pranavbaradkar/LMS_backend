@@ -18,6 +18,8 @@ const { object } = require("underscore");
 
 user_interviews.hasOne(user_interview_feedbacks, { foreignKey: 'user_id', sourceKey: 'user_id',  as: 'interview_feedback' });
 user_interview_feedbacks.belongsTo(user_interviews , { foreignKey: 'user_id', sourceKey: 'user_id'} );
+user_interviews.belongsTo(user_teaching_interests, {foreignKey: 'user_id', as:'teaching_interests'});
+user_interviews.belongsTo(users, {foreignKey: 'user_id'});
 
 user_assessments.hasMany(assessment_configurations, {  sourceKey: 'assessment_id', foreignKey: "assessment_id" });
 assessment_configurations.belongsTo(levels, { foreignKey: 'level_id' });
@@ -1712,17 +1714,44 @@ module.exports.getAllUserInterview = async (req, res) => {
   try {
     [err, interviewData] = await to(user_interviews.findAll({ 
       // where: { user_id: req.params.user_id},
-      // attributes: ['id', 'user_id', 'assessment_id', 'interviewer'],
+      attributes: ['id', 'user_id', "recommended_level","interview_slot","mode","exam_location","room_no","status","interviewer","interview_notes","interview_remark"],
       include: [ 
-        { model: user_interview_feedbacks, as: 'interview_feedback', 
-        attributes:["about_candidate","candidate_past","ctc_current", "ctc_expected","teaching_grades","teaching_boards","confidence_score","appearence_score","interview_notes","overall_rating","offer_selection"],
-        // where: { assessment_id: req.params.assessment_id }
-       }
+        {
+          model: users, attributes:['id', 'profile_pic', 'first_name', 'middle_name', 'last_name']
+        },
+        { 
+          model: user_interview_feedbacks, as: 'interview_feedback', 
+          attributes:["about_candidate","candidate_past","ctc_current", "ctc_expected","teaching_grades","teaching_boards","confidence_score","appearence_score","interview_notes","overall_rating","offer_selection"],
+          // where: { assessment_id: req.params.assessment_id }
+        },
+        { 
+          model: user_teaching_interests, as: 'teaching_interests', 
+          attributes: ['id', 'level_ids', 'school_ids', 'subject_ids']
+        }
       ]
     }));
     if(err) return ReE(res, err, 422);
 
-    return ReS(res, {data: interviewData}, 200);
+  [err, levelData] = await to(levels.findAll({ attributes:['id', 'name'] }));
+  let levelMap = {};
+  levelData.map(ele => { levelMap[ele.id] = ele.name; } );
+  [err, subjectData] = await to(subjects.findAll({ attributes:['id', 'name'] }));
+  let subjectMap = {};
+  subjectData.map(ele => { subjectMap[ele.id] = ele.name; } );
+
+  let resultData = interviewData.map(obj => {
+    let row = obj.get({plain: true});
+      if(row.teaching_interests.level_ids)
+        row.levels = row.teaching_interests.level_ids.map(lev => levelMap[lev]);
+      if(row.teaching_interests.subject_ids)
+        row.subjects = row.teaching_interests.subject_ids.map(lev => subjectMap[lev]);
+      if(row.recommended_level)
+        row.recommended_level = levelMap[row.recommended_level];
+
+      return row;
+    });
+
+    return ReS(res, {data: resultData}, 200);
   } catch (err) {
     return ReE(res, err, 422);
   } 
