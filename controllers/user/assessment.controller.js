@@ -33,6 +33,9 @@ assessment_questions.belongsTo(questions, { foreignKey: "question_id" });
 assessment_questions.belongsTo(psy_questions, { foreignKey: "question_id" });
 
 assessment_configurations.belongsTo(assessments, { foreignKey: "assessment_id" });
+
+user_assessments.belongsTo(assessment_configurations, { foreignKey: "assessment_id",  sourceKey: 'assessment_id' });
+
 assessments.hasMany(assessment_configurations, { foreignKey: "assessment_id" });
 assessments.hasMany(user_assessment_responses, { foreignKey: "assessment_id" });
 assessments.hasMany(user_assessments, { foreignKey: "assessment_id" });
@@ -231,7 +234,25 @@ const getUserRecommendedAssessments = async function (req, res) {
     console.log("live campaign", liveAssessmentList);
     
     [err, userAssessmentExist] = await to(user_assessments.findOne({ where: { user_id: req.user.id, status: { [Op.in]: ['STARTED', 'INPROGRESS', 'FINISHED', 'PASSED', 'FAILED']}, type: type.toUpperCase() }, raw: true }));
+    let findindingLevel = null;
+    if(type == 'MAINS') {
+      [err, screeningData] = await to(user_assessments.findOne({
+        where: { user_id: req.user.id, status: { [Op.in]: ['PASSED']}, type: 'SCREENING' },
+        include: [{
+          model: assessment_configurations,
+          attributes: ['level_id']
+        }],
+        attributes: ['assessment_id'],
+        raw: true,
+        nest: true
+      }));
+      console.log(screeningData);
+      if(screeningData && screeningData.assessment_configuration && screeningData.assessment_configuration.level_id) {
+        findindingLevel = screeningData.assessment_configuration.level_id;
+      }
+    }
 
+    console.log(userAssessmentExist);
     if(userAssessmentExist) {
       req.query.debug = userAssessmentExist.assessment_id;
     }
@@ -262,6 +283,8 @@ const getUserRecommendedAssessments = async function (req, res) {
       }).filter(e => e != null) : [];
     }
 
+    console.log("levelIds", levelIds);
+
     let where = [
       { 
         assessment_id: {
@@ -276,7 +299,8 @@ const getUserRecommendedAssessments = async function (req, res) {
         assessment_id: {
           [Op.in]: liveAssessmentList
         }
-    })
+      })
+      console.log("=======", JSON.stringify(where));
     }
 
     if(subjectIds.length > 0) {
@@ -368,7 +392,16 @@ const getUserRecommendedAssessments = async function (req, res) {
     }
 
     if (err) return ReE(res, err, 422);
-    console.log("assessments_screeningassessments_screening", assessments_screening);
+    console.log("assessments_screeningassessments_screening", findindingLevel, assessments_screening);
+
+    if(findindingLevel) {
+      let isDataExist = assessments_screening.filter(ele => ele.level_id == findindingLevel);
+      console.log("isDataExist", isDataExist);
+      if(isDataExist.length > 0) {
+        assessments_screening = isDataExist;
+      }
+    }
+
     if (assessments_screening !== null) {
 
       let generalAssessement = assessments_screening;
