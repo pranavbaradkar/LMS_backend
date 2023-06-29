@@ -78,9 +78,10 @@ const userAssessmentSlot = async function(req, res) {
 
     // demoPaylod ( demo.topic and description will be set already)
     let demoPayload = {};
-    if(payload.demo_link && payload.demo_link !== "")
-      {demoPayload.video_link = payload.demo_link;}
-    demoPayload.status = payload.demo_video_status;
+    if(payload.demo_link && payload.demo_link !== ""){
+      demoPayload.video_link = payload.demo_link;
+    }
+    demoPayload.status = "PENDING";
     demoPayload.demo_topic = "";
     demoPayload.user_id = req.user.id;
     // check if entry present for current user and assessment_id
@@ -88,9 +89,9 @@ const userAssessmentSlot = async function(req, res) {
     
     if(demoData) {
       demoData.video_link = payload.demo_link;
-      demoData.status = payload.demo_video_status;
+      demoData.status = "PENDING";
       demoData.save();
-      // console.log("update demovideo details");
+      console.log("update demovideo details");
     }
     else {
       // console.log("create demovideo details");
