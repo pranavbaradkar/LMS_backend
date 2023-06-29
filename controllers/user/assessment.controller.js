@@ -1542,21 +1542,31 @@ if (_.isUndefined(payload.total_score)) {
 try {
   [err, demoData] = await to(demovideo_details.findOne({ where: {user_id: req.params.user_id, assessment_id: req.params.assessment_id } }) );
   if(err) return ReE(res, err, 422);
+  if(!demoData) { return ReE(res, `Demo not found with ${req.params.user_id} assessment id ${req.params.assessment_id}`); }
 
+  [err, gradeData] = await to(grades.findAll({attributes:['id', 'name']}));
+  let gradeMap = {};
+  gradeData.map(ele => { gradeMap[ele.id]=ele.name; });
   // console.log(`find user id ${req.params.user_id} with assessment id ${req.params.assessment_id}`);
   // console.log("the demoData", JSON.parse(JSON.stringify(demoData)));
   if(demoData) {
+    // console.log("recommended grade ",demoData.grade_id);
     // calculate the scores
-    let userRecommendData, scored = 0;
-    payload.scores.map(ele => { Object.keys(ele).map(prop => { if(prop != 'total') { scored += ele[prop]; } }); });
-    [err, userRecommendData] = await to(user_recommendations.findOne({ where: {user_id:req.params.user_id} }).then((rows)=>{
-      rows.demo_score = scored;
-      rows.demo_score_total = payload.total_score;
+    let userRecommendData;
+    // payload.scores.map(ele => { Object.keys(ele).map(prop => { if(prop != 'total') { scored += ele[prop]; } }); });
+    [err, userRecommendData]  = await to(user_recommendations.findOne({ where: { user_id: req.params.user_id} }).then((rows)=>{
+      console.log("user found with id ",req.params.user_id);
+      rows.demo_score         = payload.total_score;
+      rows.demo_score_total   = 10;
+      if(payload.total_score && payload.total_score >= 6) {
+        rows.ai_recommendation = gradeMap[demoData.grade_id];
+      }
       rows.save();
     }));
+    // if(!userRecommendData) { return ReE(res, `Recommended User not found with id ${req.params.user_id}`); }
     // console.log("payload total score", payload.total_score);
     demoData.scores       = payload.scores;
-    demoData.total_score = payload.total_score;
+    demoData.total_score  = payload.total_score;
     demoData.save();
   }
 
