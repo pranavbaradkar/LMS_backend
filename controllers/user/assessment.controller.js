@@ -1071,7 +1071,6 @@ const getMainsSlot = async function(req, res) {
 module.exports.getMainsSlot = getMainsSlot;
 
 const uploadVideoPacd = async function (req, res) {
-  try {
   let userId = req.user.id;
   let payload = req.body;
   let path = `${payload.post_type}/${userId}`;
@@ -1083,15 +1082,7 @@ const uploadVideoPacd = async function (req, res) {
   } else if(payload.file_type == 'json') {
     url = await uploadVideoOnS3(path, payload.file_name, 'application/json', payload.json_data, false);
   }
-  [err, assessemntSlotData] = await to(user_assessment_slots.update({demo_link: url}, { where: { user_id: userId }}));
-  [err, demoVideoData] = await to(demovideo_details.update({video_link: url}, { where: { user_id: userId }}));
-  if(err) return ReE(res, err, 422);
-  
   return ReS(res, { data: url });
-  
-  } catch (err) {
-    return ReE(res, err, 422);
-  }
 }
 module.exports.uploadVideoPacd = uploadVideoPacd;
 
