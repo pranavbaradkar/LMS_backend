@@ -1741,13 +1741,18 @@ module.exports.getAllUserInterview = async (req, res) => {
 
   let resultData = interviewData.map(obj => {
     let row = obj.get({plain: true});
-      if(row.teaching_interests.level_ids)
+      if(row.teaching_interests && row.teaching_interests.level_ids){
         row.levels = row.teaching_interests.level_ids.map(lev => levelMap[lev]);
-      if(row.teaching_interests.subject_ids)
+      }
+      else { row.levels = []; }
+      if(row.teaching_interests && row.teaching_interests.subject_ids){
         row.subjects = row.teaching_interests.subject_ids.map(lev => subjectMap[lev]);
-      if(row.recommended_level)
+      }
+      else { row.subjects = []; }
+      if(row.recommended_level){
         row.recommended_level = levelMap[row.recommended_level];
-
+      }
+      else { row.recommended_level = ""; }
       return row;
     });
 
