@@ -14,7 +14,8 @@ module.exports = (sequelize, DataTypes) => {
         interview_score            : {type: DataTypes.INTEGER, allowNull: true},
         interview_score_total      : {type: DataTypes.INTEGER, allowNull: true},
         ai_recommendation          : {type: DataTypes.STRING, allowNull: true},
-        status                     : {type: DataTypes.ENUM('AGREE', 'DISAGREE', 'PENDING'), allowNull: true},
+        status                     : {type: DataTypes.ENUM('NOT_SELECTED','SELECTED','INTERVIEW','MAINS_CLEARED','DEMO_SUBMITTED'), allowNull: true},
+        recommendation_status      : {type: DataTypes.ENUM("PENDING", 'AGREE','DISAGREE'), allowNull: true},
         deleted_at                 : { type: DataTypes.DATE, allowNull: true, defaultValue: null }
      },{
         underscored: true,

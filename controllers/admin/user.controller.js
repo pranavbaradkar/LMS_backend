@@ -1675,7 +1675,12 @@ try {
     })); 
   }
 
-
+  let updatePayload = {};
+  updatePayload.interview_score = payload.overall_rating;
+  updatePayload.interview_score_total = 10;
+  updatePayload.status = 'INTERVIEW';
+  [err, interviewData] = await to(user_recommendations.update(updatePayload, {where: {user_id: req.params.user_id } }));
+  if(err) return ReE(res, err, 422);
 
   return ReS(res, {data: interviewData}, 422);
 } catch (err) {
@@ -1777,13 +1782,18 @@ module.exports.setUserInterview = async (req, res) => {
       payload.recommended_level = levelMap[payload.recommended_level];
     }
     [err, interviewData] = await to(user_interviews.update(payload, {where : {user_id: req.params.user_id} }));
-    if(interviewData && interviewData.length) {
+    if(err) return ReE(res, err, 422);
+
+    if(interviewData && interviewData.length && interviewData[0] == 1) {
+      console.log("found record updating");
       [err, interviewData] = await to(user_interviews.findOne({where: { user_id: req.params.user_id } }));
+      if(err) return ReE(res, err, 422);
     }
     else {
+      console.log("creating new record");
       [err, interviewData] = await to(user_interviews.create(payload));
+      if(err) return ReE(res, err, 422);
     }
-    if(err) return ReE(res, err, 422);
 
     return ReS(res, {data: interviewData}, 200);
   } catch (err) {
@@ -1797,8 +1807,8 @@ module.exports.updateRecommendStatus = async (req, res) => {
   if (_.isEmpty(req.params.user_id) || _.isUndefined(req.params.user_id)) {
     return ReE(res, "user id required in params", 422);
   } 
-  if (_.isEmpty(payload.status) || _.isUndefined(payload.status)) {
-    return ReE(res, "status is required in payload", 422);
+  if (_.isEmpty(payload.recommendation_status) || _.isUndefined(payload.recommendation_status)) {
+    return ReE(res, "recommendation_status is required in payload", 422);
   } 
   try {
     [err,statusData] = await to(user_recommendations.update(payload, { 
