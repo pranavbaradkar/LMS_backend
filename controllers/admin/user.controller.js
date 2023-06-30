@@ -1776,7 +1776,13 @@ module.exports.setUserInterview = async (req, res) => {
     if(payload.recommended_level && payload.recommended_level != '') {
       payload.recommended_level = levelMap[payload.recommended_level];
     }
-    [err, interviewData] = await to(user_interviews.create(payload));
+    [err, interviewData] = await to(user_interviews.update(payload, {where : {user_id: req.params.user_id} }));
+    if(interviewData && interviewData.length) {
+      [err, interviewData] = await to(user_interviews.findOne({where: { user_id: req.params.user_id } }));
+    }
+    else {
+      [err, interviewData] = await to(user_interviews.create(payload));
+    }
     if(err) return ReE(res, err, 422);
 
     return ReS(res, {data: interviewData}, 200);
