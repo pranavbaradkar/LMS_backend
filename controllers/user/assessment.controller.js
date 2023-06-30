@@ -33,6 +33,9 @@ assessment_questions.belongsTo(questions, { foreignKey: "question_id" });
 assessment_questions.belongsTo(psy_questions, { foreignKey: "question_id" });
 
 assessment_configurations.belongsTo(assessments, { foreignKey: "assessment_id" });
+
+user_assessments.belongsTo(assessment_configurations, { foreignKey: "assessment_id",  sourceKey: 'assessment_id' });
+
 assessments.hasMany(assessment_configurations, { foreignKey: "assessment_id" });
 assessments.hasMany(user_assessment_responses, { foreignKey: "assessment_id" });
 assessments.hasMany(user_assessments, { foreignKey: "assessment_id" });
@@ -76,26 +79,17 @@ const userAssessmentSlot = async function(req, res) {
       [err, userAssessmentSlotData] = await to(user_assessment_slots.findOne({where: {user_id: req.user.id}}));
     }
 
-    // demoPaylod ( demo.topic and description will be set already)
-    let demoPayload = {};
-    if(payload.demo_link && payload.demo_link !== "")
-      {demoPayload.video_link = payload.demo_link;}
-    demoPayload.status = payload.demo_video_status;
-    demoPayload.demo_topic = "";
-    demoPayload.user_id = req.user.id;
-    // check if entry present for current user and assessment_id
+    // only create update when payload contains demo_link
+    if(payload.demo_link && payload.demo_link !== ""){
     [err, demoData] = await to(demovideo_details.findOne({ where: { user_id: req.user.id } }));
     
     if(demoData) {
       demoData.video_link = payload.demo_link;
-      demoData.status = payload.demo_video_status;
+      demoData.status = "SUBMITTED";
       demoData.save();
-      // console.log("update demovideo details");
+      console.log("update demovideo details");
     }
-    else {
-      // console.log("create demovideo details");
-      [err, demoData] = await to(demovideo_details.create(demoPayload));
-    }
+  }
     if (err) return ReE(res, err, 422);
     return ReS(res, { data: userAssessmentSlotData }, 200);
   } catch (err) {
@@ -230,7 +224,25 @@ const getUserRecommendedAssessments = async function (req, res) {
     console.log("live campaign", liveAssessmentList);
     
     [err, userAssessmentExist] = await to(user_assessments.findOne({ where: { user_id: req.user.id, status: { [Op.in]: ['STARTED', 'INPROGRESS', 'FINISHED', 'PASSED', 'FAILED']}, type: type.toUpperCase() }, raw: true }));
+    let findindingLevel = null;
+    if(type == 'MAINS') {
+      [err, screeningData] = await to(user_assessments.findOne({
+        where: { user_id: req.user.id, status: { [Op.in]: ['PASSED']}, type: 'SCREENING' },
+        include: [{
+          model: assessment_configurations,
+          attributes: ['level_id']
+        }],
+        attributes: ['assessment_id'],
+        raw: true,
+        nest: true
+      }));
+      console.log(screeningData);
+      if(screeningData && screeningData.assessment_configuration && screeningData.assessment_configuration.level_id) {
+        findindingLevel = screeningData.assessment_configuration.level_id;
+      }
+    }
 
+    console.log(userAssessmentExist);
     if(userAssessmentExist) {
       req.query.debug = userAssessmentExist.assessment_id;
     }
@@ -261,6 +273,8 @@ const getUserRecommendedAssessments = async function (req, res) {
       }).filter(e => e != null) : [];
     }
 
+    console.log("levelIds", levelIds);
+
     let where = [
       { 
         assessment_id: {
@@ -275,7 +289,8 @@ const getUserRecommendedAssessments = async function (req, res) {
         assessment_id: {
           [Op.in]: liveAssessmentList
         }
-    })
+      })
+      console.log("=======", JSON.stringify(where));
     }
 
     if(subjectIds.length > 0) {
@@ -367,7 +382,16 @@ const getUserRecommendedAssessments = async function (req, res) {
     }
 
     if (err) return ReE(res, err, 422);
-    console.log("assessments_screeningassessments_screening", assessments_screening);
+    console.log("assessments_screeningassessments_screening", findindingLevel, assessments_screening);
+
+    if(findindingLevel) {
+      let isDataExist = assessments_screening.filter(ele => ele.level_id == findindingLevel);
+      console.log("isDataExist", isDataExist);
+      if(isDataExist.length > 0) {
+        assessments_screening = isDataExist;
+      }
+    }
+
     if (assessments_screening !== null) {
 
       let generalAssessement = assessments_screening;
@@ -1031,12 +1055,12 @@ const getMainsSlot = async function(req, res) {
       
     for(i = 0; i < 7; i++) {
       timeing =  ["10:00 am", "12:00 pm", "01:00 pm", "03:00 pm", "06:00 pm"];
-      var isDay  = moment().add(i, 'day');
+      var isDay  = moment().utcOffset("+05:30").add(i, 'day');
       // if(isDay == 6 || isDay == 7) {
         
       // }
 
-      var day = moment().add(i, 'day').format("Do MMM, YY");
+      var day = moment().utcOffset("+05:30").add(i, 'day').format("Do MMM, YY");
       let daysDiff = isDay.diff(startDate, 'days');
 
       if(daysDiff == 0) {
@@ -1541,21 +1565,31 @@ if (_.isUndefined(payload.total_score)) {
 try {
   [err, demoData] = await to(demovideo_details.findOne({ where: {user_id: req.params.user_id, assessment_id: req.params.assessment_id } }) );
   if(err) return ReE(res, err, 422);
+  if(!demoData) { return ReE(res, `Demo not found with ${req.params.user_id} assessment id ${req.params.assessment_id}`); }
 
+  [err, gradeData] = await to(grades.findAll({attributes:['id', 'name']}));
+  let gradeMap = {};
+  gradeData.map(ele => { gradeMap[ele.id]=ele.name; });
   // console.log(`find user id ${req.params.user_id} with assessment id ${req.params.assessment_id}`);
   // console.log("the demoData", JSON.parse(JSON.stringify(demoData)));
   if(demoData) {
+    // console.log("recommended grade ",demoData.grade_id);
     // calculate the scores
-    let userRecommendData, scored = 0;
-    payload.scores.map(ele => { Object.keys(ele).map(prop => { if(prop != 'total') { scored += ele[prop]; } }); });
-    [err, userRecommendData] = await to(user_recommendations.findOne({ where: {user_id:req.params.user_id} }).then((rows)=>{
-      rows.demo_score = scored;
-      rows.demo_score_total = payload.total_score;
+    let userRecommendData;
+    // payload.scores.map(ele => { Object.keys(ele).map(prop => { if(prop != 'total') { scored += ele[prop]; } }); });
+    [err, userRecommendData]  = await to(user_recommendations.findOne({ where: { user_id: req.params.user_id} }).then((rows)=>{
+      console.log("user found with id ",req.params.user_id);
+      rows.demo_score         = payload.total_score;
+      rows.demo_score_total   = 10;
+      if(payload.total_score && payload.total_score >= 6) {
+        rows.ai_recommendation = gradeMap[demoData.grade_id];
+      }
       rows.save();
     }));
+    // if(!userRecommendData) { return ReE(res, `Recommended User not found with id ${req.params.user_id}`); }
     // console.log("payload total score", payload.total_score);
     demoData.scores       = payload.scores;
-    demoData.total_score = payload.total_score;
+    demoData.total_score  = payload.total_score;
     demoData.save();
   }
 
