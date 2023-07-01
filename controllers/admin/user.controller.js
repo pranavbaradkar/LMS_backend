@@ -1,4 +1,4 @@
-const { roles,subjects, schools, levels, user_teaching_interests, users, demovideo_details, user_interviews, user_interview_feedbacks, user_assessments, assessment_results, academics, professional_infos, custom_attributes, school_inventories, user_recommendations, assessment_configurations } = require("../../models");
+const { interviewers, roles,subjects, schools, levels, user_teaching_interests, users, demovideo_details, user_interviews, user_interview_feedbacks, user_assessments, assessment_results, academics, professional_infos, custom_attributes, school_inventories, user_recommendations, assessment_configurations } = require("../../models");
 const model = require('../../models');
 const authService = require("../../services/auth.service");
 const { to, ReE, ReS, toSnakeCase, paginate, snakeToCamel, requestQueryObject, randomHash, getUUID } = require('../../services/util.service');
@@ -16,10 +16,12 @@ const validator = require('validator');
 var moment = require("moment");
 const { object } = require("underscore");
 
+schools.hasMany(interviewers,{ foreignKey: 'school_id'});
 user_interviews.hasOne(user_interview_feedbacks, { foreignKey: 'user_id', sourceKey: 'user_id',  as: 'interview_feedback' });
 user_interview_feedbacks.belongsTo(user_interviews , { foreignKey: 'user_id', sourceKey: 'user_id'} );
 user_interviews.belongsTo(user_teaching_interests, {foreignKey: 'user_id', as:'teaching_interests'});
 user_interviews.belongsTo(users, {foreignKey: 'user_id'});
+user_interviews.belongsTo(interviewers, {sourceKey: "interviewer_id" });
 
 user_assessments.hasMany(assessment_configurations, {  sourceKey: 'assessment_id', foreignKey: "assessment_id" });
 assessment_configurations.belongsTo(levels, { foreignKey: 'level_id' });
@@ -1720,7 +1722,7 @@ module.exports.getAllUserInterview = async (req, res) => {
   try {
     [err, interviewData] = await to(user_interviews.findAll({ 
       // where: { user_id: req.params.user_id},
-      attributes: ['id', 'user_id', "recommended_level","interview_slot","mode","exam_location","room_no","status","interviewer","interview_notes","interview_remark"],
+      attributes: ['id', 'user_id', "recommended_level","interviewer_id","mode","exam_location","room_no","status","interview_notes","interview_remark"],
       include: [ 
         {
           model: users, attributes:['id', 'profile_pic', 'first_name', 'middle_name', 'last_name']
@@ -1733,6 +1735,9 @@ module.exports.getAllUserInterview = async (req, res) => {
         { 
           model: user_teaching_interests, as: 'teaching_interests', 
           attributes: ['id', 'level_ids', 'school_ids', 'subject_ids']
+        },
+        {
+          model: interviewers
         }
       ]
     }));
@@ -1767,6 +1772,79 @@ module.exports.getAllUserInterview = async (req, res) => {
     return ReE(res, err, 422);
   } 
 }
+
+const getInterviewDate = () => {
+  // Set the timezone to IST (Indian Standard Time)
+  moment.tz.setDefault('Asia/Kolkata');
+
+  // Get the current date and time
+  const currentDate = moment();
+
+  // Find the next weekday (Monday to Friday)
+  let futureDate = currentDate.clone().add(3, 'days');
+  while (futureDate.isoWeekday() > 5) {
+    futureDate = futureDate.add(1, 'day');
+  }
+  // Set the time to 2:15 PM
+  futureDate.set({ hour: 14, minute: 15, second: 0 });
+  // Format the date as desired
+  const formattedDate = futureDate.format('YYYY-MM-DD HH:mm:ss');
+  return formattedDate;
+}
+const getInterviewer = () => {
+  return 'Interviewer Name';
+}
+
+const getSingleInterestedSchoolId = async (user_id) => {
+  let err, userData;
+  if(!user_id) return TE('user_id should not be null');
+  [err, userData] = await to(users.findOne({
+    where: { id: user_id },
+    include: [
+      { model: user_teaching_interests, as:'teaching_interests' },
+    ]
+  }));
+  userSchoolIds = [142];
+  if(userData) {
+    userSchoolIds = userData.teaching_interests.school_ids ? userData.teaching_interests.school_ids : userSchoolIds;
+  };
+  let schoolId = _.sample(userSchoolIds);
+  console.log(`Selected ${schoolId} from an array of ${userSchoolIds}`);
+  return schoolId;
+}
+
+const getInterviewerDetails = async (user_id, schoolId) => {
+  let err, userData, schoolData;
+  // let interestedSchoolId = await getSingleInterestedSchoolId(user_id);
+  schoolId = schoolId ? schoolId : await getSingleInterestedSchoolId(user_id);
+  [err, schoolData] = await to(schools.findAll({ 
+    where: { id: schoolId }, 
+    attributes: ['id', 'name', 'address'],
+    include: [
+      { 
+        model: interviewers, 
+        where: { interview_slot: null },
+        attributes: ['id', 'name', 'interview_slot'] 
+      }
+    ]
+  }));
+  // console.log(JSON.parse(JSON.stringify(schoolData)));
+  if(schoolData[0]) {
+    let interviewer = _.sample(schoolData[0].interviewers);
+    interviewer.interview_slot = getInterviewDate();
+    interviewer.save();
+    return [
+      interviewer.id,
+      interviewer.name,
+      `${schoolData[0].name}, ${schoolData[0].address}`
+    ];
+    
+  }
+  else { 
+    return TE(`Interview data for school id ${schoolId} not found`);
+   }
+}
+
 module.exports.setUserInterview = async (req, res) => {
   let err, interviewData;
   if (_.isEmpty(req.params.user_id) || _.isUndefined(req.params.user_id)) {
@@ -1778,6 +1856,11 @@ module.exports.setUserInterview = async (req, res) => {
     levelData.map(ele => { levelMap[ele.name] = ele.id; } );
     let payload = req.body;
     payload.user_id = req.params.user_id;
+    let [id, interviewerName, interviewLocation]   = await getInterviewerDetails(req.params.user_id);
+    payload.interviewer_id  = (payload.interview_slot) ? payload.interview_slot : id;
+    payload.interviewer     = (payload.interviewer) ? payload.interviewer : interviewerName;
+    payload.exam_location   = (payload.exam_location) ? payload.exam_location : interviewLocation;
+    // console.log("the generated payload ", payload);
     if(payload.recommended_level && payload.recommended_level != '') {
       payload.recommended_level = levelMap[payload.recommended_level];
     }
@@ -1785,12 +1868,12 @@ module.exports.setUserInterview = async (req, res) => {
     if(err) return ReE(res, err, 422);
 
     if(interviewData && interviewData.length && interviewData[0] == 1) {
-      console.log("found record updating");
+      // console.log("found record updating");
       [err, interviewData] = await to(user_interviews.findOne({where: { user_id: req.params.user_id } }));
       if(err) return ReE(res, err, 422);
     }
     else {
-      console.log("creating new record");
+      // console.log("creating new record");
       [err, interviewData] = await to(user_interviews.create(payload));
       if(err) return ReE(res, err, 422);
     }
