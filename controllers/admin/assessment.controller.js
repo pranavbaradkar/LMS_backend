@@ -1547,7 +1547,8 @@ const saveToDbAndMail = async(resultPayload) => {
     urObj[`${type}_score_total`] = resultPayload.assessment_total;
     // urObj[`${type}_assessment_id`] = resultPayload.assessment_id;
     urObj.user_id = user_id;
-    urObj.status = "PENDING";
+    urObj.recommendation_status = "PENDING";
+    urObj.status = (resultPayload.type == 'MAINS') ? "MAINS_CLEARED" : "PENDING";
     userRecommendationPayload[user_id] = urObj;
     userRecommendationUserIds.push(parseInt(user_id));
   });

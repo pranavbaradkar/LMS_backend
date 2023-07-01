@@ -1795,6 +1795,11 @@ module.exports.setUserInterview = async (req, res) => {
       if(err) return ReE(res, err, 422);
     }
 
+    let urPayload = {};
+    urPayload.status = 'INTERVIEW';
+    [err, userRecommendData] = await to(user_recommendations.update(urPayload, {where: {user_id: req.params.user_id } }));
+    if(err) return ReE(res, err, 422);
+
     return ReS(res, {data: interviewData}, 200);
   } catch (err) {
     return ReE(res, err, 422);

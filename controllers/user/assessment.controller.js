@@ -87,7 +87,11 @@ const userAssessmentSlot = async function(req, res) {
       demoData.video_link = payload.demo_link;
       demoData.status = "SUBMITTED";
       demoData.save();
-      console.log("update demovideo details");
+      
+      // update status is user_recommendation table
+      let urPayload = {};
+      urPayload.status = "DEMO_SUBMITTED";
+      [err, userRecommendData] = await to(user_recommendations.update(urPayload, { where: {user_id: req.user.id } }));
     }
   }
     if (err) return ReE(res, err, 422);
