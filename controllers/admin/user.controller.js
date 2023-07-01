@@ -18,7 +18,7 @@ const { object } = require("underscore");
 
 schools.hasMany(interviewers,{ foreignKey: 'school_id'});
 user_interviews.hasOne(user_interview_feedbacks, { foreignKey: 'user_id', sourceKey: 'user_id',  as: 'interview_feedback' });
-user_interview_feedbacks.belongsTo(user_interviews , { foreignKey: 'user_id', sourceKey: 'user_id'} );
+user_interview_feedbacks.belongsTo(user_interviews , { foreignKey: 'user_id', targetKey: 'user_id'} );
 user_interviews.belongsTo(user_teaching_interests, {foreignKey: 'user_id', as:'teaching_interests'});
 user_interviews.belongsTo(users, {foreignKey: 'user_id'});
 user_interviews.belongsTo(interviewers, {sourceKey: "interviewer_id" });
@@ -1671,17 +1671,34 @@ try {
       [err, interviewData] = await to(user_interview_feedbacks.create(payload));
       if(err) return ReE(res, err, 422);
   }
-  else {
-    [err, interviewData] = await to(user_interview_feedbacks.findOne({
-      where: { user_id: req.params.user_id }
-    })); 
-  }
 
-  let updatePayload = {};
-  updatePayload.interview_score = payload.overall_rating;
-  updatePayload.interview_score_total = 10;
-  updatePayload.status = 'INTERVIEW';
-  [err, interviewData] = await to(user_recommendations.update(updatePayload, {where: {user_id: req.params.user_id } }));
+  [err, interviewData] = await to(user_interview_feedbacks.findOne({
+    where: { user_id: req.params.user_id },
+    include: [
+      {
+        model: user_interviews, 
+        attributes: ['id', 'recommended_level', 'interviewer_id', 'status', 'interview_remark', 'interview_notes'],
+        include: [
+          {model: interviewers}
+        ]
+      }
+    ]
+  })); 
+  if(err) return ReE(res, err, 422);
+  if(interviewData) {
+    // set the interview_slot of interviewer to null
+    let interviewer = interviewData.user_interview.interviewer;
+    interviewer.interview_slot = null;
+    interviewer.save();
+    // console.log("The interviewer data ",JSON.parse(JSON.stringify(interviewData.user_interview.interviewer)));
+  }
+    // console.log("The interview data ",JSON.parse(JSON.stringify(interviewData)));
+
+  let urPayload = {};
+  urPayload.interview_score = payload.overall_rating;
+  urPayload.interview_score_total = 10;
+  urPayload.status = 'INTERVIEW';
+  [err, interviewData] = await to(user_recommendations.update(urPayload, {where: {user_id: req.params.user_id } }));
   if(err) return ReE(res, err, 422);
 
   return ReS(res, {data: interviewData}, 422);
@@ -1791,9 +1808,6 @@ const getInterviewDate = () => {
   const formattedDate = futureDate.format('YYYY-MM-DD HH:mm:ss');
   return formattedDate;
 }
-const getInterviewer = () => {
-  return 'Interviewer Name';
-}
 
 const getSingleInterestedSchoolId = async (user_id) => {
   let err, userData;
@@ -1841,6 +1855,7 @@ const getInterviewerDetails = async (user_id, schoolId) => {
     
   }
   else { 
+    //TODO: set a default interviwer
     return TE(`Interview data for school id ${schoolId} not found`);
    }
 }
