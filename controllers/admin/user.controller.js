@@ -23,7 +23,7 @@ user_interviews.belongsTo(user_teaching_interests, {foreignKey: 'user_id', as:'t
 user_interviews.belongsTo(users, {foreignKey: 'user_id'});
 user_interviews.belongsTo(interviewers, {sourceKey: "interviewer_id" });
 
-user_assessments.hasMany(assessment_configurations, {  sourceKey: 'assessment_id', foreignKey: "assessment_id" });
+user_assessments.hasOne(assessment_configurations, {  sourceKey: 'assessment_id', foreignKey: "assessment_id" });
 assessment_configurations.belongsTo(levels, { foreignKey: 'level_id' });
 
 model.users.hasMany(model.user_assessments, {foreignKey: 'user_id', targetKey: 'user_id'});
@@ -1629,12 +1629,13 @@ try {
     if (userData) {
       userData.rows = userData.rows.map(ele => {
         let obj = ele.get({plain: true})
+        //console.log(obj);
         if(obj.user && obj.user.user_assessments) {
+       
          let levels = obj.user.user_assessments.map(e => {
-            return e.assessment_configurations ? e.assessment_configurations.map(k => {
-                return k.level && k.level.name ? k.level.name  : null;
-            })[0] : [];
-         });
+          //console.log(JSON.stringify(obj.user.user_assessments));
+            return e.assessment_configuration ? e.assessment_configuration.level.name  : null;
+          });
          obj.levels = [...new Set(levels)];
         }
          return obj;
