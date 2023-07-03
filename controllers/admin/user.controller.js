@@ -1,4 +1,4 @@
-const { interviewers, roles,subjects, schools, levels, user_teaching_interests, users, demovideo_details, user_interviews, user_interview_feedbacks, user_assessments, assessment_results, academics, professional_infos, custom_attributes, school_inventories, user_recommendations, assessment_configurations } = require("../../models");
+const { interviewers, roles,subjects, boards, schools, levels, user_teaching_interests, users, demovideo_details, user_interviews, user_interview_feedbacks, user_assessments, assessment_results, academics, professional_infos, custom_attributes, school_inventories, user_recommendations, assessment_configurations } = require("../../models");
 const model = require('../../models');
 const authService = require("../../services/auth.service");
 const { to, ReE, ReS, toSnakeCase, paginate, snakeToCamel, requestQueryObject, randomHash, getUUID } = require('../../services/util.service');
@@ -1752,7 +1752,7 @@ module.exports.getAllUserInterview = async (req, res) => {
         },
         { 
           model: user_teaching_interests, as: 'teaching_interests', 
-          attributes: ['id', 'level_ids', 'school_ids', 'subject_ids']
+          attributes: ['id', 'level_ids', 'school_ids', 'subject_ids', 'board_ids']
         },
         {
           model: interviewers
@@ -1767,6 +1767,9 @@ module.exports.getAllUserInterview = async (req, res) => {
   [err, subjectData] = await to(subjects.findAll({ attributes:['id', 'name'] }));
   let subjectMap = {};
   subjectData.map(ele => { subjectMap[ele.id] = ele.name; } );
+  [err, boardData] = await to(boards.findAll({ attributes:['id', 'name'] }));
+  let boardMap = {};
+  boardData.map(ele => { boardMap[ele.id] = ele.name; } );
 
   // console.log("the interveiw query Data ", JSON.parse(JSON.stringify(interviewData)));
   let resultData = interviewData.map(obj => {
@@ -1782,6 +1785,10 @@ module.exports.getAllUserInterview = async (req, res) => {
         row.subjects = row.teaching_interests.subject_ids.map(sub => { return { id:sub, name:subjectMap[sub]}});
       }
       else { row.subjects = []; }
+      if(row.teaching_interests && row.teaching_interests.board_ids){
+        row.boards = row.teaching_interests.board_ids.map(sub => { return { id:sub, name:boardMap[sub]}});
+      }
+      else { row.boards = []; }
       if(row.recommended_level){
         row.recommended_level = levelMap[row.recommended_level];
       }
