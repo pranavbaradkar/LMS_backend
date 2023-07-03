@@ -1668,7 +1668,7 @@ try {
   if(err) return ReE(res, err, 422);
 
   if(interviewData && interviewData.length == 1 && interviewData[0] == 0) {
-    console.log("neee dto create new");
+    // console.log("neee dto create new");
       [err, interviewData] = await to(user_interview_feedbacks.create(payload));
       if(err) return ReE(res, err, 422);
   }
@@ -1788,7 +1788,7 @@ module.exports.getAllUserInterview = async (req, res) => {
       if(row.teaching_interests && row.teaching_interests.board_ids){
         row.boards = row.teaching_interests.board_ids.map(sub => { return { id:sub, name:boardMap[sub]}});
       }
-      else { row.boards = []; }
+      else { row.boards = []; }      
       if(row.recommended_level){
         row.recommended_level = levelMap[row.recommended_level];
       }

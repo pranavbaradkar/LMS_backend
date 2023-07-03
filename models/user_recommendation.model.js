@@ -10,7 +10,12 @@ module.exports = (sequelize, DataTypes) => {
         mains_score_total          : {type: DataTypes.INTEGER, allowNull: true},
         // mains_assessment_id        : {type: DataTypes.INTEGER, allowNull: true},
         demo_score                 : {type: DataTypes.INTEGER, allowNull: true},
-        demo_score_total           : {type: DataTypes.INTEGER, allowNull: true},
+        demo_score_total           : {type: DataTypes.INTEGER, allowNull: true, 
+                                    get() { 
+                                        let total = this.getDataValue('demo_score_total');
+                                        return total ? Math.round(total) : total;
+                                    }
+                                    },
         interview_score            : {type: DataTypes.INTEGER, allowNull: true},
         interview_score_total      : {type: DataTypes.INTEGER, allowNull: true},
         ai_recommendation          : {type: DataTypes.STRING, allowNull: true},
