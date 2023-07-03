@@ -1749,7 +1749,7 @@ module.exports.getAllUserInterview = async (req, res) => {
       attributes: ['id', 'user_id', "recommended_level","interviewer_id","mode","exam_location","room_no","status","interview_notes","interview_remark"],
       include: [ 
         {
-          model: users, attributes:['id', 'profile_pic', 'first_name', 'middle_name', 'last_name']
+          model: users, attributes:['id', 'profile_pic', 'first_name', 'middle_name', 'last_name', 'email']
         },
         { 
           model: user_interview_feedbacks, as: 'interview_feedback', 
