@@ -8,8 +8,8 @@ module.exports = {
       queryInterface,
       tableName: 'user_recommendations',
       columnName: 'status',
-      defaultValue: "MAINS_SUBMITTED",
-      newValues: ['NOT_SELECTED','SELECTED','INTERVIEW','MAINS_SUBMITTED','MAINS_CLEARED','DEMO_SUBMITTED'],
+      defaultValue: "PENDING",
+      newValues: ['NOT_SELECTED','SELECTED','INTERVIEW','MAINS_FAILED','MAINS_CLEARED','DEMO_SUBMITTED','PENDING'],
       enumName: 'enum_user_recommendations_status'
       
     });
