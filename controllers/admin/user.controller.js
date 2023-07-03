@@ -1513,8 +1513,15 @@ const getUserDetails = async (req, res)=> {
           model: user_interviews, 
           as:'interview', 
           attributes:["id", "mode", "room_no", "status", "interview_notes", "interview_remark"],
-          require: false
-
+          require: false,
+          include:[
+            { 
+              model: user_interview_feedbacks, 
+              as: 'interview_feedback',
+              attributes: ["about_candidate","candidate_past","ctc_current","ctc_expected","teaching_grades","teaching_boards","confidence_score","appearence_score","interview_notes","overall_rating","offer_selection"],
+              require: false,
+            }
+          ]
         },
       ]
     }));
