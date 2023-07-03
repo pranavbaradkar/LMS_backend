@@ -1509,7 +1509,13 @@ const getUserDetails = async (req, res)=> {
             } 
           ]
         },
-        { model: user_interviews, as:'interview', attributes:["id", "interview_slot", "mode", "room_no", "status", "interviewer", "interview_notes", "interview_remark"] },
+        { 
+          model: user_interviews, 
+          as:'interview', 
+          attributes:["id", "mode", "room_no", "status", "interview_notes", "interview_remark"],
+          require: false
+
+        },
       ]
     }));
     if(err) return ReE(res, err, 422);
