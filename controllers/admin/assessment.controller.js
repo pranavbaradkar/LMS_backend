@@ -1611,7 +1611,14 @@ const saveToDbAndMail = async(resultPayload) => {
   [err, assessmentResultData] = await to(assessment_results.bulkCreate(insertPayload).then(row => {
     row.map(ele => {
       // send mail on new row insert
-      sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
+      if(resultPayload.req_query && resultPayload.req_query.mail_passed_only && resultPayload.req_query.mail_passed_only == 1)
+      {
+        if(resultPayload.user_results[ele.user_id] == 'PASSED')
+        sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
+      }
+      else {
+        sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
+      }
     })
   }));  
   if(err) throw new Error("Could not insert to assessment.result");
