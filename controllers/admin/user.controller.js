@@ -1775,11 +1775,11 @@ module.exports.getAllUserInterview = async (req, res) => {
     // if(row.id == 5105) { console.log("interested levels ",row.teaching_interests.level_ids); }
       if(row.teaching_interests && row.teaching_interests.level_ids){
         // console.log("interested levels ",row.teaching_interests.level_ids);
-        row.levels = row.teaching_interests.level_ids.map(lev => levelMap[lev]);
+        row.levels = row.teaching_interests.level_ids.map(lev => { return {id: lev,  name:levelMap[lev]}});
       }
       else { row.levels = []; }
       if(row.teaching_interests && row.teaching_interests.subject_ids){
-        row.subjects = row.teaching_interests.subject_ids.map(lev => subjectMap[lev]);
+        row.subjects = row.teaching_interests.subject_ids.map(sub => { return { id:sub, name:subjectMap[sub]}});
       }
       else { row.subjects = []; }
       if(row.recommended_level){
