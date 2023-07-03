@@ -1704,7 +1704,7 @@ try {
   let urPayload = {};
   urPayload.interview_score = payload.overall_rating;
   urPayload.interview_score_total = 10;
-  urPayload.status = 'INTERVIEW';
+  urPayload.status = (payload.offer_selection && payload.offer_selection == 'YES') ? 'SELECTED' : 'NOT_SELECTED';
   [err, interviewData] = await to(user_recommendations.update(urPayload, {where: {user_id: req.params.user_id } }));
   if(err) return ReE(res, err, 422);
 
