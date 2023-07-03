@@ -19,7 +19,7 @@ const { object } = require("underscore");
 schools.hasMany(interviewers,{ foreignKey: 'school_id'});
 user_interviews.hasOne(user_interview_feedbacks, { foreignKey: 'user_id', sourceKey: 'user_id',  as: 'interview_feedback' });
 user_interview_feedbacks.belongsTo(user_interviews , { foreignKey: 'user_id', targetKey: 'user_id'} );
-user_interviews.belongsTo(user_teaching_interests, {foreignKey: 'user_id', as:'teaching_interests'});
+user_interviews.belongsTo(user_teaching_interests, {foreignKey: 'user_id', targetKey: 'user_id', as:'teaching_interests'});
 user_interviews.belongsTo(users, {foreignKey: 'user_id'});
 user_interviews.belongsTo(interviewers, {sourceKey: "interviewer_id" });
 
@@ -1768,9 +1768,13 @@ module.exports.getAllUserInterview = async (req, res) => {
   let subjectMap = {};
   subjectData.map(ele => { subjectMap[ele.id] = ele.name; } );
 
+  // console.log("the interveiw query Data ", JSON.parse(JSON.stringify(interviewData)));
   let resultData = interviewData.map(obj => {
     let row = obj.get({plain: true});
+    // console.log("the interveiw query row ", JSON.parse(JSON.stringify(row)));
+    // if(row.id == 5105) { console.log("interested levels ",row.teaching_interests.level_ids); }
       if(row.teaching_interests && row.teaching_interests.level_ids){
+        // console.log("interested levels ",row.teaching_interests.level_ids);
         row.levels = row.teaching_interests.level_ids.map(lev => levelMap[lev]);
       }
       else { row.levels = []; }
