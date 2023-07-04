@@ -1524,6 +1524,7 @@ const calculatePschometricScore = async(skillScores, skill, optionMap, user_resp
 const saveToDbAndMail = async(resultPayload) => {
   let err, assessmentResultData;
   let assessmentResultPayload = [];
+  let assessmentResultUpdatePayload = {};
   let userRecommendationPayload = {};
   let userRecommendationUserIds = [];
   Object.keys(resultPayload.skill_scores).map(user_id => {
@@ -1542,6 +1543,7 @@ const saveToDbAndMail = async(resultPayload) => {
     // excluding psychometric
     obj.skill_total     = Object.keys(resultPayload.skill_scores[user_id]).filter(skill => skill!=='Psychometric').map(skill => skill_totals[skill]);
     assessmentResultPayload.push(obj);
+    assessmentResultUpdatePayload[user_id] = obj;
     let type = (resultPayload.type).toLowerCase();
     urObj[`${type}_score`] = resultPayload.total_scores[user_id];
     urObj[`${type}_score_total`] = resultPayload.assessment_total;
@@ -1595,9 +1597,10 @@ const saveToDbAndMail = async(resultPayload) => {
 
   if(assessmentResultData) {
     assessmentResultData.forEach(row => {
-      // console.log("looping  assessmentResultData ", row.user_id);
-      // row.skill_total = _.random(100,400);
-      // row.save();
+      // update found rows
+      let arup = assessmentResultUpdatePayload[row.user_id];
+      Object.keys(arup).forEach(prop => { row[prop] = arup[prop]; } );
+      row.save();
         updatedAssessmentResultIds.push(parseInt(row.user_id));
         if(resultPayload.req_query && resultPayload.req_query.force_mail && resultPayload.req_query.force_mail == 1){
           sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
