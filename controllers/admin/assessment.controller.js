@@ -163,7 +163,22 @@ const getAllAssessments = async function (req, res) {
 
     if (err) return ReE(res, err, 422);
     if (assessmentsData) {
-      return ReS(res, { data: assessmentsData }, 200);
+      [err, subjectData] = await to(subjects.findAll({ attributes: ["id", "name"]}));
+      let subjectMap = {};
+      subjectData.map(row => { subjectMap[row.id] = row.name } );
+      // console.log(`the subject data `, subjectMap);
+      let finalResult = assessmentsData.rows.map(rows => {
+        let row = rows.get({plain: true});
+        // console.log(`skill distributions ${row.id}`,row.assessment_configurations.skill_distributions);
+        if(row.assessment_configurations.length > 0 &&  row.assessment_configurations[0].skill_distributions.length > 0) {
+          let skillObj = row.assessment_configurations[0].skill_distributions.filter(ele => ele.subject_ids);
+          if(skillObj[0]) {
+            row.assessment_configurations[0].subjects = skillObj[0].subject_ids.map(ele => { console.log("teh ids ", ele); return subjectMap[ele.subject_id]});
+          }
+        }
+         return row;
+      });
+      return ReS(res, { data: { rows: finalResult, count: assessmentsData.count } }, 200);
     } else {
       return ReE(res, "No assessments data found", 404);
     }
