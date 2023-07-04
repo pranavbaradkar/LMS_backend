@@ -1547,7 +1547,13 @@ const saveToDbAndMail = async(resultPayload) => {
     urObj[`${type}_score_total`] = resultPayload.assessment_total;
     // urObj[`${type}_assessment_id`] = resultPayload.assessment_id;
     urObj.user_id = user_id;
-    urObj.status = "PENDING";
+    urObj.recommendation_status = "PENDING";
+    if(resultPayload.type == 'MAINS') {
+    urObj.status = (resultPayload.user_results[user_id] == 'PASSED') ? "MAINS_CLEARED" : "MAINS_FAILED";
+    }
+    else {
+      urObj.status = 'PENDING'; 
+    }
     userRecommendationPayload[user_id] = urObj;
     userRecommendationUserIds.push(parseInt(user_id));
   });
@@ -1610,7 +1616,15 @@ const saveToDbAndMail = async(resultPayload) => {
   [err, assessmentResultData] = await to(assessment_results.bulkCreate(insertPayload).then(row => {
     row.map(ele => {
       // send mail on new row insert
-      sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
+      // console.log(`user ${ele.user_id} is `,resultPayload.user_results[ele.user_id]);
+      if(resultPayload.req_query && resultPayload.req_query.mail_passed_only && resultPayload.req_query.mail_passed_only == 1)
+      {
+        if(resultPayload.user_results[ele.user_id] == 'PASSED')
+          sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
+      }
+      else {
+        sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
+      }
     })
   }));  
   if(err) throw new Error("Could not insert to assessment.result");

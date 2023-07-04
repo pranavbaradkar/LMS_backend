@@ -1,4 +1,4 @@
-const { roles,subjects, schools, levels, user_teaching_interests, users, demovideo_details, user_interviews, user_interview_feedbacks, user_assessments, assessment_results, academics, professional_infos, custom_attributes, school_inventories, user_recommendations, assessment_configurations } = require("../../models");
+const { interviewers, roles,subjects, boards, schools, levels, user_teaching_interests, users, demovideo_details, user_interviews, user_interview_feedbacks, user_assessments, assessment_results, academics, professional_infos, custom_attributes, school_inventories, user_recommendations, assessment_configurations } = require("../../models");
 const model = require('../../models');
 const authService = require("../../services/auth.service");
 const { to, ReE, ReS, toSnakeCase, paginate, snakeToCamel, requestQueryObject, randomHash, getUUID } = require('../../services/util.service');
@@ -16,12 +16,14 @@ const validator = require('validator');
 var moment = require("moment");
 const { object } = require("underscore");
 
+schools.hasMany(interviewers,{ foreignKey: 'school_id'});
 user_interviews.hasOne(user_interview_feedbacks, { foreignKey: 'user_id', sourceKey: 'user_id',  as: 'interview_feedback' });
-user_interview_feedbacks.belongsTo(user_interviews , { foreignKey: 'user_id', sourceKey: 'user_id'} );
-user_interviews.belongsTo(user_teaching_interests, {foreignKey: 'user_id', as:'teaching_interests'});
+user_interview_feedbacks.belongsTo(user_interviews , { foreignKey: 'user_id', targetKey: 'user_id'} );
+user_interviews.belongsTo(user_teaching_interests, {foreignKey: 'user_id', targetKey: 'user_id', as:'teaching_interests'});
 user_interviews.belongsTo(users, {foreignKey: 'user_id'});
+user_interviews.belongsTo(interviewers, {sourceKey: "interviewer_id" });
 
-user_assessments.hasMany(assessment_configurations, {  sourceKey: 'assessment_id', foreignKey: "assessment_id" });
+user_assessments.hasOne(assessment_configurations, {  sourceKey: 'assessment_id', foreignKey: "assessment_id" });
 assessment_configurations.belongsTo(levels, { foreignKey: 'level_id' });
 
 model.users.hasMany(model.user_assessments, {foreignKey: 'user_id', targetKey: 'user_id'});
@@ -1507,7 +1509,20 @@ const getUserDetails = async (req, res)=> {
             } 
           ]
         },
-        { model: user_interviews, as:'interview', attributes:["id", "interview_slot", "mode", "room_no", "status", "interviewer", "interview_notes", "interview_remark"] },
+        { 
+          model: user_interviews, 
+          as:'interview', 
+          attributes:["id", "mode", "room_no", "status", "interview_notes", "interview_remark"],
+          require: false,
+          include:[
+            { 
+              model: user_interview_feedbacks, 
+              as: 'interview_feedback',
+              attributes: ["about_candidate","candidate_past","ctc_current","ctc_expected","teaching_grades","teaching_boards","confidence_score","appearence_score","interview_notes","overall_rating","offer_selection"],
+              require: false,
+            }
+          ]
+        },
       ]
     }));
     if(err) return ReE(res, err, 422);
@@ -1627,12 +1642,13 @@ try {
     if (userData) {
       userData.rows = userData.rows.map(ele => {
         let obj = ele.get({plain: true})
+        //console.log(obj);
         if(obj.user && obj.user.user_assessments) {
+       
          let levels = obj.user.user_assessments.map(e => {
-            return e.assessment_configurations ? e.assessment_configurations.map(k => {
-                return k.level && k.level.name ? k.level.name  : null;
-            })[0] : [];
-         });
+          //console.log(JSON.stringify(obj.user.user_assessments));
+            return e.assessment_configuration ? e.assessment_configuration.level.name  : null;
+          });
          obj.levels = [...new Set(levels)];
         }
          return obj;
@@ -1665,24 +1681,41 @@ try {
   if(err) return ReE(res, err, 422);
 
   if(interviewData && interviewData.length == 1 && interviewData[0] == 0) {
-    console.log("neee dto create new");
+    // console.log("neee dto create new");
       [err, interviewData] = await to(user_interview_feedbacks.create(payload));
       if(err) return ReE(res, err, 422);
   }
-  else {
-    [err, interviewData] = await to(user_interview_feedbacks.findOne({
-      where: { user_id: req.params.user_id }
-    })); 
-  }
 
-  let updatePayload = {};
-  updatePayload.interview_score = payload.overall_rating;
-  updatePayload.interview_score_total = 10;
-  updatePayload.status = 'INTERVIEW';
-  [err, interviewData] = await to(user_recommendations.update(updatePayload, {where: {user_id: req.params.user_id } }));
+  [err, interviewData] = await to(user_interview_feedbacks.findOne({
+    where: { user_id: req.params.user_id },
+    include: [
+      {
+        model: user_interviews, 
+        attributes: ['id', 'recommended_level', 'interviewer_id', 'status', 'interview_remark', 'interview_notes'],
+        include: [
+          {model: interviewers}
+        ]
+      }
+    ]
+  })); 
+  if(err) return ReE(res, err, 422);
+  if(interviewData) {
+    // set the interview_slot of interviewer to null
+    let interviewer = interviewData.user_interview.interviewer;
+    interviewer.interview_slot = null;
+    interviewer.save();
+    // console.log("The interviewer data ",JSON.parse(JSON.stringify(interviewData.user_interview.interviewer)));
+  }
+    // console.log("The interview data ",JSON.parse(JSON.stringify(interviewData)));
+
+  let urPayload = {};
+  urPayload.interview_score = payload.overall_rating;
+  urPayload.interview_score_total = 10;
+  urPayload.status = (payload.offer_selection && payload.offer_selection == 'YES') ? 'SELECTED' : 'NOT_SELECTED';
+  [err, interviewData] = await to(user_recommendations.update(urPayload, {where: {user_id: req.params.user_id } }));
   if(err) return ReE(res, err, 422);
 
-  return ReS(res, {data: interviewData}, 422);
+  return ReS(res, {data: interviewData}, 200);
 } catch (err) {
   return ReE(res, err, 422)  ;
 }
@@ -1720,10 +1753,10 @@ module.exports.getAllUserInterview = async (req, res) => {
   try {
     [err, interviewData] = await to(user_interviews.findAll({ 
       // where: { user_id: req.params.user_id},
-      attributes: ['id', 'user_id', "recommended_level","interview_slot","mode","exam_location","room_no","status","interviewer","interview_notes","interview_remark"],
+      attributes: ['id', 'user_id', "recommended_level","interviewer_id","mode","exam_location","room_no","status","interview_notes","interview_remark"],
       include: [ 
         {
-          model: users, attributes:['id', 'profile_pic', 'first_name', 'middle_name', 'last_name']
+          model: users, attributes:['id', 'profile_pic', 'first_name', 'middle_name', 'last_name', 'email']
         },
         { 
           model: user_interview_feedbacks, as: 'interview_feedback', 
@@ -1732,7 +1765,10 @@ module.exports.getAllUserInterview = async (req, res) => {
         },
         { 
           model: user_teaching_interests, as: 'teaching_interests', 
-          attributes: ['id', 'level_ids', 'school_ids', 'subject_ids']
+          attributes: ['id', 'level_ids', 'school_ids', 'subject_ids', 'board_ids']
+        },
+        {
+          model: interviewers
         }
       ]
     }));
@@ -1744,17 +1780,28 @@ module.exports.getAllUserInterview = async (req, res) => {
   [err, subjectData] = await to(subjects.findAll({ attributes:['id', 'name'] }));
   let subjectMap = {};
   subjectData.map(ele => { subjectMap[ele.id] = ele.name; } );
+  [err, boardData] = await to(boards.findAll({ attributes:['id', 'name'] }));
+  let boardMap = {};
+  boardData.map(ele => { boardMap[ele.id] = ele.name; } );
 
+  // console.log("the interveiw query Data ", JSON.parse(JSON.stringify(interviewData)));
   let resultData = interviewData.map(obj => {
     let row = obj.get({plain: true});
+    // console.log("the interveiw query row ", JSON.parse(JSON.stringify(row)));
+    // if(row.id == 5105) { console.log("interested levels ",row.teaching_interests.level_ids); }
       if(row.teaching_interests && row.teaching_interests.level_ids){
-        row.levels = row.teaching_interests.level_ids.map(lev => levelMap[lev]);
+        // console.log("interested levels ",row.teaching_interests.level_ids);
+        row.levels = row.teaching_interests.level_ids.map(lev => { return {id: lev,  name:levelMap[lev]}});
       }
       else { row.levels = []; }
       if(row.teaching_interests && row.teaching_interests.subject_ids){
-        row.subjects = row.teaching_interests.subject_ids.map(lev => subjectMap[lev]);
+        row.subjects = row.teaching_interests.subject_ids.map(sub => { return { id:sub, name:subjectMap[sub]}});
       }
       else { row.subjects = []; }
+      if(row.teaching_interests && row.teaching_interests.board_ids){
+        row.boards = row.teaching_interests.board_ids.map(sub => { return { id:sub, name:boardMap[sub]}});
+      }
+      else { row.boards = []; }      
       if(row.recommended_level){
         row.recommended_level = levelMap[row.recommended_level];
       }
@@ -1767,6 +1814,77 @@ module.exports.getAllUserInterview = async (req, res) => {
     return ReE(res, err, 422);
   } 
 }
+
+const getInterviewDate = () => {
+  // Set the timezone to IST (Indian Standard Time)
+  moment.tz.setDefault('Asia/Kolkata');
+
+  // Get the current date and time
+  const currentDate = moment();
+
+  // Find the next weekday (Monday to Friday)
+  let futureDate = currentDate.clone().add(3, 'days');
+  while (futureDate.isoWeekday() > 5) {
+    futureDate = futureDate.add(1, 'day');
+  }
+  // Set the time to 2:15 PM
+  futureDate.set({ hour: 14, minute: 15, second: 0 });
+  // Format the date as desired
+  const formattedDate = futureDate.format('YYYY-MM-DD HH:mm:ss');
+  return formattedDate;
+}
+
+const getSingleInterestedSchoolId = async (user_id) => {
+  let err, userData;
+  if(!user_id) return TE('user_id should not be null');
+  [err, userData] = await to(users.findOne({
+    where: { id: user_id },
+    include: [
+      { model: user_teaching_interests, as:'teaching_interests' },
+    ]
+  }));
+  userSchoolIds = [142];
+  if(userData) {
+    userSchoolIds = userData.teaching_interests.school_ids ? userData.teaching_interests.school_ids : userSchoolIds;
+  };
+  let schoolId = _.sample(userSchoolIds);
+  console.log(`Selected ${schoolId} from an array of ${userSchoolIds}`);
+  return schoolId;
+}
+
+const getInterviewerDetails = async (user_id, schoolId) => {
+  let err, userData, schoolData;
+  // let interestedSchoolId = await getSingleInterestedSchoolId(user_id);
+  schoolId = schoolId ? schoolId : await getSingleInterestedSchoolId(user_id);
+  [err, schoolData] = await to(schools.findAll({ 
+    where: { id: schoolId }, 
+    attributes: ['id', 'name', 'address'],
+    include: [
+      { 
+        model: interviewers, 
+        where: { interview_slot: null },
+        attributes: ['id', 'name', 'interview_slot'] 
+      }
+    ]
+  }));
+  // console.log(JSON.parse(JSON.stringify(schoolData)));
+  if(schoolData[0]) {
+    let interviewer = _.sample(schoolData[0].interviewers);
+    interviewer.interview_slot = getInterviewDate();
+    interviewer.save();
+    return [
+      interviewer.id,
+      interviewer.name,
+      `${schoolData[0].name}, ${schoolData[0].address}`
+    ];
+    
+  }
+  else { 
+    //TODO: set a default interviwer
+    return TE(`Interview data for school id ${schoolId} not found`);
+   }
+}
+
 module.exports.setUserInterview = async (req, res) => {
   let err, interviewData;
   if (_.isEmpty(req.params.user_id) || _.isUndefined(req.params.user_id)) {
@@ -1778,6 +1896,11 @@ module.exports.setUserInterview = async (req, res) => {
     levelData.map(ele => { levelMap[ele.name] = ele.id; } );
     let payload = req.body;
     payload.user_id = req.params.user_id;
+    let [id, interviewerName, interviewLocation]   = await getInterviewerDetails(req.params.user_id);
+    payload.interviewer_id  = (payload.interview_slot) ? payload.interview_slot : id;
+    payload.interviewer     = (payload.interviewer) ? payload.interviewer : interviewerName;
+    payload.exam_location   = (payload.exam_location) ? payload.exam_location : interviewLocation;
+    // console.log("the generated payload ", payload);
     if(payload.recommended_level && payload.recommended_level != '') {
       payload.recommended_level = levelMap[payload.recommended_level];
     }
@@ -1785,15 +1908,20 @@ module.exports.setUserInterview = async (req, res) => {
     if(err) return ReE(res, err, 422);
 
     if(interviewData && interviewData.length && interviewData[0] == 1) {
-      console.log("found record updating");
+      // console.log("found record updating");
       [err, interviewData] = await to(user_interviews.findOne({where: { user_id: req.params.user_id } }));
       if(err) return ReE(res, err, 422);
     }
     else {
-      console.log("creating new record");
+      // console.log("creating new record");
       [err, interviewData] = await to(user_interviews.create(payload));
       if(err) return ReE(res, err, 422);
     }
+
+    let urPayload = {};
+    urPayload.status = 'INTERVIEW';
+    [err, userRecommendData] = await to(user_recommendations.update(urPayload, {where: {user_id: req.params.user_id } }));
+    if(err) return ReE(res, err, 422);
 
     return ReS(res, {data: interviewData}, 200);
   } catch (err) {
