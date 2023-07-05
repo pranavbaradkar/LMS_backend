@@ -7,6 +7,7 @@ module.exports = (sequelize, DataTypes) => {
         name         : { type: DataTypes.STRING, allowNull: false },
         score_type   : { type: DataTypes.ENUM('QUESTION', 'ASSESSMENT'), allowNull: false },
         instructions : { type: DataTypes.TEXT, allowNull : true },
+        status       : { type: DataTypes.ENUM('DRAFT', 'PUBLISHED'), allowNull:false, defaultValue: 'DRAFT' },
         deleted_at   : { type: DataTypes.DATE, allowNull: true, defaultValue: null }
     },{
         timestamps: true,
