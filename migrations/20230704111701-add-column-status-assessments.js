@@ -9,7 +9,7 @@ module.exports = {
      * await queryInterface.createTable('users', { id: Sequelize.INTEGER });
      */
     return [
-      queryInterface.addColumn('assessments', 'status', { type: Sequelize.ENUM('DRAFT', 'PUBLISHED'), allowNull: true, defaultValue: 'DRAFT' })
+      queryInterface.addColumn('assessments', 'status', { type: Sequelize.ENUM('DRAFT', 'PUBLISHED', 'PENDING'), allowNull: true, defaultValue: 'PENDING' })
     ]
   },
 
