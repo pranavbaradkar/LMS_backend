@@ -2000,3 +2000,86 @@ const getAssessmentConfigurationUsers = async function (req, res) {
 
 };
 module.exports.getAssessmentConfigurationUsers = getAssessmentConfigurationUsers;
+
+const getReplacementQuestion = async (req, res) => {
+  let err, questionData, assessmentData;
+  if(req.params && (req.params.assessment_id == undefined)) {
+    return ReE(res, { message: "assessment_id is required." }, 422);
+  }
+  if(req.params && (req.params.question_id == undefined)) {
+    return ReE(res, { message: "question_id is required." }, 422);
+  }
+  try {
+
+    [err, assessmentData] = await to(assessment_questions.findAll({
+      where: { assessment_id: req.params.assessment_id },
+      attributes: ['question_id']
+    }));
+    if(!assessmentData) return ReE(res, 'Assessment not found', 422);
+
+    let psychometricQuestionIds = [];
+    let questionIds = [];
+    assessmentData.forEach(obj => {
+      if(obj.question_id > 1000000000) { psychometricQuestionIds.push(obj.question_id ); }
+      else questionIds.push(obj.question_id);
+    } );
+
+    let isPsychometric = parseInt(req.params.question_id) > 1000000000;
+
+    // return ReS(res, { data: [questionIds, psychometricQuestionIds]  }, 200);
+
+    if(isPsychometric) {
+      [err, questionData] = await getSimilarPsychometricQuestions(req.params.question_id, psychometricQuestionIds);
+    }
+    else {
+      [err, questionData] = await getSimilarQuestions(req.params.question_id, questionIds);
+    }
+    return ReS(res, { data: questionData  }, 200);
+  } catch (err) {
+    return ReE(res, err, 422);
+  }
+};
+module.exports.getReplacementQuestion = getReplacementQuestion;
+
+const getSimilarQuestions = async (questionId, excludeIds) => {
+  let err, oldQuestion, questionData;
+  [err, oldQuestion] = await to(questions.findByPk(questionId));
+  
+  if(!oldQuestion) { TE('Question not found', err); }
+  // return [err, oldQuestion];
+
+  [err, questionData] = await to(questions.findAll({
+    where: {
+      blooms_taxonomy: oldQuestion.blooms_taxonomy,
+      difficulty_level: oldQuestion.difficulty_level,
+      complexity_level: oldQuestion.complexity_level,
+      skill_id: oldQuestion.skill_id,
+      level_id: oldQuestion.level_id,
+      grade_id: oldQuestion.grade_id,
+      subject_id: oldQuestion.subject_id,
+      id : {[Op.notIn]:excludeIds}
+    }
+  }))
+  return [err, questionData];
+};
+
+const getSimilarPsychometricQuestions = async (questionId, excludeIds) => {
+  let err, oldQuestion, questionData;
+  [err, oldQuestion] = await to(psy_questions.findByPk(questionId));
+  
+  if(!oldQuestion) { TE('Question not found', err); }
+  // return [err, oldQuestion];
+
+  [err, questionData] = await to(psy_questions.findAll({
+    where: {
+      // score_type: oldQuestion.score_type,
+      // set_number: oldQuestion.set_number,
+      skill_id: oldQuestion.skill_id,
+      level_id: oldQuestion.level_id,
+      grade_id: oldQuestion.grade_id,
+      subject_id: oldQuestion.subject_id,
+      id : {[Op.notIn]:excludeIds}
+    }
+  }))
+  return [err, questionData];
+};
