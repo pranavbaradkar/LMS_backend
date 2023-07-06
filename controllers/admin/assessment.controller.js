@@ -206,19 +206,19 @@ const getAssessment = async function (req, res) {
           attributes: { exclude: ['created_at', 'updated_at', 'deleted_at']},
           require: false
         },
-        {
-          model: assessment_questions,
-          require: false,
-          attributes: { exclude: ['created_at', 'updated_at', 'deleted_at']},
-          include: [
-            { model: questions, require: false, include:[
-              { model: question_options, attributes: ['id', 'question_id', 'option_key', 'option_value', 'option_type']}
-            ], attributes: { exclude: ['created_at', 'updated_at', 'deleted_at']}},
-            { model: psy_questions, require: false, include: [
-              { model: psy_question_options, attributes: ['id', 'psy_question_id', 'option_key', 'option_value', 'option_type']}
-            ], attributes: { exclude: ['created_at', 'updated_at', 'deleted_at']}}
-          ]
-        }
+        // {
+        //   model: assessment_questions,
+        //   require: false,
+        //   attributes: { exclude: ['created_at', 'updated_at', 'deleted_at']},
+        //   include: [
+        //     { model: questions, require: false, include:[
+        //       { model: question_options, attributes: ['id', 'question_id', 'option_key', 'option_value', 'option_type']}
+        //     ], attributes: { exclude: ['created_at', 'updated_at', 'deleted_at']}},
+        //     { model: psy_questions, require: false, include: [
+        //       { model: psy_question_options, attributes: ['id', 'psy_question_id', 'option_key', 'option_value', 'option_type']}
+        //     ], attributes: { exclude: ['created_at', 'updated_at', 'deleted_at']}}
+        //   ]
+        // }
       ]
     }));
     if (err) return ReE(res, err, 422);
