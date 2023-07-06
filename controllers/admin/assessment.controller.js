@@ -320,26 +320,46 @@ const deleteBulkAssessment = async function (req, res) {
 }
 module.exports.deleteBulkAssessment = deleteBulkAssessment;
 
+const updateAssessmentConfig = async(body) => {
+  let err, configData;
+  try {
+    [err, configData] = await to(assessment_configurations.update(body, {where: {
+      assessment_id: body.assessment_id
+    }}));
+    if(configData) {
+      [err, configData] = await to(assessment_configurations.findOne({ where: {assessment_id : body.assessment_id } }));
+    }
+    return [err, configData];
+  } catch (err) {
+    TE(err);
+  }
+};
+module.exports.updateAssessmentConfig = updateAssessmentConfig;
+
 // create configuration for screening and mains
 const createAssessmentConfiguration = async function (req, res) {
-  let err, assessmentData, assessmentQuestionData;
+  let err, configData;
   let body = req.body;
   body.assessment_type = req.params.assessment_type.toUpperCase();
   body.assessment_id = parseInt(req.params.assessment_id);
   body.skill_distributions = body.skill_distributions;
-  [err, assessmentsData] = await to(assessments.findOne({id: body.assessment_id}));
-  if(assessmentsData == null) {
-    return ReE(res, "Assessment not found", 404);
-  }
-  [err, isAssementConfigurationExist] = await to(assessment_configurations.findAll({where: {assessment_id: body.assessment_id, assessment_type: body.assessment_type}, raw: true}));
-  console.log(isAssementConfigurationExist);
-  if(isAssementConfigurationExist.length > 0) {
-    return ReE(res, `#${body.assessment_id} ${body.assessment_type.toLowerCase()} assessment ${isAssementConfigurationExist.length} ${isAssementConfigurationExist.length > 1 ?  'entries' : 'entry'} already is exist`, 422);
-  }
   try {
-    [err, screeningConfiguratonData] = await to(assessment_configurations.create(body));
-    if (err) return ReE(res, err, 422);
-    return ReS(res, { data: screeningConfiguratonData  }, 200);
+    [err, assessmentsData] = await to(assessments.findOne({id: body.assessment_id}));
+    if(assessmentsData == null) {
+      return ReE(res, "Assessment not found", 404);
+    }
+    [err, isAssementConfigurationExist] = await to(assessment_configurations.findAll({where: {assessment_id: body.assessment_id, assessment_type: body.assessment_type}, raw: true}));
+    console.log(isAssementConfigurationExist);
+    if(isAssementConfigurationExist.length > 0) {
+      [err, configData] = await updateAssessmentConfig(body);
+      if (err) return ReE(res, err, 422);
+      // return ReE(res, `#${body.assessment_id} ${body.assessment_type.toLowerCase()} assessment ${isAssementConfigurationExist.length} ${isAssementConfigurationExist.length > 1 ?  'entries' : 'entry'} already is exist`, 422);
+    }
+    else {
+      [err, configData] = await to(assessment_configurations.create(body));
+      if (err) return ReE(res, err, 422);
+    }
+    return ReS(res, { data: configData  }, 200);
   } catch (err) {
     return ReE(res, err, 422);
   }
