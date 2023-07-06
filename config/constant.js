@@ -1,5 +1,8 @@
 let masterTableMapping = {
   clusters: "clusters",
+  topics: "topics",
+  sub_strands: "sub_strands",
+  strands: "strands",
   "clusters_meta": "clusters_meta",
   brands: { 
     name: "brands", 
