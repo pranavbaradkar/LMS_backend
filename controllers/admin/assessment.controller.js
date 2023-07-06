@@ -14,6 +14,7 @@ const axios = require('axios');
 const psychometric_skill_id = process.env.PSYCHOMETRIC_SKILL_ID || 48;
 
 
+assessment_questions.belongsTo(assessments, { foreignKey: "assessment_id" });
 assessment_questions.belongsTo(questions, { foreignKey: "question_id" });
 assessment_questions.belongsTo(psy_questions, { foreignKey: "question_id" });
 
@@ -32,6 +33,7 @@ assessments.belongsTo(campaign_assessments, { foreignKey: "id", targetKey: "asse
 
 assessments.hasMany(user_assessments, { foreignKey: "assessment_id" });
 
+assessment_configurations.belongsTo(assessments, { foreignKey: 'assessment_id' });
 assessment_configurations.belongsTo(levels, { foreignKey: 'level_id' });
 assessment_configurations.hasMany(user_assessments, {  sourceKey: 'assessment_id', foreignKey: "assessment_id" });
 user_assessments.belongsTo(users, { foreignKey: "user_id" });
@@ -195,27 +197,35 @@ const getAssessment = async function (req, res) {
     return ReE(res, { message: "Assessment id params is missing" }, 422);
   }
   try {
-    [err, assessmentData] = await to(assessments.findOne({ where: { id: req.params.assessment_id } }));
+    [err, assessmentData] = await to(assessments.findOne({ 
+      where: { id: req.params.assessment_id },
+      attributes: { exclude: ['created_at', 'updated_at', 'deleted_at']},
+      include: [
+        { 
+          model: assessment_configurations, 
+          attributes: { exclude: ['created_at', 'updated_at', 'deleted_at']},
+          require: false
+        },
+        {
+          model: assessment_questions,
+          require: false,
+          attributes: { exclude: ['created_at', 'updated_at', 'deleted_at']},
+          include: [
+            { model: questions, require: false, include:[
+              { model: question_options, attributes: ['id', 'question_id', 'option_key', 'option_value', 'option_type']}
+            ], attributes: { exclude: ['created_at', 'updated_at', 'deleted_at']}},
+            { model: psy_questions, require: false, include: [
+              { model: psy_question_options, attributes: ['id', 'psy_question_id', 'option_key', 'option_value', 'option_type']}
+            ], attributes: { exclude: ['created_at', 'updated_at', 'deleted_at']}}
+          ]
+        }
+      ]
+    }));
     if (err) return ReE(res, err, 422);
-    if (assessmentData !== null) {
-      [err, assessmentQuestionData] = await to(assessment_questions.findAll({
-        where: { assessment_id: req.params.assessment_id },
-        include:
-          [
-            {
-              model: questions,
-              include: [{
-                model: question_options, attributes: ['id', 'question_id', 'option_key', 'option_value', 'option_type'],
-              }]
-            }
-          ],
+    if(!assessmentData) return ReE(res, "No assessment data found", 404);
+    
+    return ReS(res, { data: assessmentData }, 200);
 
-      }));
-      if (err) return ReE(res, err, 422);
-      return ReS(res, { data: assessmentData, assessmentQuestionData }, 200);
-    } else {
-      return ReE(res, "No assessment data found", 404);
-    }
   } catch (err) {
     return ReE(res, err, 422);
   }
@@ -236,7 +246,6 @@ const updateAssessment = async function (req, res) {
     } else {
       await assessmentData.update(payload);
 
-
       let screenObject = payload.screening_question_ids ? payload.screening_question_ids.map(ele => {
         let newObject = {
           assessment_id: assessmentData.id,
@@ -245,14 +254,14 @@ const updateAssessment = async function (req, res) {
         }
         return newObject;
       }) : []
-      let mainsObject = payload.mains_question_ids.map(ele => {
+      let mainsObject = payload.mains_question_ids ? payload.mains_question_ids.map(ele => {
         let newObject1 = {
           assessment_id: assessmentData.id,
           question_id: ele,
           type: 'MAINS'
         }
         return newObject1;
-      })
+      }) : [];
       let assessmentQueVar = screenObject.concat(mainsObject);
       [err, assessmentQuestionData] = await to(assessment_questions.bulkCreate(assessmentQueVar));
      
