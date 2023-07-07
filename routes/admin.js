@@ -39,14 +39,13 @@ router.get("/assessments/:assessment_id/configurations",adminPassport.authentica
 
 router.get("/assessments/:assessment_id/configurations/:assessment_type/questions",adminPassport.authenticate("jwt", { session: false }), AssessmentController.getAssessmentConfigurationQuestions); 
 
-
 router.get("/assessments",adminPassport.authenticate("jwt", { session: false }), AssessmentController.getAllAssessments); 
 router.get("/assessments/:assessment_id",adminPassport.authenticate("jwt", { session: false }), AssessmentController.getAssessment);
 router.get("/assessments/:assessment_id/configurations/:assessment_type/users",adminPassport.authenticate("jwt", { session: false }), AssessmentController.getAssessmentConfigurationUsers);
 router.put("/update/assessments/:assessment_id",adminPassport.authenticate("jwt", { session: false }), AssessmentController.updateAssessment); 
 router.delete("/delete/assessments/:assessment_id", adminPassport.authenticate("jwt", { session: false }), AssessmentController.deleteAssessment); 
 router.delete("/bulk/assessments", adminPassport.authenticate("jwt", { session: false }), AssessmentController.deleteBulkAssessment); 
-
+router.put("/assessments/:assessment_id/questions",adminPassport.authenticate("jwt", { session: false }), AssessmentController.replaceAssessmentQuestion); 
 
 router.post("/assessments/inventory/block/:user_id", AssessmentController.blockSchoolInventory); 
 
@@ -69,6 +68,7 @@ router.post("/questions/import",adminPassport.authenticate("jwt", { session: fal
 router.delete("/bulk/questions", adminPassport.authenticate("jwt", { session: false }), QuestionController.deleteBulkQuestion); 
 router.post("/lo_bank/import",adminPassport.authenticate("jwt", { session: false }), QuestionController.loBankImport);
 router.post("/psychometry/import",adminPassport.authenticate("jwt", { session: false }), QuestionController.importPsychometry);
+router.get("/question/:question_id/assessments/:assessment_id",adminPassport.authenticate("jwt", { session: false }), AssessmentController.getReplacementQuestion); 
 
 // ********************* Roles ROUTES **************************
 router.post("/roles",adminPassport.authenticate("jwt", { session: false }), RoleController.createRole); 

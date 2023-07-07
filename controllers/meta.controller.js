@@ -297,10 +297,24 @@ const getMeta = async function (req, res) {
       });
     }
 
+    let considerFilter = ['topics', 'strands', 'sub_strands'];
+    if(considerFilter.indexOf(req.params.table) >= 0 && req.query.filter) {
+      let filter = {};
+      Object.keys(req.query.filter).forEach(ele=> {
+        filter[ele] = parseInt(req.query.filter[ele]);
+      });
+      paginateData.where = {...paginateData.where, ...filter};
+    }
+
+    //console.log(req.params.table);
+
+
+    console.log(JSON.stringify(paginateData.where));
+
     [err, response] = await to(model[table].findAndCountAll(paginateData));
     
     if(response == null) {
-      return ReE(res, {message: "No data found"}, 422);
+      return ReS(res, {data: {count: 0, rows: []}}, 200);
     }
    
     if (err) {
@@ -359,6 +373,7 @@ const getMeta = async function (req, res) {
 
     return ReS(res, { data: response }, 200);
   } catch (err) {
+    console.log(err);
     return ReE(res, err, 422);
   }
 }

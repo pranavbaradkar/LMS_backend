@@ -14,6 +14,7 @@ const axios = require('axios');
 const psychometric_skill_id = process.env.PSYCHOMETRIC_SKILL_ID || 48;
 
 
+assessment_questions.belongsTo(assessments, { foreignKey: "assessment_id" });
 assessment_questions.belongsTo(questions, { foreignKey: "question_id" });
 assessment_questions.belongsTo(psy_questions, { foreignKey: "question_id" });
 
@@ -32,6 +33,7 @@ assessments.belongsTo(campaign_assessments, { foreignKey: "id", targetKey: "asse
 
 assessments.hasMany(user_assessments, { foreignKey: "assessment_id" });
 
+assessment_configurations.belongsTo(assessments, { foreignKey: 'assessment_id' });
 assessment_configurations.belongsTo(levels, { foreignKey: 'level_id' });
 assessment_configurations.hasMany(user_assessments, {  sourceKey: 'assessment_id', foreignKey: "assessment_id" });
 user_assessments.belongsTo(users, { foreignKey: "user_id" });
@@ -163,7 +165,22 @@ const getAllAssessments = async function (req, res) {
 
     if (err) return ReE(res, err, 422);
     if (assessmentsData) {
-      return ReS(res, { data: assessmentsData }, 200);
+      [err, subjectData] = await to(subjects.findAll({ attributes: ["id", "name"]}));
+      let subjectMap = {};
+      subjectData.map(row => { subjectMap[row.id] = row.name } );
+      // console.log(`the subject data `, subjectMap);
+      let finalResult = assessmentsData.rows.map(rows => {
+        let row = rows.get({plain: true});
+        // console.log(`skill distributions ${row.id}`,row.assessment_configurations.skill_distributions);
+        if(row.assessment_configurations.length > 0 &&  row.assessment_configurations[0].skill_distributions.length > 0) {
+          let skillObj = row.assessment_configurations[0].skill_distributions.filter(ele => ele.subject_ids);
+          if(skillObj[0]) {
+            row.assessment_configurations[0].subjects = skillObj[0].subject_ids.map(ele => { console.log("teh ids ", ele); return subjectMap[ele.subject_id]});
+          }
+        }
+         return row;
+      });
+      return ReS(res, { data: { rows: finalResult, count: assessmentsData.count } }, 200);
     } else {
       return ReE(res, "No assessments data found", 404);
     }
@@ -180,27 +197,35 @@ const getAssessment = async function (req, res) {
     return ReE(res, { message: "Assessment id params is missing" }, 422);
   }
   try {
-    [err, assessmentData] = await to(assessments.findOne({ where: { id: req.params.assessment_id } }));
+    [err, assessmentData] = await to(assessments.findOne({ 
+      where: { id: req.params.assessment_id },
+      attributes: { exclude: ['created_at', 'updated_at', 'deleted_at']},
+      include: [
+        { 
+          model: assessment_configurations, 
+          attributes: { exclude: ['created_at', 'updated_at', 'deleted_at']},
+          require: false
+        },
+        // {
+        //   model: assessment_questions,
+        //   require: false,
+        //   attributes: { exclude: ['created_at', 'updated_at', 'deleted_at']},
+        //   include: [
+        //     { model: questions, require: false, include:[
+        //       { model: question_options, attributes: ['id', 'question_id', 'option_key', 'option_value', 'option_type']}
+        //     ], attributes: { exclude: ['created_at', 'updated_at', 'deleted_at']}},
+        //     { model: psy_questions, require: false, include: [
+        //       { model: psy_question_options, attributes: ['id', 'psy_question_id', 'option_key', 'option_value', 'option_type']}
+        //     ], attributes: { exclude: ['created_at', 'updated_at', 'deleted_at']}}
+        //   ]
+        // }
+      ]
+    }));
     if (err) return ReE(res, err, 422);
-    if (assessmentData !== null) {
-      [err, assessmentQuestionData] = await to(assessment_questions.findAll({
-        where: { assessment_id: req.params.assessment_id },
-        include:
-          [
-            {
-              model: questions,
-              include: [{
-                model: question_options, attributes: ['id', 'question_id', 'option_key', 'option_value', 'option_type'],
-              }]
-            }
-          ],
+    if(!assessmentData) return ReE(res, "No assessment data found", 404);
+    
+    return ReS(res, { data: assessmentData }, 200);
 
-      }));
-      if (err) return ReE(res, err, 422);
-      return ReS(res, { data: assessmentData, assessmentQuestionData }, 200);
-    } else {
-      return ReE(res, "No assessment data found", 404);
-    }
   } catch (err) {
     return ReE(res, err, 422);
   }
@@ -221,7 +246,6 @@ const updateAssessment = async function (req, res) {
     } else {
       await assessmentData.update(payload);
 
-
       let screenObject = payload.screening_question_ids ? payload.screening_question_ids.map(ele => {
         let newObject = {
           assessment_id: assessmentData.id,
@@ -230,14 +254,14 @@ const updateAssessment = async function (req, res) {
         }
         return newObject;
       }) : []
-      let mainsObject = payload.mains_question_ids.map(ele => {
+      let mainsObject = payload.mains_question_ids ? payload.mains_question_ids.map(ele => {
         let newObject1 = {
           assessment_id: assessmentData.id,
           question_id: ele,
           type: 'MAINS'
         }
         return newObject1;
-      })
+      }) : [];
       let assessmentQueVar = screenObject.concat(mainsObject);
       [err, assessmentQuestionData] = await to(assessment_questions.bulkCreate(assessmentQueVar));
      
@@ -296,26 +320,46 @@ const deleteBulkAssessment = async function (req, res) {
 }
 module.exports.deleteBulkAssessment = deleteBulkAssessment;
 
+const updateAssessmentConfig = async(body) => {
+  let err, configData;
+  try {
+    [err, configData] = await to(assessment_configurations.update(body, {where: {
+      assessment_id: body.assessment_id
+    }}));
+    if(configData) {
+      [err, configData] = await to(assessment_configurations.findOne({ where: {assessment_id : body.assessment_id } }));
+    }
+    return [err, configData];
+  } catch (err) {
+    TE(err);
+  }
+};
+module.exports.updateAssessmentConfig = updateAssessmentConfig;
+
 // create configuration for screening and mains
 const createAssessmentConfiguration = async function (req, res) {
-  let err, assessmentData, assessmentQuestionData;
+  let err, configData;
   let body = req.body;
   body.assessment_type = req.params.assessment_type.toUpperCase();
   body.assessment_id = parseInt(req.params.assessment_id);
   body.skill_distributions = body.skill_distributions;
-  [err, assessmentsData] = await to(assessments.findOne({id: body.assessment_id}));
-  if(assessmentsData == null) {
-    return ReE(res, "Assessment not found", 404);
-  }
-  [err, isAssementConfigurationExist] = await to(assessment_configurations.findAll({where: {assessment_id: body.assessment_id, assessment_type: body.assessment_type}, raw: true}));
-  console.log(isAssementConfigurationExist);
-  if(isAssementConfigurationExist.length > 0) {
-    return ReE(res, `#${body.assessment_id} ${body.assessment_type.toLowerCase()} assessment ${isAssementConfigurationExist.length} ${isAssementConfigurationExist.length > 1 ?  'entries' : 'entry'} already is exist`, 422);
-  }
   try {
-    [err, screeningConfiguratonData] = await to(assessment_configurations.create(body));
-    if (err) return ReE(res, err, 422);
-    return ReS(res, { data: screeningConfiguratonData  }, 200);
+    [err, assessmentsData] = await to(assessments.findOne({id: body.assessment_id}));
+    if(assessmentsData == null) {
+      return ReE(res, "Assessment not found", 404);
+    }
+    [err, isAssementConfigurationExist] = await to(assessment_configurations.findAll({where: {assessment_id: body.assessment_id, assessment_type: body.assessment_type}, raw: true}));
+    console.log(isAssementConfigurationExist);
+    if(isAssementConfigurationExist.length > 0) {
+      [err, configData] = await updateAssessmentConfig(body);
+      if (err) return ReE(res, err, 422);
+      // return ReE(res, `#${body.assessment_id} ${body.assessment_type.toLowerCase()} assessment ${isAssementConfigurationExist.length} ${isAssementConfigurationExist.length > 1 ?  'entries' : 'entry'} already is exist`, 422);
+    }
+    else {
+      [err, configData] = await to(assessment_configurations.create(body));
+      if (err) return ReE(res, err, 422);
+    }
+    return ReS(res, { data: configData  }, 200);
   } catch (err) {
     return ReE(res, err, 422);
   }
@@ -1524,6 +1568,7 @@ const calculatePschometricScore = async(skillScores, skill, optionMap, user_resp
 const saveToDbAndMail = async(resultPayload) => {
   let err, assessmentResultData;
   let assessmentResultPayload = [];
+  let assessmentResultUpdatePayload = {};
   let userRecommendationPayload = {};
   let userRecommendationUserIds = [];
   Object.keys(resultPayload.skill_scores).map(user_id => {
@@ -1542,6 +1587,7 @@ const saveToDbAndMail = async(resultPayload) => {
     // excluding psychometric
     obj.skill_total     = Object.keys(resultPayload.skill_scores[user_id]).filter(skill => skill!=='Psychometric').map(skill => skill_totals[skill]);
     assessmentResultPayload.push(obj);
+    assessmentResultUpdatePayload[user_id] = obj;
     let type = (resultPayload.type).toLowerCase();
     urObj[`${type}_score`] = resultPayload.total_scores[user_id];
     urObj[`${type}_score_total`] = resultPayload.assessment_total;
@@ -1595,9 +1641,10 @@ const saveToDbAndMail = async(resultPayload) => {
 
   if(assessmentResultData) {
     assessmentResultData.forEach(row => {
-      // console.log("looping  assessmentResultData ", row.user_id);
-      // row.skill_total = _.random(100,400);
-      // row.save();
+      // update found rows
+      let arup = assessmentResultUpdatePayload[row.user_id];
+      Object.keys(arup).forEach(prop => { row[prop] = arup[prop]; } );
+      row.save();
         updatedAssessmentResultIds.push(parseInt(row.user_id));
         if(resultPayload.req_query && resultPayload.req_query.force_mail && resultPayload.req_query.force_mail == 1){
           sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
@@ -1953,3 +2000,118 @@ const getAssessmentConfigurationUsers = async function (req, res) {
 
 };
 module.exports.getAssessmentConfigurationUsers = getAssessmentConfigurationUsers;
+
+const getReplacementQuestion = async (req, res) => {
+  let err, questionData, assessmentData;
+  if(req.params && (req.params.assessment_id == undefined)) {
+    return ReE(res, { message: "assessment_id is required." }, 422);
+  }
+  if(req.params && (req.params.question_id == undefined)) {
+    return ReE(res, { message: "question_id is required." }, 422);
+  }
+  try {
+
+    [err, assessmentData] = await to(assessment_questions.findAll({
+      where: { assessment_id: req.params.assessment_id },
+      attributes: ['question_id']
+    }));
+    if(!assessmentData) return ReE(res, 'Assessment not found', 422);
+
+    let psychometricQuestionIds = [];
+    let questionIds = [];
+    assessmentData.forEach(obj => {
+      if(obj.question_id > 1000000000) { psychometricQuestionIds.push(obj.question_id ); }
+      else questionIds.push(obj.question_id);
+    } );
+
+    let isPsychometric = parseInt(req.params.question_id) > 1000000000;
+
+    // return ReS(res, { data: [questionIds, psychometricQuestionIds]  }, 200);
+
+    if(isPsychometric) {
+      [err, questionData] = await getSimilarPsychometricQuestions(req.params.question_id, psychometricQuestionIds);
+    }
+    else {
+      [err, questionData] = await getSimilarQuestions(req.params.question_id, questionIds);
+    }
+    return ReS(res, { data: questionData  }, 200);
+  } catch (err) {
+    return ReE(res, err, 422);
+  }
+};
+module.exports.getReplacementQuestion = getReplacementQuestion;
+
+const getSimilarQuestions = async (questionId, excludeIds) => {
+  let err, oldQuestion, questionData;
+  [err, oldQuestion] = await to(questions.findByPk(questionId));
+  
+  if(!oldQuestion) { TE('Question not found', err); }
+  // return [err, oldQuestion];
+
+  [err, questionData] = await to(questions.findAll({
+    where: {
+      blooms_taxonomy: oldQuestion.blooms_taxonomy,
+      difficulty_level: oldQuestion.difficulty_level,
+      complexity_level: oldQuestion.complexity_level,
+      skill_id: oldQuestion.skill_id,
+      level_id: oldQuestion.level_id,
+      grade_id: oldQuestion.grade_id,
+      subject_id: oldQuestion.subject_id,
+      id : {[Op.notIn]:excludeIds}
+    }
+  }))
+  let random = _.random(0, (questionData.length-1));
+  return [err, (questionData[random]) ? questionData[random] : [] ];
+};
+
+const getSimilarPsychometricQuestions = async (questionId, excludeIds) => {
+  let err, oldQuestion, questionData;
+  [err, oldQuestion] = await to(psy_questions.findByPk(questionId));
+  
+  if(!oldQuestion) { TE('Question not found', err); }
+  // return [err, oldQuestion];
+
+  [err, questionData] = await to(psy_questions.findAll({
+    where: {
+      // score_type: oldQuestion.score_type,
+      // set_number: oldQuestion.set_number,
+      skill_id: oldQuestion.skill_id,
+      level_id: oldQuestion.level_id,
+      grade_id: oldQuestion.grade_id,
+      subject_id: oldQuestion.subject_id,
+      id : {[Op.notIn]:excludeIds}
+    }
+  }))
+  let random = _.random(0, (questionData.length-1));
+  return [err, (questionData[random]) ? questionData[random] : [] ];
+};
+
+const replaceAssessmentQuestion = async (req,res) => {
+  let err, assessmentData;
+  if(req.params && (req.params.assessment_id == undefined)) {
+    return ReE(res, { message: "assessment_id is required." }, 422);
+  }
+  let payload = req.body;
+  try {
+    [err, deleteSuccess] = await to(assessment_questions.destroy({
+      where: { 
+        assessment_id: req.params.assessment_id, 
+        question_id: payload.remove 
+      }
+    }));
+    if(err) return ReE(res,err, 422);
+    if(!deleteSuccess) { return ReE(res,`Error deleting question ${payload.remove}`,422); }
+
+    // console.log("deleted data", assessmentData);
+
+    payload.question_id   = payload.add;
+    payload.assessment_id = req.params.assessment_id;
+    payload.type          = payload.type;
+    [err, assessmentData] = await to(assessment_questions.create(payload));
+
+    return ReS(res, { data: assessmentData  }, 200);
+  } catch (err) {
+    return ReE(res, err, 422);
+  }
+};
+module.exports.replaceAssessmentQuestion = replaceAssessmentQuestion;
