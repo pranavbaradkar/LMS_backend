@@ -2061,7 +2061,7 @@ const getSimilarQuestions = async (questionId, excludeIds) => {
     }
   }))
   let random = _.random(0, (questionData.length-1));
-  return [err, questionData[random]];
+  return [err, (questionData[random]) ? questionData[random] : [] ];
 };
 
 const getSimilarPsychometricQuestions = async (questionId, excludeIds) => {
@@ -2083,7 +2083,7 @@ const getSimilarPsychometricQuestions = async (questionId, excludeIds) => {
     }
   }))
   let random = _.random(0, (questionData.length-1));
-  return [err, questionData[random]];
+  return [err, (questionData[random]) ? questionData[random] : [] ];
 };
 
 const replaceAssessmentQuestion = async (req,res) => {
