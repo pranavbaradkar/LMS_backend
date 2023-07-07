@@ -45,7 +45,7 @@ router.get("/assessments/:assessment_id/configurations/:assessment_type/users",a
 router.put("/update/assessments/:assessment_id",adminPassport.authenticate("jwt", { session: false }), AssessmentController.updateAssessment); 
 router.delete("/delete/assessments/:assessment_id", adminPassport.authenticate("jwt", { session: false }), AssessmentController.deleteAssessment); 
 router.delete("/bulk/assessments", adminPassport.authenticate("jwt", { session: false }), AssessmentController.deleteBulkAssessment); 
-
+router.put("/assessments/:assessment_id/questions",adminPassport.authenticate("jwt", { session: false }), AssessmentController.replaceAssessmentQuestion); 
 
 router.post("/assessments/inventory/block/:user_id", AssessmentController.blockSchoolInventory); 
 

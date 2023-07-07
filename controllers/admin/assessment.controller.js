@@ -2083,3 +2083,33 @@ const getSimilarPsychometricQuestions = async (questionId, excludeIds) => {
   }))
   return [err, questionData];
 };
+
+const replaceAssessmentQuestion = async (req,res) => {
+  let err, assessmentData;
+  if(req.params && (req.params.assessment_id == undefined)) {
+    return ReE(res, { message: "assessment_id is required." }, 422);
+  }
+  let payload = req.body;
+  try {
+    [err, deleteSuccess] = await to(assessment_questions.destroy({
+      where: { 
+        assessment_id: req.params.assessment_id, 
+        question_id: payload.remove 
+      }
+    }));
+    if(err) return ReE(res,err, 422);
+    if(!deleteSuccess) { return ReE(res,`Error deleting question ${payload.remove}`,422); }
+
+    // console.log("deleted data", assessmentData);
+
+    payload.question_id   = payload.add;
+    payload.assessment_id = req.params.assessment_id;
+    payload.type          = payload.type;
+    [err, assessmentData] = await to(assessment_questions.create(payload));
+
+    return ReS(res, { data: assessmentData  }, 200);
+  } catch (err) {
+    return ReE(res, err, 422);
+  }
+};
+module.exports.replaceAssessmentQuestion = replaceAssessmentQuestion;
