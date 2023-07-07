@@ -2060,7 +2060,8 @@ const getSimilarQuestions = async (questionId, excludeIds) => {
       id : {[Op.notIn]:excludeIds}
     }
   }))
-  return [err, questionData];
+  let random = _.random(0, (questionData.length-1));
+  return [err, questionData[random]];
 };
 
 const getSimilarPsychometricQuestions = async (questionId, excludeIds) => {
@@ -2081,7 +2082,8 @@ const getSimilarPsychometricQuestions = async (questionId, excludeIds) => {
       id : {[Op.notIn]:excludeIds}
     }
   }))
-  return [err, questionData];
+  let random = _.random(0, (questionData.length-1));
+  return [err, questionData[random]];
 };
 
 const replaceAssessmentQuestion = async (req,res) => {
