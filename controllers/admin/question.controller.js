@@ -12,6 +12,8 @@ const path = require("path");
 var _ = require('underscore');
 const { result, where } = require('underscore');
 const { serialize } = require('v8');
+const PSYCHOMETRIC_SKILL_ID = process.env.PSYCHOMETRIC_SKILL_ID || 48;
+
 questions.belongsTo(model.skills, { foreignKey: 'skill_id' });
 questions.belongsTo(model.levels, { foreignKey: 'level_id' });
 questions.belongsTo(model.subjects, { foreignKey: 'subject_id' });
@@ -153,32 +155,70 @@ const getAllQuestions = async function (req, res) {
       }
     ]]
   }
-  
 
   try {
-    [err, questionData] = await to(questions.findAndCountAll({...paginateData, ...{
-        include: questionInclude,
-        distinct: true
-      }
-    }
-    ));
-    if (err) return ReE(res, err, 422);
-    if (questionData) {
-      questionData.rows = questionData.rows.map(ele => {
-        let obj = {...ele.get({plain: true})};
-        obj.question_options = _.sortBy(obj.question_options, 'option_key');
-        obj.question_mtf_answers = _.sortBy(obj.question_mtf_answers, 'option_key');
-        return obj;
-      })
-      return ReS(res, { data: questionData }, 200);
-    } else {
-      return ReE(res, "No questions data found", 404);
-    }
+    // if(req.query && req.query.filter && req.query.filter.skill_id && req.query.filter.skill_id == PSYCHOMETRIC_SKILL_ID) {
+    //   console.log("fetch psychometric questions only");
+    //   questionData = await getPsychometricQuestion(paginateData, questionInclude);
+    // }
+    // else {
+      let psyQuestionData = await getPsychometricQuestion(paginateData, questionInclude);
+      questionData = await getAllSkillsQuestion(paginateData, questionInclude);
+      questionData.count += psyQuestionData.count;
+      questionData.rows = [...questionData.rows, ...psyQuestionData.rows];
+    // }
+
+    if(!questionData) return ReE(res, "No questions data found", 404);
+
+    return ReS(res, { data: questionData }, 200);
   } catch (err) {
     return ReE(res, err, 422);
   }
 };
 module.exports.getAllQuestions = getAllQuestions;
+
+const getAllSkillsQuestion = async (paginateData, questionInclude) => {
+  let err, questionData;
+  [err, questionData] = await to(questions.findAndCountAll({...paginateData, ...{
+    include: questionInclude,
+    distinct: true
+  }
+  }
+  ));
+  if (err) TE(err);
+  if (questionData) {
+    questionData.rows = questionData.rows.map(ele => {
+      let obj = {...ele.get({plain: true})};
+      obj.question_options = _.sortBy(obj.question_options, 'option_key');
+      obj.question_mtf_answers = _.sortBy(obj.question_mtf_answers, 'option_key');
+      return obj;
+    })
+  }
+  return questionData;
+};
+
+const getPsychometricQuestion = async (paginateData, questionInclude) => {
+  let err, questionData;
+  // remove question_options, question_mtf_answers
+  questionInclude = questionInclude.slice(0,1);
+  questionInclude.push({ model: psy_question_options, require: false },);
+  [err, questionData] = await to(psy_questions.findAndCountAll({...paginateData, ...{
+    include: questionInclude,
+    distinct: true
+  }
+  }
+  ));
+  if (err) TE(err);
+  if (questionData) {
+    questionData.rows = questionData.rows.map(ele => {
+      let obj = {...ele.get({plain: true})};
+      obj.question_options = _.sortBy(obj.psy_question_options, 'option_key');
+      delete obj.psy_question_options;
+      return obj;
+    })
+  }
+  return questionData;
+};
 
 const getQuestion = async function (req, res) {
   let err, questionData;

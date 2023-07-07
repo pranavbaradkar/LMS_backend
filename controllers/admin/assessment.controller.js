@@ -11,7 +11,7 @@ var Sequelize = require("sequelize");
 const Op = Sequelize.Op;
 var _ = require('underscore');
 const axios = require('axios');
-const psychometric_skill_id = process.env.PSYCHOMETRIC_SKILL_ID || 48;
+const PSYCHOMETRIC_SKILL_ID = process.env.PSYCHOMETRIC_SKILL_ID || 48;
 
 
 assessment_questions.belongsTo(assessments, { foreignKey: "assessment_id" });
@@ -1822,7 +1822,7 @@ const calculateAssessmentTotal = (assessmentConfig) => {
     // if(ele.skill_id == 45) { // Core skill
     //   total += ele.no_of_questions;
     // }
-    if(ele.skill_id == psychometric_skill_id) {// Psychometric 
+    if(ele.skill_id == PSYCHOMETRIC_SKILL_ID) {// Psychometric 
       // total += (ele.no_of_questions*4);
     }
     else {
