@@ -550,7 +550,8 @@ const getUserAssessments = async function (req, res) {
       where: {
         id: {
           [Op.in]: liveAssessmentList
-        }
+        },
+        status: 'PUBLISHED'
       },
       include: include,
       order: [
