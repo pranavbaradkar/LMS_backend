@@ -2015,7 +2015,7 @@ const getReplacementQuestion = async (req, res) => {
       where: { assessment_id: req.params.assessment_id },
       attributes: ['question_id']
     }));
-    if(!assessmentData) return ReE(res, 'Assessment not found', 422);
+    if(assessmentData && !assessmentData.length) return ReE(res, 'Assessment not found', 422);
 
     let psychometricQuestionIds = [];
     let questionIds = [];
