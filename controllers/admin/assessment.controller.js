@@ -2058,7 +2058,10 @@ const getSimilarQuestions = async (questionId, excludeIds) => {
       grade_id: oldQuestion.grade_id,
       subject_id: oldQuestion.subject_id,
       id : {[Op.notIn]:excludeIds}
-    }
+    },
+    include: [
+      { model: question_options, attributes: { exclude: ['created_at','updated_at','deleted_at' ]} }
+    ]
   }))
   let random = _.random(0, (questionData.length-1));
   return [err, (questionData[random]) ? questionData[random] : [] ];
@@ -2080,7 +2083,10 @@ const getSimilarPsychometricQuestions = async (questionId, excludeIds) => {
       grade_id: oldQuestion.grade_id,
       subject_id: oldQuestion.subject_id,
       id : {[Op.notIn]:excludeIds}
-    }
+    },
+    include: [
+      { model: psy_question_options, attributes: { exclude: ['created_at','updated_at','deleted_at' ]} }
+    ]
   }))
   let random = _.random(0, (questionData.length-1));
   return [err, (questionData[random]) ? questionData[random] : [] ];

@@ -127,7 +127,7 @@ const getAllQuestions = async function (req, res) {
       orData.push(obj);
     })
 
-    //whereIncludeSearch = { name: { [Op.like]: `%${req.query.search}%`} };
+    // whereIncludeSearch = { name: { [Op.like]: `%${req.query.search}%`} };
   }
  
   if(orData.length > 0) {
