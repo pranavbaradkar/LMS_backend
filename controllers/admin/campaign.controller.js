@@ -284,11 +284,11 @@ const updateUserCampaign = async function (req, res) {
     } else {
 
       //date format code
-      let startDateTime = moment(`${payload.start_date} ${payload.start_time}`, "DD-MM-YYYY H:mm:ss").utc();
+      let startDateTime = moment(`${payload.start_date} ${payload.start_time}`, "DD-MM-YYYY H:mm:ss");
       payload.start_date = startDateTime;
       payload.start_time = startDateTime;
       
-      let endDateTime = moment(`${payload.end_date} ${payload.end_time}`, "DD-MM-YYYY HH:mm:ss").utc();
+      let endDateTime = moment(`${payload.end_date} ${payload.end_time}`, "DD-MM-YYYY HH:mm:ss");
       payload.end_date = endDateTime;
       payload.end_time = endDateTime;
 
