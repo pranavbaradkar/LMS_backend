@@ -1,5 +1,5 @@
 const model = require('../../models');
-const { psy_questions, psy_question_options,lo_banks, topics, strands, sub_strands, levels,grades,subjects, learning_objectives, questions, skills, question_options, question_mtf_answers, question_los } = require("../../models");
+const { question_views, psy_questions, psy_question_options,lo_banks, topics, strands, sub_strands, levels,grades,subjects, learning_objectives, questions, skills, question_options, question_mtf_answers, question_los } = require("../../models");
 const { to, ReE, ReS, toSnakeCase,cleanLoText, requestQueryObject } = require("../../services/util.service");
 
 const axios = require('axios');
@@ -19,6 +19,13 @@ questions.belongsTo(model.levels, { foreignKey: 'level_id' });
 questions.belongsTo(model.subjects, { foreignKey: 'subject_id' });
 questions.hasMany(question_options, { foreignKey: 'question_id', as: "questionOptions" });
 questions.hasMany(question_mtf_answers, { foreignKey: 'question_id'});
+
+question_views.belongsTo(model.skills, { foreignKey: 'skill_id' });
+question_views.belongsTo(model.levels, { foreignKey: 'level_id' });
+question_views.belongsTo(model.subjects, { foreignKey: 'subject_id' });
+question_views.hasMany(question_options, { foreignKey: 'question_id', as: "questionOptions" });
+question_views.hasMany(psy_question_options, { foreignKey: 'psy_question_id', sourceKey:'id' });
+question_views.hasMany(question_mtf_answers, { foreignKey: 'question_id'});
 
 
 const createQuestion = async function (req, res) {
@@ -129,7 +136,7 @@ const getAllQuestions = async function (req, res) {
 
     // whereIncludeSearch = { name: { [Op.like]: `%${req.query.search}%`} };
   }
- 
+  
   if(orData.length > 0) {
     queryParams = {...queryParams,...{[Op.or]: orData}}
   } else {
@@ -139,11 +146,13 @@ const getAllQuestions = async function (req, res) {
 
   let paginateData = {...requestQueryObject(req.query, queryParams)};
   console.log("testest", paginateData);
+  paginateData.order = [['updated_at','DESC']];
 
   let questionInclude = [
     { model: model.skills, attributes: ['name'], require: false,
     where: whereIncludeSearch },
-    { model: question_options, require: false },
+    { model: question_options, as: "questionOptions", require: false },
+    { model: psy_question_options, require: false },
     { model: question_mtf_answers, require: false }
   ];
   if(Object.keys(whereIncludeSearch).length > 0) {
@@ -157,18 +166,24 @@ const getAllQuestions = async function (req, res) {
   }
 
   try {
-    // if(req.query && req.query.filter && req.query.filter.skill_id && req.query.filter.skill_id == PSYCHOMETRIC_SKILL_ID) {
-    //   console.log("fetch psychometric questions only");
-    //   questionData = await getPsychometricQuestion(paginateData, questionInclude);
-    // }
-    // else {
-      let psyQuestionData = await getPsychometricQuestion(paginateData, questionInclude);
-      questionData = await getAllSkillsQuestion(paginateData, questionInclude);
-      questionData.count += psyQuestionData.count;
-      questionData.rows = [...questionData.rows, ...psyQuestionData.rows];
-    // }
-
+    [err, questionData] = await to(question_views.findAndCountAll({...paginateData, ...{
+      include: questionInclude,
+      distinct: true
+    }
+    }
+    ));
     if(!questionData) return ReE(res, "No questions data found", 404);
+    
+    if (questionData) {
+      questionData.rows = questionData.rows.map(ele => {
+        let obj = {...ele.get({plain: true})};
+        obj.question_options = (obj.questionOptions && obj.questionOptions.length > 0) ? _.sortBy(obj.questionOptions, 'option_key') : _.sortBy(obj.psy_question_options, 'option_key');
+        obj.question_mtf_answers = _.sortBy(obj.question_mtf_answers, 'option_key');
+        delete obj.questionOptions;
+        delete obj.psy_question_options;
+        return obj;
+      })
+    }
 
     return ReS(res, { data: questionData }, 200);
   } catch (err) {
@@ -176,49 +191,6 @@ const getAllQuestions = async function (req, res) {
   }
 };
 module.exports.getAllQuestions = getAllQuestions;
-
-const getAllSkillsQuestion = async (paginateData, questionInclude) => {
-  let err, questionData;
-  [err, questionData] = await to(questions.findAndCountAll({...paginateData, ...{
-    include: questionInclude,
-    distinct: true
-  }
-  }
-  ));
-  if (err) TE(err);
-  if (questionData) {
-    questionData.rows = questionData.rows.map(ele => {
-      let obj = {...ele.get({plain: true})};
-      obj.question_options = _.sortBy(obj.question_options, 'option_key');
-      obj.question_mtf_answers = _.sortBy(obj.question_mtf_answers, 'option_key');
-      return obj;
-    })
-  }
-  return questionData;
-};
-
-const getPsychometricQuestion = async (paginateData, questionInclude) => {
-  let err, questionData;
-  // remove question_options, question_mtf_answers
-  questionInclude = questionInclude.slice(0,1);
-  questionInclude.push({ model: psy_question_options, require: false },);
-  [err, questionData] = await to(psy_questions.findAndCountAll({...paginateData, ...{
-    include: questionInclude,
-    distinct: true
-  }
-  }
-  ));
-  if (err) TE(err);
-  if (questionData) {
-    questionData.rows = questionData.rows.map(ele => {
-      let obj = {...ele.get({plain: true})};
-      obj.question_options = _.sortBy(obj.psy_question_options, 'option_key');
-      delete obj.psy_question_options;
-      return obj;
-    })
-  }
-  return questionData;
-};
 
 const getQuestion = async function (req, res) {
   let err, questionData;
