@@ -348,7 +348,7 @@ const createAssessmentConfiguration = async function (req, res) {
     if(assessmentsData == null) {
       return ReE(res, "Assessment not found", 404);
     }
-    [err, isAssementConfigurationExist] = await to(assessment_configurations.findAll({where: {assessment_id: body.assessment_id, assessment_type: body.assessment_type}, raw: true}));
+    [err, isAssementConfigurationExist] = await to(assessment_configurations.findAll({where: {assessment_id: body.assessment_id}, raw: true}));
     console.log(isAssementConfigurationExist);
     if(isAssementConfigurationExist.length > 0) {
       [err, configData] = await updateAssessmentConfig(body);
