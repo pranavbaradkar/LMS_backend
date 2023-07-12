@@ -293,6 +293,12 @@ const updateUserCampaign = async function (req, res) {
       payload.end_time = endDateTime;
 
       campaignData.update(payload);
+      if(payload.assessment_ids && payload.assessment_ids.length > 0) {
+        let mapObj = payload.assessment_ids.map(e => {
+          return {assessment_id: e};
+        });
+        await updateCampaignMeta(mapObj, campaignData.id, 'campaign_assessments');
+      }
       if (err) return ReE(res, err, 422);
       return ReS(res, { data: campaignData }, 200);
     }
