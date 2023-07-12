@@ -7,7 +7,7 @@ var moment = require("moment");
 const { Op } = require("sequelize");
 const { include } = require("underscore");
 
-let ist = "+05:30";
+let ist = "+00:00";//"+05:30";
 
 campaigns.hasMany(campaign_assessments, { foreignKey: "campaign_id" });
 campaigns.hasMany(campaign_levels, { foreignKey: "campaign_id" });
