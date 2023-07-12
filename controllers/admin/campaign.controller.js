@@ -186,8 +186,8 @@ const getAllUserCampaigns = async function (req, res) {
       campaignData.forEach(ele => {
         ele = ele.get({plain: true});
 
-        ele.start_date = moment(ele.start_date).utcOffset(ist).format("DD-MM-YYYY");
-        ele.end_date = moment(ele.end_date).utcOffset(ist).format("DD-MM-YYYY");
+        ele.start_date = moment(ele.start_date).utcOffset(ist).format("YYYY-MM-DD");
+        ele.end_date = moment(ele.end_date).utcOffset(ist).format("YYYY-MM-DD");
        
         
         ele.levels = ele.campaign_levels.map(ele => {
@@ -253,8 +253,8 @@ const getUserCampaign = async function (req, res) {
     if (err) return ReE(res, err, 422);
     if (campaignData !== null) {
       campaignData = campaignData.get({plain: true});
-      campaignData.start_date = moment(campaignData.start_date).utcOffset(ist).format("DD-MM-YYYY");
-      campaignData.end_date = moment(campaignData.end_date).utcOffset(ist).format("DD-MM-YYYY");
+      campaignData.start_date = moment(campaignData.start_date).utcOffset(ist).format("YYYY-MM-DD");
+      campaignData.end_date = moment(campaignData.end_date).utcOffset(ist).format("YYYY-MM-DD");
       campaignData.start_time = moment(campaignData.start_time).utcOffset(ist).format("HH:mm");
       campaignData.end_time = moment(campaignData.end_time).utcOffset(ist).format("HH:mm");
       campaignData.assessments = campaignData.campaign_assessments.map(ele => {
