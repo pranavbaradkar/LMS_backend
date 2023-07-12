@@ -31,7 +31,7 @@
     "mysql2": "^3.1.2",
     "node-cache": "^5.1.2",
     "nodemailer": "^6.9.1",
-    "nodemon": "^2.0.20",
+    "nodemon": "^3.0.1",
     "parse-error": "^0.2.0",
     "passport": "^0.6.0",
     "passport-jwt": "^4.0.1",

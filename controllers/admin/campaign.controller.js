@@ -160,6 +160,7 @@ const getAllUserCampaigns = async function (req, res) {
           require: false,
           attributes: ['assessment_id'],
           include: [{
+            require: false,
             model: user_assessments,
             attributes: ['screening_status', 'mains_status'],
           }]
