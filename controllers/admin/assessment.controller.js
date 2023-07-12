@@ -2011,28 +2011,31 @@ const getReplacementQuestion = async (req, res) => {
   }
   try {
 
-    [err, assessmentData] = await to(assessment_questions.findAll({
-      where: { assessment_id: req.params.assessment_id },
-      attributes: ['question_id']
-    }));
-    if(assessmentData && !assessmentData.length) return ReE(res, 'Assessment not found', 422);
-
-    let psychometricQuestionIds = [];
-    let questionIds = [];
-    assessmentData.forEach(obj => {
-      if(obj.question_id > 1000000000) { psychometricQuestionIds.push(obj.question_id ); }
-      else questionIds.push(obj.question_id);
-    } );
-
-    let isPsychometric = parseInt(req.params.question_id) > 1000000000;
-
-    // return ReS(res, { data: [questionIds, psychometricQuestionIds]  }, 200);
-
-    if(isPsychometric) {
-      [err, questionData] = await getSimilarPsychometricQuestions(req.params.question_id, psychometricQuestionIds);
+    let excludeIds = [];
+    if(req.body.question_ids) {
+      excludeIds = req.body.question_ids;
     }
     else {
-      [err, questionData] = await getSimilarQuestions(req.params.question_id, questionIds);
+      [err, assessmentData] = await to(assessment_questions.findAll({
+        where: { assessment_id: req.params.assessment_id },
+        attributes: ['question_id']
+      }));
+      // if(assessmentData && !assessmentData.length) return ReE(res, 'Assessment not found', 422);
+      assessmentData.forEach(obj => {
+        if(obj.question_id > 1000000000) { excludeIds.push(obj.question_id ); }
+        else excludeIds.push(obj.question_id);
+      } );
+    }
+      
+    let isPsychometric = parseInt(req.params.question_id) > 1000000000;
+
+    // return ReS(res, { data: excludeIds  }, 200);
+
+    if(isPsychometric) {
+      [err, questionData] = await getSimilarPsychometricQuestions(req.params.question_id, excludeIds);
+    }
+    else {
+      [err, questionData] = await getSimilarQuestions(req.params.question_id, excludeIds);
     }
     return ReS(res, { data: questionData  }, 200);
   } catch (err) {
