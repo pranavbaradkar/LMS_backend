@@ -41,7 +41,7 @@ const createQuestion = async function (req, res) {
     return ReE(res, "hint is required.", 422);
   } else if (!payload.answer_explanation) {
     return ReE(res, "Answer explanation is required.", 422);
-  } else if (!payload.correct_answer) {
+  } else if (!payload.correct_answer && !payload.is_psychometric) {
     return ReE(res, "Correct answer is required.", 422);
   } else if (!payload.question_options) {
     return ReE(res, "Options is required.", 422);
@@ -50,35 +50,53 @@ const createQuestion = async function (req, res) {
     [err, skillData] = await to(skills.findOne({ where: { id: payload.skill_id } }));
     if (err) return ReE(res, err, 422);
     if (skillData !== null) {
-
-      payload.lo_ids = payload.lo_ids.join(",");
-      [err, questionData] = await to(questions.create(payload));
+      
+      if(!payload.is_psychometric) {
+        payload.lo_ids = payload.lo_ids.join(",");
+        [err, questionData] = await to(questions.create(payload));
+      } else {
+        payload.lo_ids = payload.lo_ids.join(",");
+        payload.correct_answer = '0';
+        payload.score_type = 1;
+        [err, questionData] = await to(psy_questions.create(payload));
+      }
       if (err) return ReE(res, err, 422);
 
-      // console.log(questionData);
-
-      let metaObject = payload.question_options.map(ele => {
-        return {
-          question_id: questionData.id,
-          option_key: ele.option_key,
-          option_value: ele.option_value,
-          option_type: ele.option_type,
-          is_correct: ele.is_correct ? ele.is_correct : false,
-          correct_answer: ele.correct_answer ? ele.correct_answer : null
-        }
-      });
-      [err, questionOptionData] = await to(question_options.bulkCreate(metaObject));
-
-      if(payload.question_mtf_answers) {
-        let answerMetaObject = payload.question_mtf_answers.map(ele => {
+      if(!payload.is_psychometric) {
+        let metaObject = payload.question_options.map(ele => {
           return {
             question_id: questionData.id,
-            answer_key: ele.answer_key,
-            answer_value: ele.answer_value,
-            answer_type: ele.answer_type
+            option_key: ele.option_key,
+            option_value: ele.option_value,
+            option_type: ele.option_type,
+            is_correct: ele.is_correct ? ele.is_correct : false,
+            correct_answer: ele.correct_answer ? ele.correct_answer : null
           }
         });
-        [err, questionOptionResponse] = await to(question_mtf_answers.bulkCreate(answerMetaObject));
+        [err, questionOptionData] = await to(question_options.bulkCreate(metaObject));
+
+        if(payload.question_mtf_answers) {
+          let answerMetaObject = payload.question_mtf_answers.map(ele => {
+            return {
+              question_id: questionData.id,
+              answer_key: ele.answer_key,
+              answer_value: ele.answer_value,
+              answer_type: ele.answer_type
+            }
+          });
+          [err, questionOptionResponse] = await to(question_mtf_answers.bulkCreate(answerMetaObject));
+        }
+      } else if(payload.is_psychometric) {
+        let metaObject = payload.question_options.map(ele => {
+          return {
+            psy_question_id: questionData.id,
+            option_key: ele.option_key,
+            option_value: ele.option_value,
+            option_type: ele.option_type,
+            score_value: ele.score_value != '' && ele.score_value != null ? parseInt(ele.score_value) : 0 ,
+          }
+        });
+        [err, questionOptionData] = await to(psy_question_options.bulkCreate(metaObject));
       }
       
 
@@ -96,7 +114,7 @@ const createQuestion = async function (req, res) {
         // return false;
         [err, questionLoData] = await to(question_los.bulkCreate(questionLoDataObject));
         if (err) return ReE(res, err, 422);
-     }
+      }
      
       
       return ReS(res, { data: questionData, question_options: questionOptionData, lo: questionLoDataObject }, 200);
@@ -229,7 +247,12 @@ const updateQuestion = async function (req, res) {
     return ReE(res, { message: "Question id params is missing" }, 422);
   }
   try {
-    [err, questionData] = await to(questions.findOne({ where: { id: req.params.question_id } }));
+    if(!payload.is_psychometric) {
+      [err, questionData] = await to(questions.findOne({ where: { id: req.params.question_id } }));
+    }
+    if(payload.is_psychometric) {
+      [err, questionData] = await to(psy_questions.findOne({ where: { id: req.params.question_id } }));
+    }
     if (err) return ReE(res, err, 422);
     if (questionData == null) {
       return ReE(res, "No question data found", 404);
@@ -257,9 +280,18 @@ const updateQuestion = async function (req, res) {
       if(payload.lo_ids) {
         delete payload.lo_ids;
       }
-      questionData.update(payload);
 
-      if(payload.question_options && payload.question_options.length > 0) {
+      if(!payload.is_psychometric) {
+        [err, questionData] = await to(questions.update(payload, { where: { id: req.params.question_id } }));
+      }
+
+      if(payload.is_psychometric) {
+        payload.correct_answer = '0';
+        payload.score_type = 1;
+        [err, questionData] = await to(psy_questions.update(payload, { where: { id: req.params.question_id } }));
+      }
+
+      if(payload.question_options && payload.question_options.length > 0 && !payload.is_psychometric) {
         await to(question_options.destroy({where: {question_id: req.params.question_id}, force: true }));
         let optionsUpdate = []
         payload.question_options.forEach(async element => {
@@ -274,6 +306,22 @@ const updateQuestion = async function (req, res) {
           optionsUpdate.push(obj);
         });
         await to(question_options.bulkCreate(optionsUpdate));
+      }
+
+      if(payload.question_options && payload.question_options.length > 0 && payload.is_psychometric) {
+        await to(psy_question_options.destroy({where: {psy_question_id: req.params.question_id}, force: true }));
+        let optionsUpdate = []
+        payload.question_options.forEach(async element => {
+          let obj = {
+            psy_question_id: req.params.question_id,
+            option_key: element.option_key,
+            option_value: element.option_value,
+            option_type: element.option_type,
+            score_value: element.score_value != '' && element.score_value != null ? parseInt(element.score_value) : 0 ,
+          }
+          optionsUpdate.push(obj);
+        });
+        await to(psy_question_options.bulkCreate(optionsUpdate));
       }
 
       if(payload.question_mtf_answers && payload.question_mtf_answers.length > 0) {

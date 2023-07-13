@@ -4,9 +4,9 @@
 module.exports = (sequelize, DataTypes) => {
   var Model = sequelize.define('psy_questions', {
     id                  : { type: DataTypes.INTEGER(11), autoIncrement: true, allowNull: false, primaryKey: true },
+    skill_id            : { type: DataTypes.INTEGER, allowNull: true },
     set_number          : { type: DataTypes.INTEGER, allowNull: false }, 
     score_type          : { type: DataTypes.INTEGER, allowNull: false },
-    skill_id            : { type: DataTypes.INTEGER, allowNull: true },
     level_id            : { type: DataTypes.INTEGER, allowNull: true },
     grade_id            : { type: DataTypes.INTEGER, allowNull: true },
     subject_id          : { type: DataTypes.INTEGER, allowNull: true },
