@@ -22,5 +22,9 @@ module.exports = {
      * Example:
      * await queryInterface.dropTable('users');
      */
+    return [
+      queryInterface.removeColumn('questions', 'set_number'),
+      queryInterface.removeColumn('questions', 'score_type')
+    ];
   }
 };

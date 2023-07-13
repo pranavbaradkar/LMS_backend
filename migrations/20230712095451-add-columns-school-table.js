@@ -9,7 +9,7 @@ module.exports = {
      * await queryInterface.createTable('users', { id: Sequelize.INTEGER });
      */
     return [
-      queryInterface.addColumn('schools', 'hr_email_1', { type: Sequelize.STRING, allowNull: true })
+      queryInterface.addColumn('schools', 'hr_email', { type: Sequelize.STRING, allowNull: true })
     ]
   },
 
@@ -22,7 +22,7 @@ module.exports = {
      */
     
     return [
-      queryInterface.removeColumn('schools', 'hr_email_1')
+      queryInterface.removeColumn('schools', 'hr_email')
     ];
     
   }
