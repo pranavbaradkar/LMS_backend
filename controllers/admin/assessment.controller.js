@@ -263,6 +263,8 @@ const updateAssessment = async function (req, res) {
         return newObject1;
       }) : [];
       let assessmentQueVar = screenObject.concat(mainsObject);
+      //soft delete old Assessment_questions
+      [err, oldAssessmentQuestionData] = await to(assessment_questions.destroy({ where: {assessment_id: req.params.assessment_id} }));
       [err, assessmentQuestionData] = await to(assessment_questions.bulkCreate(assessmentQueVar));
      
       let plainAssessmentData  = assessmentData.get({plain: true});
