@@ -28,8 +28,6 @@ module.exports = (sequelize, DataTypes) => {
     correct_answer_score : { type: DataTypes.FLOAT(5, 2), allowNull: true, defaultValue: 0 },
     answer               : { type: DataTypes.STRING, allowNull: true },
     tags                 : { type: DataTypes.TEXT, allowNull: true },
-    set_number          : { type: DataTypes.INTEGER, allowNull: true }, 
-    score_type          : { type: DataTypes.INTEGER, allowNull: true },
     deleted_at           : { type: DataTypes.DATE, allowNull: true, defaultValue: null }
   },{
     underscored: true,
