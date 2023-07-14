@@ -2147,7 +2147,7 @@ const getAssociatedAssessmentQuestion = async (req, res) => {
               include:[
                 {
                   model: question_options, 
-                  attributes: { exclude: ['created_at', 'updated_at', 'deleted_at', ]},
+                  attributes: ['id', 'option_key', 'option_value', 'option_type', 'is_correct', 'correct_answer'],
                 },
                 { model: skills, attributes: ['name'] },
                 { model: levels, attributes: ['name'] },
@@ -2155,11 +2155,13 @@ const getAssociatedAssessmentQuestion = async (req, res) => {
               ]
             },
             {
-              model: psy_questions, attributes: { exclude: ['created_at', 'updated_at', 'deleted_at', ]},
+              model: psy_questions, 
+              attributes: ["id", "skill_id", "set_number", "score_type", "level_id", "grade_id", "question_type", "statement", "hint", "s3url", "mime_type"],
               include:[
                 {
                   model: psy_question_options,
-                  attributes: { exclude: ['created_at', 'updated_at', 'deleted_at', ]},
+                  // attributes: ['id', 'option_key', 'option_value','score_value'],
+                  
                 },
                 { model: skills, attributes: ['name'] },
                 { model: levels, attributes: ['name'] },
@@ -2209,22 +2211,29 @@ const getAssociatedAssessmentQuestion = async (req, res) => {
       // if(i==2)
       // console.log("question oBJ ",JSON.parse(JSON.stringify(row)));
       // console.log("the skill now ",skill, skillQuestions[skill]);
+      console.log(" the question ", row.question_id, row.question);
+
+      // check for psychometric question;
+      let question  = row.question ? row.question : row.psy_question;
+
       questionIds.push(row.question_id);
       let filterObj = {};
-      filterObj.bloom           = row.question.blooms_taxonomy;
-      filterObj.complex         = row.question.complexity_level;
-      filterObj.level_id        = row.question.level_id;
+      // if(question.skill_id !== PSYCHOMETRIC_SKILL_ID)
+        filterObj.bloom           = question.blooms_taxonomy;
+
+      filterObj.complex         = question.complexity_level;
+      filterObj.level_id        = question.level_id;
       filterObj.limit           = 2;// FIXME: what is limit here?
-      if(row.question.skill_id == CORE_SKILL_ID){
-        filterObj.grade_id        = row.question.grade_id;
+      if(question.skill_id == CORE_SKILL_ID){
+        filterObj.grade_id        = question.grade_id;
         filterObj.subject_ids     = subjectIds;
       }
       let filterCode = `${filterObj.bloom}${filterObj.complex}${filterObj.grade_id}${filterObj.level_id}`;
       
-      let skill = skillMap[row.question.skill_id];
-      skillQuestions[skill].questions.push(row);
+      let skill = skillMap[question.skill_id];
+      skillQuestions[skill].questions.push(question);
       skillQuestions[skill].question_ids.push(row.question_id);
-      skillQuestions[skill].id                  = row.question.skill_id;
+      skillQuestions[skill].id                  = question.skill_id;
       skillQuestions[skill].name                = skill;
       skillQuestions[skill].questions_count     = skillQuestions[skill].questions.length;
       skillQuestions[skill].question_remaining  = [];
