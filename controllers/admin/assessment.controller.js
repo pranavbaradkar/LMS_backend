@@ -2205,6 +2205,8 @@ const getAssociatedAssessmentQuestion = async (req, res) => {
       skillMap[obj.id]                          = obj.name; 
       skillwiseQuestions[obj.name]              = [];
       skillQuestions[obj.name]                  = {};
+      skillQuestions[obj.name].id               = obj.id;
+      skillQuestions[obj.name].name             = obj.name;
       skillQuestions[obj.name].questions        = [];
       skillQuestions[obj.name].question_ids     = [];
       skillQuestions[obj.name].no_of_questions  = skillNoOfQuestionMap[obj.id];
