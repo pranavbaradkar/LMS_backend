@@ -3,6 +3,8 @@ const pe = require('parse-error');
 const axios = require('axios');
 const csv = require('csv');
 var AWS = require('aws-sdk');
+const { createLogger, format, transports } = require("winston");
+
 var config = {
     accessKeyId: process.env.ACCESS_KEY,
     secretAccessKey: process.env.SECRET_ACCESS_KEY,
@@ -12,6 +14,24 @@ AWS.config.update(config);
 const { Op } = require('sequelize');
 
 s3Client = new AWS.S3({ apiVersion: '2006-03-01', signatureVersion: 'v4' });
+
+
+ 
+const logLevels = {
+  fatal: 0,
+  error: 1,
+  warn: 2,
+  info: 3,
+  debug: 4,
+  trace: 5,
+};
+ 
+module.exports.logger = createLogger({
+  levels: logLevels,
+  exitOnError: false,
+  format: format.json(),
+  transports: [new transports.Console()],
+});
 
 module.exports.to = async (promise) => {
     let err, res;

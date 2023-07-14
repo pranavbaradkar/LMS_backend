@@ -1,7 +1,7 @@
 const { users, countries, states, user_assessment_slots, districts, cities, talukas, academics, professional_infos, user_communications, user_assessments, user_teaching_interests,levels,schools, boards, subjects } = require("../../models");
 const authService = require("../../services/auth.service");
 const assessmentService = require("../../services/assessment.service");
-const { to, ReE, ReS, toSnakeCase, sendSMS, isBlank, validatePhoneNo } = require("../../services/util.service");
+const { to, ReE, ReS, toSnakeCase,logger, sendSMS, isBlank, validatePhoneNo } = require("../../services/util.service");
 var moment = require("moment");
 var _ = require('underscore');
 var ejs = require("ejs");
@@ -690,21 +690,22 @@ const verifyOtp = async function (req, res) {
     
 
     if(payload.mobile == '0987654321' || ['quality.assurance@vgos.org', 'quality.hobblehox@gmail.com'].indexOf(payload.email) >= 0) {
-      console.log("no validation check for this users")
+      logger.info("no validation check for this users")
     } else {
+      console.log("existingOTP", existingOTP);
+      logger.info('existingOTP',{existingOTP: existingOTP });
       if(existingOTP == undefined) {
         return ReE(
           res,
           "OTP has been expired",
           422,
-          {existingOTP: true, payload: payload}
+          {payload: payload}
         );
       } else if(payload.otp != existingOTP && payload.debug == undefined) {
         return ReE(
           res,
           "invalid otp",
-          422,
-          {existingOTP: true}
+          422
         );
       }
     }
