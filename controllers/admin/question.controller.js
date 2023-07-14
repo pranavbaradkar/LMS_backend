@@ -582,7 +582,11 @@ const loBankImport = async function(req, res) {
     resData.lo_bank = "inserted to Lo_bank";
   }
   if(responseQ && responseQ.questions && responseQ.questions[2]) {
-    resData.questions = "inserted to Questions Table ";
+    // console.log("================ inserted ", JSON.parse(JSON.stringify(responseQ.questions)).length);
+    let ql = JSON.parse(JSON.stringify(responseQ.questions)).length;
+    let ol = JSON.parse(JSON.stringify(responseQ.question_options)).length;
+    let el = responseQ.excel;
+    resData.questions = `Read ${el} rows from Excel::inserted ${ql} records to Questions Table :: ${ol} records to options table`;
   }
 
   return ReS(res, { data: resData }, 200);
@@ -1054,7 +1058,8 @@ const addToLoQuestion = async (req, res, excelObj, loBankData) => {
 
   return {
     questions: questionData,
-    question_options: qOptionsData
+    question_options: qOptionsData,
+    excel: excelObj.length
   };
 } 
 
