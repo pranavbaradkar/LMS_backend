@@ -390,6 +390,15 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
   let payload = req.body;
   payload.assessment_id = parseInt(req.params.assessment_id);
   try {
+      //if assessment is in draft status fetch already assigned questions
+      if(await isDraftAssessment(req.params.assessment_id)) {
+        console.log("======================= This is draft assessment");
+        return await getAssociatedAssessmentQuestion(req, res);
+      }
+  
+      console.log("=========================== This is not a draft assessment");
+      // if assessment is not in draft status
+
     let type = req.params.assessment_type.toUpperCase();
     let assessment_id = parseInt(req.params.assessment_id);
     [err, assessment_configurations_data] = await to(assessment_configurations.findOne({ where :{ assessment_id: assessment_id, assessment_type: type}, raw: true }));
@@ -2161,7 +2170,6 @@ const getAssociatedAssessmentQuestion = async (req, res) => {
                 {
                   model: psy_question_options,
                   // attributes: ['id', 'option_key', 'option_value','score_value'],
-                  
                 },
                 { model: skills, attributes: ['name'] },
                 { model: levels, attributes: ['name'] },
@@ -2211,7 +2219,7 @@ const getAssociatedAssessmentQuestion = async (req, res) => {
       // if(i==2)
       // console.log("question oBJ ",JSON.parse(JSON.stringify(row)));
       // console.log("the skill now ",skill, skillQuestions[skill]);
-      console.log(" the question ", row.question_id, row.question);
+      // console.log(" the question ", row.question_id, row.question);
 
       // check for psychometric question;
       let question  = row.question ? row.question : row.psy_question;
@@ -2223,7 +2231,6 @@ const getAssociatedAssessmentQuestion = async (req, res) => {
 
       filterObj.complex         = question.complexity_level;
       filterObj.level_id        = question.level_id;
-      filterObj.limit           = 2;// FIXME: what is limit here?
       if(question.skill_id == CORE_SKILL_ID){
         filterObj.grade_id        = question.grade_id;
         filterObj.subject_ids     = subjectIds;
@@ -2258,3 +2265,14 @@ const getAssociatedAssessmentQuestion = async (req, res) => {
   }
 };
 module.exports.getAssociatedAssessmentQuestion = getAssociatedAssessmentQuestion;
+
+const isDraftAssessment = async (assessment_id) => {
+  let err, assessmentData;
+  try {
+    [err, assessmentData] = await to(assessments.findByPk(assessment_id));
+    if(!assessmentData) { TE("Assessment not found"); }
+    return assessmentData.status == 'DRAFT' ? true : false;
+  } catch (err) {
+    TE(err);
+  }
+}
