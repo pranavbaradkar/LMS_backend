@@ -12,6 +12,7 @@ const Op = Sequelize.Op;
 var _ = require('underscore');
 const axios = require('axios');
 const PSYCHOMETRIC_SKILL_ID = process.env.PSYCHOMETRIC_SKILL_ID || 48;
+const CORE_SKILL_ID = process.env.CORE_SKILL_ID || 45;
 
 
 assessment_questions.belongsTo(assessments, { foreignKey: "assessment_id" });
@@ -33,6 +34,7 @@ assessments.belongsTo(campaign_assessments, { foreignKey: "id", targetKey: "asse
 
 assessments.hasMany(user_assessments, { foreignKey: "assessment_id" });
 
+assessment_configurations.hasMany(assessment_questions, { foreignKey: "assessment_id", sourceKey: 'assessment_id' });
 assessment_configurations.belongsTo(assessments, { foreignKey: 'assessment_id' });
 assessment_configurations.belongsTo(levels, { foreignKey: 'level_id' });
 assessment_configurations.hasMany(user_assessments, {  sourceKey: 'assessment_id', foreignKey: "assessment_id" });
@@ -2126,3 +2128,124 @@ const replaceAssessmentQuestion = async (req,res) => {
   }
 };
 module.exports.replaceAssessmentQuestion = replaceAssessmentQuestion;
+
+const getAssociatedAssessmentQuestion = async (req, res) => {
+  let err, questionData;
+  if(req.params && (req.params.assessment_id == undefined)) {
+    return ReE(res, { message: "assessment_id is required." }, 422);
+  }
+  try {
+    [err, questionData] = await to(assessment_configurations.findOne({
+      where: { assessment_id: req.params.assessment_id },
+      include: [
+        {
+          model: assessment_questions, 
+          attributes: ['question_id'],
+          include: [
+            {
+              model: questions, attributes: { exclude: ['created_at', 'updated_at', 'deleted_at', ]},
+              include:[
+                {
+                  model: question_options, 
+                  attributes: { exclude: ['created_at', 'updated_at', 'deleted_at', ]},
+                },
+                { model: skills, attributes: ['name'] },
+                { model: levels, attributes: ['name'] },
+                { model: subjects, attributes: ['name'] },
+              ]
+            },
+            {
+              model: psy_questions, attributes: { exclude: ['created_at', 'updated_at', 'deleted_at', ]},
+              include:[
+                {
+                  model: psy_question_options,
+                  attributes: { exclude: ['created_at', 'updated_at', 'deleted_at', ]},
+                },
+                { model: skills, attributes: ['name'] },
+                { model: levels, attributes: ['name'] },
+              ]
+            },
+          ],
+        }
+      ]
+    }));
+    if(err) return ReE(res, err, 422);
+
+    let finalData = questionData.get({plain: true});
+    let skill_ids = [], skillNoOfQuestionMap = {}, skillSubjectMaps = {}, subjectIds = [];
+    // console.log(JSON.parse(JSON.stringify(questionData.skill_distributions)));
+    finalData.skill_distributions.map(skillObj => {
+      skill_ids.push(skillObj.skill_id);
+      skillNoOfQuestionMap[skillObj.skill_id] = skillObj.no_of_questions;
+      skillSubjectMaps[skillObj.skill_id]= skillObj.subject_ids ? skillObj.subject_ids : null;
+      if(skillObj.subject_ids) {
+        subjectIds = skillObj.subject_ids.map(sub => sub.subject_id);
+      }
+    });
+    [err, skillData] = await to(skills.findAll({ 
+      where: { id: {[Op.in]: skill_ids} },
+      attributes: ['id', 'name']
+    }));
+    // console.log("Skill Data",JSON.parse(JSON.stringify(skillData)));
+    let skillMap = {}, skillwiseQuestions = {}, skillQuestions = {}, questionFilter = {};
+    skillData.map(obj => { 
+      skillMap[obj.id]                          = obj.name; 
+      skillwiseQuestions[obj.name]              = [];
+      skillQuestions[obj.name]                  = {};
+      skillQuestions[obj.name].questions        = [];
+      skillQuestions[obj.name].question_ids     = [];
+      skillQuestions[obj.name].no_of_questions  = skillNoOfQuestionMap[obj.id];
+      skillQuestions[obj.name].subjectIds       = skillSubjectMaps[obj.id];
+      
+      questionFilter[obj.name]                  = {};
+    } );
+    finalData.skillMap = skillMap;
+    
+    // console.log("the subject ids ",subjectIds);
+    console.log("skillQuestions",skillQuestions);
+    let questionIds = [];
+    // set assessment questions
+    finalData.assessment_questions.map((row, i) => {
+      // if(i==2)
+      // console.log("question oBJ ",JSON.parse(JSON.stringify(row)));
+      // console.log("the skill now ",skill, skillQuestions[skill]);
+      questionIds.push(row.question_id);
+      let filterObj = {};
+      filterObj.bloom           = row.question.blooms_taxonomy;
+      filterObj.complex         = row.question.complexity_level;
+      filterObj.level_id        = row.question.level_id;
+      filterObj.limit           = 2;// FIXME: what is limit here?
+      if(row.question.skill_id == CORE_SKILL_ID){
+        filterObj.grade_id        = row.question.grade_id;
+        filterObj.subject_ids     = subjectIds;
+      }
+      let filterCode = `${filterObj.bloom}${filterObj.complex}${filterObj.grade_id}${filterObj.level_id}`;
+      
+      let skill = skillMap[row.question.skill_id];
+      skillQuestions[skill].questions.push(row);
+      skillQuestions[skill].question_ids.push(row.question_id);
+      skillQuestions[skill].id                  = row.question.skill_id;
+      skillQuestions[skill].name                = skill;
+      skillQuestions[skill].questions_count     = skillQuestions[skill].questions.length;
+      skillQuestions[skill].question_remaining  = [];
+      
+      questionFilter[skill][filterCode] = filterObj;
+    });
+    delete finalData.assessment_questions;
+    finalData.skill_questions = [];
+    Object.keys(skillQuestions).map(skill => {
+      skillQuestions[skill].filterData = Object.values(questionFilter[skill]);
+      finalData.skill_questions.push(skillQuestions[skill]);
+    });
+    finalData.question_ids      = questionIds;
+    finalData.total_questions   = questionIds.length;
+
+    // console.log("skill question filter ", questionFilter);
+
+    
+    return ReS(res, { data: finalData  }, 200);
+  } catch (err) {
+    return ReE(res, err, 422);
+  }
+};
+module.exports.getAssociatedAssessmentQuestion = getAssociatedAssessmentQuestion;
