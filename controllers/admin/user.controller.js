@@ -1520,6 +1520,11 @@ const getUserDetails = async (req, res)=> {
               as: 'interview_feedback',
               attributes: ["about_candidate","candidate_past","ctc_current","ctc_expected","teaching_grades","teaching_boards","confidence_score","appearence_score","interview_notes","overall_rating","offer_selection"],
               require: false,
+            },
+
+            {
+              model: interviewers,
+              require: false
             }
           ]
         },
@@ -1737,6 +1742,7 @@ const getUserInterview = async (req, res) => {
         attributes:["about_candidate","candidate_past","ctc_current", "ctc_expected","teaching_grades","teaching_boards","confidence_score","appearence_score","interview_notes","overall_rating","offer_selection"],
         // where: { assessment_id: req.params.assessment_id }
        }
+       
       ]
     }));
     if(err) return ReE(res, err, 422);
