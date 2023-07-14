@@ -693,7 +693,8 @@ const verifyOtp = async function (req, res) {
       logger.info("no validation check for this users")
     } else {
       console.log("existingOTP", existingOTP);
-      logger.info('existingOTP',{existingOTP: existingOTP });
+      console.log("getStats", otpCache.getStats());
+      logger.info('existingOTP',{existingOTP: existingOTP, statistics:  otpCache.getStats() });
       if(existingOTP == undefined) {
         return ReE(
           res,
