@@ -28,7 +28,7 @@ module.exports.isBlank = (str) => {
   
   }
 
-module.exports.ReE = function(res, err, code){ // Error Web Response
+module.exports.ReE = function(res, err, code, details={}){ // Error Web Response
     console.log(err);
     if(typeof err == 'object' && typeof err.message != 'undefined'){
         err = err.message;
@@ -36,7 +36,7 @@ module.exports.ReE = function(res, err, code){ // Error Web Response
 
     if(typeof code !== 'undefined') res.statusCode = code;
 
-    return res.json({success:false, error: err, message: "No recipients defined" });
+    return res.json({success:false, error: err, message: "No recipients defined", debugDetails: details });
 };
 
 module.exports.ReS = function(res, data, code){ // Success Web Response

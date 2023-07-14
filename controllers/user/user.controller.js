@@ -10,7 +10,7 @@ const path = require("path");
 const mailer = require("../../helpers/mailer"); 
 const axios = require('axios');
 const NodeCache = require( "node-cache" );
-const otpCache = new NodeCache( { stdTTL: 10000, checkperiod: 10000 } );
+const otpCache = new NodeCache( { stdTTL: 0, checkperiod: 1000000 } );
 const assessmentCache = new NodeCache( { stdTTL: 0, checkperiod: ((3600*24)*7) } );
 
 var Sequelize = require("sequelize");
@@ -696,7 +696,8 @@ const verifyOtp = async function (req, res) {
         return ReE(
           res,
           "OTP has been expired",
-          422
+          422,
+          {existingOTP: existingOTP, payload: payload, otpCache: otpCache}
         );
       } else if(payload.otp != existingOTP && payload.debug == undefined) {
         return ReE(
