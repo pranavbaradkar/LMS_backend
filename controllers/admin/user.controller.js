@@ -1715,6 +1715,11 @@ try {
   [err, interviewData] = await to(user_recommendations.update(urPayload, {where: {user_id: req.params.user_id } }));
   if(err) return ReE(res, err, 422);
 
+  //send mail to school hr
+  let subject = "Interview Feedback";
+  let email_to = "kanhailal2010@gmail.com";
+  await sendMailToHr(subject, email_to);
+
   return ReS(res, {data: interviewData}, 200);
 } catch (err) {
   return ReE(res, err, 422)  ;
@@ -1722,6 +1727,33 @@ try {
 
 }
 module.exports.userInterviewFeedback = userInterviewFeedback;
+
+const sendMailToHr = async (subject, email_to) => {
+  parameters = { name: 'HrName' };
+  let html = await ejs.render(
+    fs.readFileSync(__dirname + `/../../views/interview.ejs`).toString(),
+    parameters
+  );
+  
+  if(email_to) {
+    try {
+      let mailObject = { to: email_to , subject: subject, html: html, attachments: [
+        {
+          filename: 'sample.pdf',
+          path: __dirname + `/../../public/assets/sample.pdf`,
+          contentType: 'application/pdf'
+        }
+      ]};
+      let response = await mailer.sendWithAttachment(mailObject);
+      // console.log("mail reponse", response);
+      return true;
+    } catch(err) {
+      throw new Error('Error sending Email not sent', err);
+    }
+  } else {
+    throw new Error('Email not found');
+  }
+}
 
 const getUserInterview = async (req, res) => {
   let err, interviewData;
