@@ -697,13 +697,14 @@ const verifyOtp = async function (req, res) {
           res,
           "OTP has been expired",
           422,
-          {existingOTP: existingOTP, payload: payload, otpCache: otpCache}
+          {existingOTP: true, payload: payload}
         );
       } else if(payload.otp != existingOTP && payload.debug == undefined) {
         return ReE(
           res,
           "invalid otp",
-          422
+          422,
+          {existingOTP: true}
         );
       }
     }
