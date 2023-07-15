@@ -11,7 +11,7 @@ var Sequelize = require("sequelize");
 const Op = Sequelize.Op;
 var _ = require('underscore');
 const axios = require('axios');
-const psychometric_skill_id = process.env.PSYCHOMETRIC_SKILL_ID || 48;
+const PSYCHOMETRIC_SKILL_ID = process.env.PSYCHOMETRIC_SKILL_ID || 48;
 
 
 assessment_questions.belongsTo(assessments, { foreignKey: "assessment_id" });
@@ -1669,7 +1669,7 @@ const saveToDbAndMail = async(resultPayload) => {
         if(resultPayload.user_results[ele.user_id] == 'PASSED')
           sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
       }
-      else {
+      else if(resultPayload.req_query && resultPayload.req_query.send_mail) {
         sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
       }
     })
@@ -1796,13 +1796,18 @@ const calculateFinalScores = async (userSkillScores, assessmentConfigData, skill
       isPsychoPass = userSkill.Psychometric < 57 ? false : true ;
       console.log(user, " has passed psychometric ? ",  isPsychoPass);
 
+      isPedaPass = skillPercent.Pedagogy < 5 ? false : true;
+
       // TODO: pyschometric key 
+      // remove psychometric from config Percent Passing criteria
       if(skillPercent.Psychometric) { delete skillPercent.Psychometric; }
+      // remove Pedagogy from config Percent Passing criteria
+      if(skillPercent.Pedagogy) { delete skillPercent.Pedagogy; }
       // console.log("skill percent ",skillPercent);
 
       // Check if user has scored more than passing_criteria in every subject
       const isPassed = Object.values(skillPercent).every(score => parseInt(score) > assessmentConfigData.passing_criteria);
-      result = (isPassed && isPsychoPass) ? 'PASSED' : 'FAILED';
+      result = (isPassed && isPsychoPass && isPedaPass) ? 'PASSED' : 'FAILED';
     }
     userResult[user] = result;
     userPercentile[user] = percentile;
@@ -1822,7 +1827,7 @@ const calculateAssessmentTotal = (assessmentConfig) => {
     // if(ele.skill_id == 45) { // Core skill
     //   total += ele.no_of_questions;
     // }
-    if(ele.skill_id == psychometric_skill_id) {// Psychometric 
+    if(ele.skill_id == PSYCHOMETRIC_SKILL_ID) {// Psychometric 
       // total += (ele.no_of_questions*4);
     }
     else {
