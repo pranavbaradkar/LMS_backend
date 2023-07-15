@@ -1167,12 +1167,13 @@ const importPsychometry = async (req, res) => {
   let topicSet = new Set();
 
   
-  excelData.forEach(obj => {
+  excelData.forEach((obj,i) => {
     // let key_code = String.fromCharCode(66).toLowerCase(); // Generate A,B,C,D
     // let excelRow = excelData[0];
     // let rowCode = `option_${key_code}`;
     // let a = excelRow[`option_${key_code}`];
     // console.log("the rowcode and value ", rowCode, a);
+    // console.log("the obj value at line ", i, JSON.parse(JSON.stringify(obj)));
     
     // return ReE(res, "working ", 422);
     let subCode = obj.sub_strand.replace(/ /g, "_").toLowerCase();
@@ -1312,7 +1313,7 @@ const importPsychometry = async (req, res) => {
   });
   // console.log("question payload ", questionPayload);
   // insert questions 
-  let questionData, optionsPayload=[];
+  let questionData, optionsPayload=[], insertedQuestionCount=0;
   [err, questionData] = await to(psy_questions.bulkCreate(questionPayload).then(rows=>{
     rows.forEach((row, index)=> {
       // console.log(row.id);
@@ -1328,6 +1329,7 @@ const importPsychometry = async (req, res) => {
         };
         optionsPayload.push(obj);
       }
+      insertedQuestionCount++;
     });
   }));
   if(err) { return ReE(res, err, 422); }
@@ -1338,6 +1340,6 @@ const importPsychometry = async (req, res) => {
   [err, optionsData] = await to(psy_question_options.bulkCreate(optionsPayload));
   if(err) { return ReE(res, err, 422); }
 
-  return ReS(res, {data: excelData}, 200);
+  return ReS(res, {data: {row_read: excelData.length, inserted: insertedQuestionCount, excelDataFile: excelData} }, 200);
 }
 module.exports.importPsychometry = importPsychometry;
