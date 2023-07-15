@@ -1491,7 +1491,7 @@ const getUserDetails = async (req, res)=> {
         },
         { 
           model: assessment_results, 
-          attributes: ["id", "assessment_id", "percentile", "type", "result", "skill_scores", "subject_scores","total_scored", "total"],
+          attributes: ["id", "assessment_id", "percentile", "type", "result", "skill_scores", "subject_scores","total_scored", "total", "skill_total"],
           include: [
             { 
               model: model.assessments,
