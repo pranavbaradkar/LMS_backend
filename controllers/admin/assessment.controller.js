@@ -1682,10 +1682,11 @@ const saveToDbAndMail = async(resultPayload) => {
       // console.log(`user ${ele.user_id} is `,resultPayload.user_results[ele.user_id]);
       if(resultPayload.req_query && resultPayload.req_query.mail_passed_only && resultPayload.req_query.mail_passed_only == 1)
       {
-        if(resultPayload.user_results[ele.user_id] == 'PASSED')
+        if(resultPayload.user_results[ele.user_id] == 'PASSED'){
           sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
+        }
       }
-      else {
+      else if(resultPayload.req_query && resultPayload.req_query.send_mail && resultPayload.req_query.send_mail == 1) {
         sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
       }
     })
@@ -1812,13 +1813,18 @@ const calculateFinalScores = async (userSkillScores, assessmentConfigData, skill
       isPsychoPass = userSkill.Psychometric < 57 ? false : true ;
       console.log(user, " has passed psychometric ? ",  isPsychoPass);
 
+      isPedaPass = skillPercent.Pedagogy < 5 ? false : true;
+
       // TODO: pyschometric key 
+      // remove psychometric from config Percent Passing criteria
       if(skillPercent.Psychometric) { delete skillPercent.Psychometric; }
+      // remove Pedagogy from config Percent Passing criteria
+      if(skillPercent.Pedagogy) { delete skillPercent.Pedagogy; }
       // console.log("skill percent ",skillPercent);
 
       // Check if user has scored more than passing_criteria in every subject
       const isPassed = Object.values(skillPercent).every(score => parseInt(score) > assessmentConfigData.passing_criteria);
-      result = (isPassed && isPsychoPass) ? 'PASSED' : 'FAILED';
+      result = (isPassed && isPsychoPass && isPedaPass) ? 'PASSED' : 'FAILED';
     }
     userResult[user] = result;
     userPercentile[user] = percentile;
