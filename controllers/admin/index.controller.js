@@ -48,7 +48,10 @@ module.exports.create = create;
 
 const get = async function (req, res) {
   let admin = req.user;
-  return ReS(res, { admin: admin.toWeb() });
+  let adminData = admin.toWeb();
+  [err, roleInfo] = await to(roles.findOne({ where: { id: adminData.role_id }, raw: true }));
+  adminData.roles = roleInfo; 
+  return ReS(res, { admin: adminData });
 };
 module.exports.get = get;
 
@@ -171,10 +174,8 @@ module.exports.getRoleUser = getRoleUser;
 
 const updateRoleUser = async function (req, res) {
   let payloadBody = req.body;
-  let payload = {};
-  for (const val in payloadBody) {
-    payload[toSnakeCase(val)] = payloadBody[val];
-  }
+  let payload = req.body;
+  
   if (_.isEmpty(req.params.user_id) || _.isUndefined(req.params.user_id)) {
     return ReE(res, "User id required in params", 422);
   }
@@ -182,7 +183,8 @@ const updateRoleUser = async function (req, res) {
   if (_.isEmpty(user)) {
     return ReE(res, "User not found", 404);
   }
-  if (payload.email && user.email !== payload.email) {
+  console.log(user.email, payload.email);
+  if (payload.email && user.email === payload.email) {
     [err, userData] = await to(admins.findOne({ where: { email: payload.email } }));
     if (userData != null) {
       return ReE(res, "User already exist with email.", 422);
