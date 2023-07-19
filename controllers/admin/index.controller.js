@@ -191,7 +191,7 @@ const updateRoleUser = async function (req, res) {
     }
   } else {
     try {
-      [err, user] = await to(admins.update(payload, { where: { id: req.params.user_id } }));
+      [err, user] = await to(admins.update(payload, { where: { id: req.params.user_id }, individualHooks: true }));
       if (err) return ReE(res, err, 422);
       [err, user] = await to(admins.findOne({ where: { id: req.params.user_id } }));
       return ReS(res, { data: user }, 200);

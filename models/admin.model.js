@@ -40,6 +40,20 @@ module.exports = (sequelize, DataTypes) => {
     }
   });
 
+  // Model.beforeUpdate(async (user, options) => {
+  //   let err;
+  //   if (user.changed("password")) {
+  //     let salt, hash;
+  //     [err, salt] = await to(bcrypt.genSalt(10));
+  //     if (err) TE(err.message, true);
+
+  //     [err, hash] = await to(bcrypt.hash(user.password, salt));
+  //     if (err) TE(err.message, true);
+
+  //     user.password = hash;
+  //   }
+  // });
+
   Model.prototype.comparePassword = async function(pw) {
     let err, pass;
     if (!this.password) TE("password not set");
