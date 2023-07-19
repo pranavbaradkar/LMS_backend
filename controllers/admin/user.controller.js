@@ -8,7 +8,7 @@ const fs = require("fs");
 const mailer = require("../../helpers/mailer");
 const readXlsxFile = require('read-excel-file/node')
 const path = require("path");
-
+const pdf = require('html-pdf');
 var Sequelize = require("sequelize");
 const Op = Sequelize.Op;
 
@@ -1718,15 +1718,80 @@ try {
   //send mail to school hr
   let subject = "Interview Feedback";
   let email_to = "kanhailal2010@gmail.com";
-  await sendMailToHr(subject, email_to);
+  // await sendMailToHr(subject, email_to);
 
-  return ReS(res, {data: interviewData}, 200);
+  // generate pdf
+  let pdfData = { 
+    school_name: 'Vibgyor Dadar',
+    scores: '80/100',
+  };
+  [err, userData] = await to(users.findOne({
+    where: {id: req.params.user_id },
+    attributes:['first_name', 'middle_name', 'last_name', 'full_name', 'email'],
+    include:[
+      { model: assessment_results}
+    ]
+  }));
+  if(err) return ReE(res, err, 422);
+
+  if(userData && userData.length) {
+    pdfData.name = userData.full_name;
+    pdfData.email = userData.email;
+  }
+  await generateFeedbackPdf(pdfData);
+
+  return ReS(res, {data: userData}, 200);
 } catch (err) {
   return ReE(res, err, 422)  ;
 }
 
 }
 module.exports.userInterviewFeedback = userInterviewFeedback;
+
+const generateFeedbackPdf = async (pdfData) => {
+  try {
+    let localPath = __dirname + `/../..`;
+    // const filePathName = path.resolve(__dirname, 'htmltopdf.ejs');
+    //     const htmlString = fs.readFileSync(filePathName).toString();
+    //     let  options = { format: 'Letter' };
+    
+    let html = fs.readFileSync(`${localPath}/views/interview-feedback-pdf.ejs`).toString();
+    const ejsData = ejs.render(html, pdfData);
+    // console.log(`The HTML is ${html}`);
+    var options = {
+      // Export options
+      "directory": `${localPath}/public/files`,       // The directory the file gets written into if not using .toFile(filename, callback). default: '/tmp'
+      // "height": "11.7in",        // allowed units: mm, cm, in, px
+      // "width": "9.3in",            // allowed units: mm, cm, in, px
+      "width": "732px",
+      "height" : "1000px",
+      // "format": "A4",        // allowed units: A3, A4, A5, Legal, Letter, Tabloid
+
+      // "orientation": "portrait", // portrait or landscape
+      // Page options
+      "border": "0",             // default is 0, units: mm, cm, in, px
+    };
+    
+    pdf.create(ejsData, options).toFile(`${localPath}/public/files/interview_feedback.pdf`, function(err, res) {
+      if (err) return console.log(err);
+      console.log(res); // { filename: '/app/businesscard.pdf' }
+    });
+
+    // await htmlToPdf.convertHTMLFile(html, `${localPath}/public/files/interview_feedback.pdf`,
+    // function (error, success) {
+    //    if (error) {
+    //         console.log('Oh noes! Errorz!');
+    //         console.log(error);
+    //     } else {
+    //         console.log('Woot! Success!');
+    //         console.log(success);
+    //     }
+    //   }
+    // );
+  } catch (err) {
+    TE(err);
+  }
+};
 
 const sendMailToHr = async (subject, email_to) => {
   parameters = { name: 'HrName' };
@@ -1875,6 +1940,7 @@ const getSingleInterestedSchoolId = async (user_id) => {
       { model: user_teaching_interests, as:'teaching_interests' },
     ]
   }));
+  // console.log("userdata teaching interest",userData.teaching_interests);
   userSchoolIds = [142];
   if(userData) {
     userSchoolIds = userData.teaching_interests.school_ids ? userData.teaching_interests.school_ids : userSchoolIds;
@@ -1913,7 +1979,7 @@ const getInterviewerDetails = async (user_id, schoolId) => {
   }
   else { 
     //TODO: set a default interviwer
-    return TE(`Interview data for school id ${schoolId} not found`);
+    return TE(`School data for school_id ${schoolId} not found`);
    }
 }
 

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Browser</title>
+</head>
+
+<!-- <body style="display: flex; flex-direction: column; justify-content: space-between; align-self: center; color: #000; font-family: Calibri; align-items: center;"> -->
+<body style="width: 732px; margin: 0 auto;">
+        
+  <table style="width:100%; background-color: #E7E9EA; padding: 24px; padding-bottom: 2px;">
+    <tr>
+      <td style="width:75%;">
+        <div style="font-size: 24px; font-weight: 300;">Smart Staff Selection</div>
+        <div style="font-size: 47px; font-style: normal; font-weight: 700; line-height: 0.8;">User Report</div>
+      </td>
+      <td><img style="width: 192px; height: 53px;" src="https://smartstaff.staging.hubblehox.ai/img/logo.abdba3ff.svg"></td>
+    </tr>
+  </table>
+  <!-- user data -->
+  <table style="width:100%; background-color: #F1F2F2; padding: 24px; border-bottom: 2px solid #C7C8CA;">
+    <tr>
+      <td rowspan="2" style="width: 520px;color: #3D366A; font-size: 26px; font-weight: 700;">USER DATA</td>
+    </tr>
+    <tr>
+        <td width="100">
+          <div style="border-radius: 6px; padding:6px 8px; border: 0.8px solid #39B54A; background: linear-gradient(0deg, #CBE5C5 0%, #CBE5C5 100%), #D9D9D9; display: flex; flex-direction: row; font-size: 17.763px; font-style: normal; font-weight: 400;">
+              <span style="display: inline-block; border-radius: 4px; margin: 2px 4px 2px 0; background: #39B54A; width: 17px; height: 17px;"></span>
+                Passed
+            </div>
+        </td>
+    </tr>
+    <tr>
+      <td colspan="2" style="margin-top: 8px; font-size: 20px;">Name: <%= name %></td>
+    </tr>
+    <tr>
+      <td colspan="2" style="margin-top: 8px; font-size: 20px;">Email: <%= email %></td>
+    </tr>
+    <tr>
+      <td colspan="2" style="margin-top: 8px; font-size: 20px;">School name: <%= school_name %></td>
+    </tr>
+  </table>
+  <!-- screening -->
+  <table style="width:100%; background-color: #F1F2F2; padding: 24px 24px 0;">
+    <tr>
+      <td rowspan="2" style="width:400px; color: #3D366A; font-size: 26px; font-weight: 700;">SCREENING</td>
+      <td style="width: 120px;text-align: center;"> Score </td>
+      <td style="width: 100px;text-align: center;">Status</td>
+    </tr>
+    <tr>
+      <td style="font-size: 15px; height: 30px; border-radius: 6px; background: #fff; padding:2px 8px; text-align: center;">
+        <%= scores %>
+      </td>
+      <td>
+        <div style="border-radius: 6px; padding:6px 8px; border: 0.8px solid #39B54A; background: linear-gradient(0deg, #CBE5C5 0%, #CBE5C5 100%), #D9D9D9; display: flex; flex-direction: row; font-size: 17.763px; font-style: normal; font-weight: 400;">
+          <span style="display: inline-block; border-radius: 4px; margin: 2px 4px 2px 0; background: #39B54A; width: 17px; height: 17px;"></span>
+          Passed
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2" style="font-size: 20px; margin-top: 8px;">Foundational English</td>
+    </tr>
+  </table>
+  <!-- screening subject scores -->
+  <table style="width:100%; background-color: #F1F2F2; padding: 0 24px 24px; border-bottom: 2px solid #C7C8CA;">
+    <tr>
+      <td>
+        <div style="font-size: 15px; border-radius: 6px; background: #fff; padding: 6px 8px;"> Core Skill - English .......... /.........</div>
+      </td>
+      <td>
+        <div style="font-size: 15px; border-radius: 6px; background: #fff; padding: 6px 8px;">Communication Skill .......... /.........</div>
+      </td>
+    </tr>
+  </table>
+  <!-- mains -->
+  <table style="width:100%; background-color: #F1F2F2; padding: 24px 24px 0;">
+    <tr>
+      <td style="width:90%;color: #3D366A; font-size: 26px; font-weight: 700;">MAINS</td>
+      <td>
+        <div style="border-radius: 6px; padding: 8px; padding-bottom: 2px; padding-top: 2px; border: 0.8px solid #39B54A; background: linear-gradient(0deg, #CBE5C5 0%, #CBE5C5 100%), #D9D9D9; display: flex; flex-direction: row; font-size: 17.763px; font-style: normal; font-weight: 400;">
+          <span style="display: inline-block; border-radius: 4px; margin: 2px 4px 2px 0; background: #39B54A; width: 17px; height: 17px;"></span>
+          Passed
+        </div>
+      </td>
+    </tr>
+  </table>
+  <!-- mains Scores -->
+  <table style="width:100%; background-color: #F1F2F2; padding: 0 24px 24px; border-bottom: 2px solid #C7C8CA;">
+    <tr>
+      <td colspan="2" style="font-size: 20px; margin-top: 8px;">Foundational School English Mains</td>
+    </tr>
+    <tr>
+      <td>
+        <div style="font-size: 15px; border-radius: 6px; background: #fff; padding: 6px 8px;">Core Skill - Mathematics <span style="float:right">90/100</span></div>
+      </td>
+      <td>
+        <div style="font-size: 15px; border-radius: 6px; background: #fff; padding: 6px 8px;">Pedagogy  <span style="float:right">80/100</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <div style="font-size: 15px; border-radius: 6px; background: #fff; padding: 6px 8px;">Digital Literacy  <span style="float:right">80/100</span></div>
+      </td>
+      <td>
+        <div style="font-size: 15px; border-radius: 6px; background: #fff; padding: 6px 8px;">Communication Skills <span style="float:right">80/100</span></div>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <div style="font-size: 15px; border-radius: 6px; background: #fff; padding: 6px 8px;">Psychometric <span style="float:right">80/100</span></div>
+      </td>
+    </tr>
+  </table>
+  <!-- demo video -->
+  <table style="width:100%; background-color: #F1F2F2; padding: 24px 24px 0;">
+    <tr>
+      <td style="width:90%; color: #3D366A; font-size: 26px; font-weight: 700;">DEMO TOTAL SCORE</td>
+      <td>
+        <div style="border-radius: 6px; padding: 8px; padding-bottom: 2px; padding-top: 2px; border: 0.8px solid #39B54A; background: linear-gradient(0deg, #CBE5C5 0%, #CBE5C5 100%), #D9D9D9; display: flex; flex-direction: row; font-size: 17.763px; font-style: normal; font-weight: 400;">
+          <span style="display: inline-block; border-radius: 4px; margin: 2px 4px 2px 0; background: #39B54A; width: 17px; height: 17px;"></span>
+          Passed
+        </div>
+      </td>
+    </tr>
+  </table>
+  <!-- Demo Video Scores -->
+  <table style="width:100%; background-color: #F1F2F2; padding: 0 24px 24px; border-bottom: 2px solid #C7C8CA;">
+    <tr>
+      <td width="120">
+        <div style="margin-right: 8px; font-size: 20px; line-height: 20px;">Knowledge Score</div>
+      </td>
+      <td>
+        <div style="width: 45px; font-size: 15px; border-radius: 6px; background: #fff; padding: 6px 8px; text-align: center;">... /...</div>
+      </td>
+      <td style="width: 140px">
+      </td>
+      <td width="120">
+        <div style="margin-right: 8px; font-size: 20px; line-height: 20px;">Confidence Score</div>
+      </td>
+      <td>
+        <div style="width: 45px; font-size: 15px; border-radius: 6px; background: #fff; padding: 6px 8px; text-align: center;">... /...</div>
+      </td>
+      <td style="width: 140px">
+      </td>
+      <td width="120">
+        <div style="margin-right: 8px; font-size: 20px; line-height: 20px;">Fluency Score</div>
+      </td>
+      <td>
+        <div style="width: 45px; font-size: 15px; border-radius: 6px; background: #fff; padding: 6px 8px; text-align: center;">... /...</div>
+      </td>
+    </tr>
+  </table>
+  <!-- interview -->
+  <table style="width:100%; background-color: #F1F2F2; padding: 40px; padding-bottom: 28px; border-bottom: 2px solid #C7C8CA;">
+    <tr>
+      <td style="width:90%; color: #3D366A; font-size: 26px; font-weight: 700;">INTERVIEW</td>
+      <td>
+        <div style="border-radius: 6px; padding: 8px; padding-bottom: 2px; padding-top: 2px; border: 0.8px solid #39B54A; background: linear-gradient(0deg, #CBE5C5 0%, #CBE5C5 100%), #D9D9D9; display: flex; flex-direction: row; font-size: 17.763px; font-style: normal; font-weight: 400;">
+          <span style="display: inline-block; border-radius: 4px; margin: 2px 4px 2px 0; background: #39B54A; width: 17px; height: 17px;"></span>
+          SELECTED
+        </div>
+      </td>
+    </tr>
+  </table>
+  <footer style="background: #317FC1; padding: 8px;">
+    <table style="width:100%; display: flex; flex-direction: column; text-align: center;">
+      <tr>
+        <td style="color: #FFF; font-size: 20px; font-weight: 700;">HUBBLEHOX TECHNOLOGIES PVT. LTD.</td>
+      </tr>
+      <tr>
+        <td style="color: #FFF; font-size: 12px;">D-402, Lotus Corporate Park, Ram Mandir Road, Goregaon (E), Mumbai 400 063.</td>
+      </tr>
+    </table>
+  </footer>
+</body>
+</html>
+ 
