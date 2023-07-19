@@ -152,9 +152,14 @@ const getAllUserCampaigns = async function (req, res) {
 
  [err, usercount] = await to(users.count({}));
   console.log(usercount);
+  let userObj = {};
+  console.log(req.user);
+  if(req.user.role_type == 'USER') {
+    userObj = { user_id: req.user.id };
+  }
   try {
     [err, campaignData] = await to(campaigns.findAll({ 
-      where: { user_id: req.user.id },
+      where: userObj,
       include: [{
           model: campaign_assessments,
           require: false,
