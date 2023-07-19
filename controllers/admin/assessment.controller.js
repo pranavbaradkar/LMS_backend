@@ -12,6 +12,7 @@ const Op = Sequelize.Op;
 var _ = require('underscore');
 const axios = require('axios');
 const PSYCHOMETRIC_SKILL_ID = process.env.PSYCHOMETRIC_SKILL_ID || 48;
+const CORE_SKILL_ID = process.env.CORE_SKILL_ID || 45;
 
 
 assessment_questions.belongsTo(assessments, { foreignKey: "assessment_id" });
@@ -33,6 +34,7 @@ assessments.belongsTo(campaign_assessments, { foreignKey: "id", targetKey: "asse
 
 assessments.hasMany(user_assessments, { foreignKey: "assessment_id" });
 
+assessment_configurations.hasMany(assessment_questions, { foreignKey: "assessment_id", sourceKey: 'assessment_id' });
 assessment_configurations.belongsTo(assessments, { foreignKey: 'assessment_id' });
 assessment_configurations.belongsTo(levels, { foreignKey: 'level_id' });
 assessment_configurations.hasMany(user_assessments, {  sourceKey: 'assessment_id', foreignKey: "assessment_id" });
@@ -263,8 +265,11 @@ const updateAssessment = async function (req, res) {
         return newObject1;
       }) : [];
       let assessmentQueVar = screenObject.concat(mainsObject);
+
       //soft delete old Assessment_questions
-      [err, oldAssessmentQuestionData] = await to(assessment_questions.destroy({ where: {assessment_id: req.params.assessment_id} }));
+      if(assessmentQueVar.length){
+        [err, oldAssessmentQuestionData] = await to(assessment_questions.destroy({ where: {assessment_id: req.params.assessment_id} }));
+      }  
       [err, assessmentQuestionData] = await to(assessment_questions.bulkCreate(assessmentQueVar));
      
       let plainAssessmentData  = assessmentData.get({plain: true});
@@ -388,6 +393,15 @@ const getAssessmentConfigurationQuestions = async function (req, res) {
   let payload = req.body;
   payload.assessment_id = parseInt(req.params.assessment_id);
   try {
+      //if assessment is in draft status fetch already assigned questions
+      if(await isDraftAssessment(req.params.assessment_id)) {
+        console.log("======================= This is draft assessment");
+        return await getAssociatedAssessmentQuestion(req, res);
+      }
+  
+      console.log("=========================== This is not a draft assessment");
+      // if assessment is not in draft status
+
     let type = req.params.assessment_type.toUpperCase();
     let assessment_id = parseInt(req.params.assessment_id);
     [err, assessment_configurations_data] = await to(assessment_configurations.findOne({ where :{ assessment_id: assessment_id, assessment_type: type}, raw: true }));
@@ -1668,10 +1682,11 @@ const saveToDbAndMail = async(resultPayload) => {
       // console.log(`user ${ele.user_id} is `,resultPayload.user_results[ele.user_id]);
       if(resultPayload.req_query && resultPayload.req_query.mail_passed_only && resultPayload.req_query.mail_passed_only == 1)
       {
-        if(resultPayload.user_results[ele.user_id] == 'PASSED')
+        if(resultPayload.user_results[ele.user_id] == 'PASSED'){
           sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
+        }
       }
-      else {
+      else if(resultPayload.req_query && resultPayload.req_query.send_mail && resultPayload.req_query.send_mail == 1) {
         sendResultMail(resultPayload.user_info[ele.user_id], resultLink, subject);
       }
     })
@@ -1798,13 +1813,18 @@ const calculateFinalScores = async (userSkillScores, assessmentConfigData, skill
       isPsychoPass = userSkill.Psychometric < 57 ? false : true ;
       console.log(user, " has passed psychometric ? ",  isPsychoPass);
 
+      isPedaPass = skillPercent.Pedagogy < 5 ? false : true;
+
       // TODO: pyschometric key 
+      // remove psychometric from config Percent Passing criteria
       if(skillPercent.Psychometric) { delete skillPercent.Psychometric; }
+      // remove Pedagogy from config Percent Passing criteria
+      if(skillPercent.Pedagogy) { delete skillPercent.Pedagogy; }
       // console.log("skill percent ",skillPercent);
 
       // Check if user has scored more than passing_criteria in every subject
       const isPassed = Object.values(skillPercent).every(score => parseInt(score) > assessmentConfigData.passing_criteria);
-      result = (isPassed && isPsychoPass) ? 'PASSED' : 'FAILED';
+      result = (isPassed && isPsychoPass && isPedaPass) ? 'PASSED' : 'FAILED';
     }
     userResult[user] = result;
     userPercentile[user] = percentile;
@@ -2126,3 +2146,144 @@ const replaceAssessmentQuestion = async (req,res) => {
   }
 };
 module.exports.replaceAssessmentQuestion = replaceAssessmentQuestion;
+
+const getAssociatedAssessmentQuestion = async (req, res) => {
+  let err, questionData;
+  if(req.params && (req.params.assessment_id == undefined)) {
+    return ReE(res, { message: "assessment_id is required." }, 422);
+  }
+  try {
+    [err, questionData] = await to(assessment_configurations.findOne({
+      where: { assessment_id: req.params.assessment_id },
+      include: [
+        {
+          model: assessment_questions, 
+          attributes: ['question_id'],
+          include: [
+            {
+              model: questions, attributes: { exclude: ['created_at', 'updated_at', 'deleted_at', ]},
+              include:[
+                {
+                  model: question_options, 
+                  attributes: ['id', 'option_key', 'option_value', 'option_type', 'is_correct', 'correct_answer'],
+                },
+                { model: skills, attributes: ['name'] },
+                { model: levels, attributes: ['name'] },
+                { model: subjects, attributes: ['name'] },
+              ]
+            },
+            {
+              model: psy_questions, 
+              attributes: ["id", "skill_id", "set_number", "score_type", "level_id", "grade_id", "question_type", "statement", "hint", "s3url", "mime_type"],
+              include:[
+                {
+                  model: psy_question_options,
+                  // attributes: ['id', 'option_key', 'option_value','score_value'],
+                },
+                { model: skills, attributes: ['name'] },
+                { model: levels, attributes: ['name'] },
+              ]
+            },
+          ],
+        }
+      ]
+    }));
+    if(err) return ReE(res, err, 422);
+
+    let finalData = questionData.get({plain: true});
+    let skill_ids = [], skillNoOfQuestionMap = {}, skillSubjectMaps = {}, subjectIds = [];
+    // console.log(JSON.parse(JSON.stringify(questionData.skill_distributions)));
+    finalData.skill_distributions.map(skillObj => {
+      skill_ids.push(skillObj.skill_id);
+      skillNoOfQuestionMap[skillObj.skill_id] = skillObj.no_of_questions;
+      skillSubjectMaps[skillObj.skill_id]= skillObj.subject_ids ? skillObj.subject_ids : null;
+      if(skillObj.subject_ids) {
+        subjectIds = skillObj.subject_ids.map(sub => sub.subject_id);
+      }
+    });
+    [err, skillData] = await to(skills.findAll({ 
+      where: { id: {[Op.in]: skill_ids} },
+      attributes: ['id', 'name']
+    }));
+    // console.log("Skill Data",JSON.parse(JSON.stringify(skillData)));
+    let skillMap = {}, skillwiseQuestions = {}, skillQuestions = {}, questionFilter = {};
+    skillData.map(obj => { 
+      skillMap[obj.id]                          = obj.name; 
+      skillwiseQuestions[obj.name]              = [];
+      skillQuestions[obj.name]                  = {};
+      skillQuestions[obj.name].id               = obj.id;
+      skillQuestions[obj.name].name             = obj.name;
+      skillQuestions[obj.name].questions        = [];
+      skillQuestions[obj.name].question_ids     = [];
+      skillQuestions[obj.name].no_of_questions  = skillNoOfQuestionMap[obj.id];
+      skillQuestions[obj.name].subjectIds       = skillSubjectMaps[obj.id];
+      
+      questionFilter[obj.name]                  = {};
+    } );
+    finalData.skillMap = skillMap;
+    
+    // console.log("the subject ids ",subjectIds);
+    console.log("skillQuestions",skillQuestions);
+    let questionIds = [];
+    // set assessment questions
+    finalData.assessment_questions.map((row, i) => {
+      // if(i==2)
+      // console.log("question oBJ ",JSON.parse(JSON.stringify(row)));
+      // console.log("the skill now ",skill, skillQuestions[skill]);
+      // console.log(" the question ", row.question_id, row.question);
+
+      // check for psychometric question;
+      let question  = row.question ? row.question : row.psy_question;
+
+      questionIds.push(row.question_id);
+      let filterObj = {};
+      // if(question.skill_id !== PSYCHOMETRIC_SKILL_ID)
+        filterObj.bloom           = question.blooms_taxonomy;
+
+      filterObj.complex         = question.complexity_level;
+      filterObj.level_id        = question.level_id;
+      if(question.skill_id == CORE_SKILL_ID){
+        filterObj.grade_id        = question.grade_id;
+        filterObj.subject_ids     = subjectIds;
+      }
+      let filterCode = `${filterObj.bloom}${filterObj.complex}${filterObj.grade_id}${filterObj.level_id}`;
+      
+      let skill = skillMap[question.skill_id];
+      skillQuestions[skill].questions.push(question);
+      skillQuestions[skill].question_ids.push(row.question_id);
+      skillQuestions[skill].id                  = question.skill_id;
+      skillQuestions[skill].name                = skill;
+      skillQuestions[skill].questions_count     = skillQuestions[skill].questions.length;
+      skillQuestions[skill].question_remaining  = [];
+      
+      questionFilter[skill][filterCode] = filterObj;
+    });
+    delete finalData.assessment_questions;
+    finalData.skill_questions = [];
+    Object.keys(skillQuestions).map(skill => {
+      skillQuestions[skill].filterData = Object.values(questionFilter[skill]);
+      finalData.skill_questions.push(skillQuestions[skill]);
+    });
+    finalData.question_ids      = questionIds;
+    finalData.total_questions   = questionIds.length;
+
+    // console.log("skill question filter ", questionFilter);
+
+    
+    return ReS(res, { data: finalData  }, 200);
+  } catch (err) {
+    return ReE(res, err, 422);
+  }
+};
+module.exports.getAssociatedAssessmentQuestion = getAssociatedAssessmentQuestion;
+
+const isDraftAssessment = async (assessment_id) => {
+  let err, assessmentData;
+  try {
+    [err, assessmentData] = await to(assessments.findByPk(assessment_id));
+    if(!assessmentData) { TE("Assessment not found"); }
+    return assessmentData.status == 'DRAFT' ? true : false;
+  } catch (err) {
+    TE(err);
+  }
+}

@@ -1,7 +1,7 @@
 const { users, countries, states, user_assessment_slots, districts, cities, talukas, academics, professional_infos, user_communications, user_assessments, user_teaching_interests,levels,schools, boards, subjects } = require("../../models");
 const authService = require("../../services/auth.service");
 const assessmentService = require("../../services/assessment.service");
-const { to, ReE, ReS, toSnakeCase, sendSMS, isBlank, validatePhoneNo } = require("../../services/util.service");
+const { to, ReE, ReS, toSnakeCase,logger, sendSMS, isBlank, validatePhoneNo } = require("../../services/util.service");
 var moment = require("moment");
 var _ = require('underscore');
 var ejs = require("ejs");
@@ -10,8 +10,16 @@ const path = require("path");
 const mailer = require("../../helpers/mailer"); 
 const axios = require('axios');
 const NodeCache = require( "node-cache" );
-const otpCache = new NodeCache( { stdTTL: 10000, checkperiod: 10000 } );
+const otpCache = new NodeCache( { stdTTL: 0, checkperiod: 1000000 } );
 const assessmentCache = new NodeCache( { stdTTL: 0, checkperiod: ((3600*24)*7) } );
+
+const Redis   = require('ioredis');
+const redis = new Redis({
+  host: process.env.REDIS_HOST,
+  port: process.env.REDIS_PORT,
+});
+
+
 
 var Sequelize = require("sequelize");
 const { response } = require("express");
@@ -630,6 +638,8 @@ const generateOtp = async function (req, res) {
       let parameters = { otp: payload.otp };
       if(payload.email == 'quality.assurance@vgos.org' || payload.email == 'quality.hobblehox@gmail.com') {
         success = otpCache.set(payload.email, payload.otp, 300 );
+        success = await redis.set(payload.email, payload.otp);
+        await redis.expire(payload.email, 300);
       } else {
         let html = ejs.render(
           fs.readFileSync(__dirname + `/../../views/otpTemplate.ejs`).toString(),
@@ -640,14 +650,20 @@ const generateOtp = async function (req, res) {
         let response = await mailer.send(payload.email, subject, html);
         console.log("test", response);
         success = otpCache.set(payload.email, payload.otp, 300 );
+        success = await redis.set(payload.email, payload.otp);
+        await redis.expire(payload.email, 300);
       }
     }
     if(payload.mobile) {
       if(payload.mobile == '0987654321') {
         success = otpCache.set(payload.mobile, payload.otp, 300 );
+        success = await redis.set(payload.mobile, payload.otp);
+        await redis.expire(payload.mobile, 300);
       } else {
        
         success = otpCache.set(payload.mobile, payload.otp, 300 );
+        success = await redis.set(payload.mobile, payload.otp);
+        await redis.expire(payload.mobile, 300); // 10 seconds
         let data = await sendSMS(payload.mobile, payload.otp);
         console.log(data);
       }
@@ -681,22 +697,24 @@ const verifyOtp = async function (req, res) {
 
     let existingOTP = null;
     if(payload.email) {
-      existingOTP = otpCache.get(payload.email);
+      existingOTP = await redis.get(payload.email);
     }
 
     if(payload.mobile) {
-      existingOTP = otpCache.get(payload.mobile);
+      existingOTP = await redis.get(payload.mobile);
     }
     
-
     if(payload.mobile == '0987654321' || ['quality.assurance@vgos.org', 'quality.hobblehox@gmail.com'].indexOf(payload.email) >= 0) {
-      console.log("no validation check for this users")
+      logger.info("no validation check for this users")
     } else {
+      console.log("existingOTP", existingOTP);
+      logger.info('existingOTP',{existingOTP: existingOTP, statistics:  otpCache.getStats() });
       if(existingOTP == undefined) {
         return ReE(
           res,
           "OTP has been expired",
-          422
+          422,
+          {payload: payload}
         );
       } else if(payload.otp != existingOTP && payload.debug == undefined) {
         return ReE(

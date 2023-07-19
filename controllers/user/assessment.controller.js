@@ -34,7 +34,7 @@ assessment_questions.belongsTo(psy_questions, { foreignKey: "question_id" });
 
 assessment_configurations.belongsTo(assessments, { foreignKey: "assessment_id" });
 
-user_assessments.belongsTo(assessment_configurations, { foreignKey: "assessment_id",  sourceKey: 'assessment_id' });
+user_assessments.belongsTo(assessment_configurations, { foreignKey: "assessment_id",  targetKey: 'assessment_id' });
 
 assessments.hasMany(assessment_configurations, { foreignKey: "assessment_id" });
 assessments.hasMany(user_assessment_responses, { foreignKey: "assessment_id" });
@@ -229,12 +229,13 @@ const getUserRecommendedAssessments = async function (req, res) {
     
     [err, userAssessmentExist] = await to(user_assessments.findOne({ where: { user_id: req.user.id, status: { [Op.in]: ['STARTED', 'INPROGRESS', 'FINISHED', 'PASSED', 'FAILED']}, type: type.toUpperCase() }, raw: true }));
     let findindingLevel = null;
+    let screeningSubject = null;
     if(type == 'MAINS') {
       [err, screeningData] = await to(user_assessments.findOne({
         where: { user_id: req.user.id, status: { [Op.in]: ['PASSED']}, type: 'SCREENING' },
         include: [{
           model: assessment_configurations,
-          attributes: ['level_id']
+          attributes: ['level_id', 'skill_distributions']
         }],
         attributes: ['assessment_id'],
         raw: true,
@@ -243,6 +244,26 @@ const getUserRecommendedAssessments = async function (req, res) {
       console.log(screeningData);
       if(screeningData && screeningData.assessment_configuration && screeningData.assessment_configuration.level_id) {
         findindingLevel = screeningData.assessment_configuration.level_id;
+      }
+      if(screeningData && screeningData.assessment_configuration && screeningData.assessment_configuration.skill_distributions) {
+        console.log("teteststst", screeningData.assessment_configuration.skill_distributions);
+        let subjectIds = screeningData.assessment_configuration.skill_distributions.map(ele => {
+          if(ele.subject_ids) {
+            return ele.subject_ids.map(e => {
+              return e.subject_id;
+            }).join(",");
+          } else {
+            return null;
+          }
+        });
+        let final = subjectIds.filter(k => {
+            return k != null;
+          }).map(ele => {
+            return parseInt(ele);
+          });
+        if(final.length > 0) {
+          screeningSubject = final;
+        }
       }
     }
 
@@ -275,6 +296,12 @@ const getUserRecommendedAssessments = async function (req, res) {
       subjectIds = teachingInterest.subject_ids ? teachingInterest.subject_ids.map(ele => {
         return ele ? parseInt(ele) : null;
       }).filter(e => e != null) : [];
+
+      if(screeningSubject != null) {
+        subjectIds = screeningSubject;
+      }
+
+
     }
 
     console.log("levelIds", levelIds);
@@ -1578,6 +1605,15 @@ try {
   // console.log(`find user id ${req.params.user_id} with assessment id ${req.params.assessment_id}`);
   // console.log("the demoData", JSON.parse(JSON.stringify(demoData)));
   if(demoData) {
+    // change status
+    if(payload.total_score && payload.total_score >= 6) {
+      demoData.status         = 'RECOMMENDED';
+    }
+    else if(payload.total_score && payload.total_score < 6) {
+      demoData.status         ='NOT_RECOMMENDED';
+    }
+    demoData.save();
+
     // console.log("recommended grade ",demoData.grade_id);
     // calculate the scores
     let userRecommendData;
@@ -1587,7 +1623,7 @@ try {
       rows.demo_score         = payload.total_score;
       rows.demo_score_total   = 10;
       if(payload.total_score && payload.total_score >= 6) {
-        rows.ai_recommendation = gradeMap[demoData.grade_id];
+        rows.ai_recommendation  = gradeMap[demoData.grade_id];
       }
       rows.save();
     }));

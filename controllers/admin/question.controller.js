@@ -565,13 +565,26 @@ module.exports.questionImport = questionImport;
 // TODO: find level grade subject from db
 // TODO: media upload
 const loBankImport = async function(req, res) {
-
   let excelObj = await excelReader(path.join(__dirname +  `/../../public/assets/${req.body.file_name}`));
-
+  
   if(req.body.debug) 
   {
     let preTest = await testExcelFile(req, res, excelObj);
     return ReS(res, {test_result: preTest}, 200);
+  }
+  else {
+    try {
+      // check if question exist
+      let body = req.body;
+      [err, questionData] = await to(questions.findAll({
+        where: { grade_id : body.grade_id, subject_id : body.subject_id }
+      }))
+      if(questionData && questionData.length) {
+        TE(`questions Already Exist for this Grade ${body.grade_id} and Subject ${body.subject_id}`);
+      }
+    } catch (err) {
+      return ReE(res, err, 422);
+    }
   }
 
   let responseB = await addToLoBank(req, res, excelObj);
@@ -582,7 +595,11 @@ const loBankImport = async function(req, res) {
     resData.lo_bank = "inserted to Lo_bank";
   }
   if(responseQ && responseQ.questions && responseQ.questions[2]) {
-    resData.questions = "inserted to Questions Table ";
+    // console.log("================ inserted ", JSON.parse(JSON.stringify(responseQ.questions)).length);
+    let ql = JSON.parse(JSON.stringify(responseQ.questions)).length;
+    let ol = JSON.parse(JSON.stringify(responseQ.question_options)).length;
+    let el = responseQ.excel;
+    resData.questions = `Read ${el} rows from Excel::inserted ${ql} records to Questions Table :: ${ol} records to options table`;
   }
 
   return ReS(res, { data: resData }, 200);
@@ -590,10 +607,10 @@ const loBankImport = async function(req, res) {
 module.exports.loBankImport = loBankImport;
 
 const testExcelFile = async (req, res, excelObj, dataReturn) => {
+  let preTestLog = [];
   let qTypeMap = { "SCQ": 'SINGLE_CHOICE', "MCQ": 'MULTIPLE_CHOICE', "FIB": 'FILL_IN_THE_BLANKS', "TF": 'TRUE_FALSE', "MTF":'MATCH_THE_FOLLOWING' };
   if(dataReturn == 'question_type_map') { return qTypeMap;}
 
-  let preTestLog = [];
   
   let level_id = 0;
   [err, levelData] = await to(levels.findOne({ where: {name: req.body.level_name }}));
@@ -1021,7 +1038,7 @@ const addToLoQuestion = async (req, res, excelObj, loBankData) => {
             // excel_row_no: excelRow,
             // excel_row_lo_count: loCountInExcelRow[excelRow],
             option_key: key_code,
-            option_value: excel[j],
+            option_value: String(excel[j]),
             option_type: 'TEXT',
             question_id: obj.id
           };
@@ -1054,7 +1071,8 @@ const addToLoQuestion = async (req, res, excelObj, loBankData) => {
 
   return {
     questions: questionData,
-    question_options: qOptionsData
+    question_options: qOptionsData,
+    excel: excelObj.length
   };
 } 
 
@@ -1162,12 +1180,13 @@ const importPsychometry = async (req, res) => {
   let topicSet = new Set();
 
   
-  excelData.forEach(obj => {
+  excelData.forEach((obj,i) => {
     // let key_code = String.fromCharCode(66).toLowerCase(); // Generate A,B,C,D
     // let excelRow = excelData[0];
     // let rowCode = `option_${key_code}`;
     // let a = excelRow[`option_${key_code}`];
     // console.log("the rowcode and value ", rowCode, a);
+    // console.log("the obj value at line ", i, JSON.parse(JSON.stringify(obj)));
     
     // return ReE(res, "working ", 422);
     let subCode = obj.sub_strand.replace(/ /g, "_").toLowerCase();
@@ -1307,7 +1326,7 @@ const importPsychometry = async (req, res) => {
   });
   // console.log("question payload ", questionPayload);
   // insert questions 
-  let questionData, optionsPayload=[];
+  let questionData, optionsPayload=[], insertedQuestionCount=0;
   [err, questionData] = await to(psy_questions.bulkCreate(questionPayload).then(rows=>{
     rows.forEach((row, index)=> {
       // console.log(row.id);
@@ -1323,6 +1342,7 @@ const importPsychometry = async (req, res) => {
         };
         optionsPayload.push(obj);
       }
+      insertedQuestionCount++;
     });
   }));
   if(err) { return ReE(res, err, 422); }
@@ -1333,6 +1353,6 @@ const importPsychometry = async (req, res) => {
   [err, optionsData] = await to(psy_question_options.bulkCreate(optionsPayload));
   if(err) { return ReE(res, err, 422); }
 
-  return ReS(res, {data: excelData}, 200);
+  return ReS(res, {data: {row_read: excelData.length, inserted: insertedQuestionCount, excelDataFile: excelData} }, 200);
 }
 module.exports.importPsychometry = importPsychometry;
