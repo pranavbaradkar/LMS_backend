@@ -1538,7 +1538,14 @@ const getUserDetails = async (req, res)=> {
     let subjectData = [];
     let schoolData = [];
     let objData = userDetails.get({plain: true});
-    
+    if(objData.demo_video && objData.demo_video.length) {
+      // console.log("the demovideo",objData.demo_video);
+      objData.demo_video.map(row => {
+        // console.log("the row value ", row);
+        if(row.status == 'RECOMMENDED') { row.status = 'AGREE'; }
+        if(row.status == 'NOT_RECOMMENDED') { row.status = 'DISAGREE'; }
+      });
+    }
     if(objData && objData.teaching_interests) {
         // console.log("the ids obj ", interestIds);
       [err, levelData] = await to(levels.findAll({ where: {id: objData.teaching_interests.level_ids }, attributes: ['id','name'], raw: true }));

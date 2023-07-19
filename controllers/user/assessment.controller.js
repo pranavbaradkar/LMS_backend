@@ -1605,6 +1605,15 @@ try {
   // console.log(`find user id ${req.params.user_id} with assessment id ${req.params.assessment_id}`);
   // console.log("the demoData", JSON.parse(JSON.stringify(demoData)));
   if(demoData) {
+    // change status
+    if(payload.total_score && payload.total_score >= 6) {
+      demoData.status         = 'RECOMMENDED';
+    }
+    else if(payload.total_score && payload.total_score < 6) {
+      demoData.status         ='NOT_RECOMMENDED';
+    }
+    demoData.save();
+
     // console.log("recommended grade ",demoData.grade_id);
     // calculate the scores
     let userRecommendData;
@@ -1614,7 +1623,7 @@ try {
       rows.demo_score         = payload.total_score;
       rows.demo_score_total   = 10;
       if(payload.total_score && payload.total_score >= 6) {
-        rows.ai_recommendation = gradeMap[demoData.grade_id];
+        rows.ai_recommendation  = gradeMap[demoData.grade_id];
       }
       rows.save();
     }));
