@@ -1,7 +1,7 @@
 const { interviewers, roles,subjects, boards, schools, levels, user_teaching_interests, users, demovideo_details, user_interviews, user_interview_feedbacks, user_assessments, assessment_results, academics, professional_infos, custom_attributes, school_inventories, user_recommendations, assessment_configurations } = require("../../models");
 const model = require('../../models');
 const authService = require("../../services/auth.service");
-const { to, ReE, ReS, toSnakeCase, paginate, snakeToCamel, requestQueryObject, randomHash, getUUID } = require('../../services/util.service');
+const { to, ReE, ReS, capitalizeWords, toSnakeCase, paginate, snakeToCamel, requestQueryObject, randomHash, getUUID } = require('../../services/util.service');
 var _ = require('underscore');
 var ejs = require("ejs");
 const fs = require("fs");
@@ -15,6 +15,8 @@ const Op = Sequelize.Op;
 const validator = require('validator');
 var moment = require("moment");
 const { object } = require("underscore");
+const PSYCHOMETRIC_SKILL_ID = process.env.PSYCHOMETRIC_SKILL_ID || 48;
+const PSYCHOMETRIC_ANSWER_MAX_VALUE = process.env.PSYCHOMETRIC_ANSWER_MAX_VALUE || 4;
 
 schools.hasMany(interviewers,{ foreignKey: 'school_id'});
 user_interviews.hasOne(user_interview_feedbacks, { foreignKey: 'user_id', sourceKey: 'user_id',  as: 'interview_feedback' });
@@ -28,6 +30,7 @@ assessment_configurations.belongsTo(levels, { foreignKey: 'level_id' });
 
 model.users.hasMany(model.user_assessments, {foreignKey: 'user_id', targetKey: 'user_id'});
 user_assessments.belongsTo(model.users, { foreignKey: 'user_id' });
+user_assessments.belongsTo(demovideo_details,  { foreignKey: 'user_id', targetKey: 'user_id' });
 
 user_teaching_interests.belongsTo(model.users, { foreignKey: 'user_id' });
 users.hasOne(model.user_teaching_interests, { foreignKey: 'user_id', as:'teaching_interests' });
@@ -1727,12 +1730,9 @@ try {
   [err, interviewData] = await to(user_recommendations.update(urPayload, {where: {user_id: req.params.user_id } }));
   if(err) return ReE(res, err, 422);
 
-  //send mail to school hr
-  let subject = "Interview Feedback";
-  let email_to = "kanhailal2010@gmail.com";
-  // await sendMailToHr(subject, email_to);
 
-  // generate pdf
+  //============================= generate pdf export data 
+  
   let pdfData = { 
     school_name: 'Vibgyor Dadar',
     scores: '80/100',
@@ -1741,18 +1741,140 @@ try {
     where: {id: req.params.user_id },
     attributes:['first_name', 'middle_name', 'last_name', 'full_name', 'email'],
     include:[
-      { model: assessment_results}
+      {
+        model: user_teaching_interests, as: 'teaching_interests', attributes: ['subject_ids', 'level_ids', 'school_ids']
+      },
+      {
+        model: user_interviews, as:'interview', attributes:['school_id', 'recommended_level']
+      },
+      { 
+        model: assessment_results,
+        attributes: ["assessment_id","skill_scores", "skill_total","subject_scores","total", "total_scored", "result", "type"],
+        include: [
+          { 
+            model: model.assessments , attributes: ['name']
+          }
+        ]
+      },
+      {
+        model: user_assessments, attributes:['assessment_id'],
+        include: [ 
+          { model: assessment_configurations, attributes: ['skill_distributions'] },
+          { model: demovideo_details, attributes: ['id','assessment_id','scores','scores_raw', 'total_score', 'subject_id'], required: false }
+        ]
+      }
+    ],
+    order: [
+      [{model: assessment_results}, 'id', 'ASC']
     ]
   }));
-  if(err) return ReE(res, err, 422);
+  if(err || !userData) return ReE(res, err, 422);
 
-  if(userData && userData.length) {
-    pdfData.name = userData.full_name;
-    pdfData.email = userData.email;
+  let plainData;
+  
+  if(userData) {
+    plainData                 = userData.get({plain: true});
+    let passed_img_url        = 'https://hubblehox-lms-assets.s3.amazonaws.com/question-bank/b2b/vibgyor/k12/passed_assessemnt/options/2323-2323-23/options/passed.png';
+    let failed_img_url        = 'https://hubblehox-lms-assets.s3.amazonaws.com/question-bank/b2b/vibgyor/k12/failed_assessemnt/options/2323-2323-24/options/failed.png';
+    let sel_img_url           = 'https://hubblehox-lms-assets.s3.amazonaws.com/question-bank/b2b/vibgyor/k12/selected/options/2323-2323-26/options/selected.png';
+    let not_sel_img_url       = 'https://hubblehox-lms-assets.s3.amazonaws.com/question-bank/b2b/vibgyor/k12/not_selected/options/2323-2323-25/options/not_selected.png';
+    let interview_subject_id  = 0;
+    pdfData.interview_result_img = req.body.offer_selection == "YES" ? sel_img_url: not_sel_img_url ;
+    pdfData.name              = plainData.full_name;
+    pdfData.email             = plainData.email;
+    pdfData.screening         = (plainData.assessment_results[0]) ? plainData.assessment_results[0] : null;
+    if(pdfData.screening) {
+      pdfData.screening_result_img = pdfData.screening.result == 'PASSED' ? passed_img_url : failed_img_url; 
+      pdfData.screening_result= pdfData.screening.result; 
+    }
+    pdfData.mains             = (plainData.assessment_results[1]) ? plainData.assessment_results[1] : null;
+    if(pdfData.mains) {
+      pdfData.mains_subjects  = plainData.assessment_results[1].subject_scores;
+      pdfData.mains_subjects  = Object.keys(pdfData.mains_subjects).filter(subject => subject!="null");
+
+      pdfData.mains_result_img= pdfData.mains.result == 'PASSED' ? passed_img_url : failed_img_url; 
+      pdfData.mains_result    = pdfData.mains.result; 
+    }
+    pdfData.user_result_img   = failed_img_url;
+    pdfData.user_result       = 'FAILED';
+    if (pdfData.mains_result == pdfData.screening_result && pdfData.mains_result == 'PASSED') {
+      pdfData.user_result_img = passed_img_url;
+      pdfData.user_result       = 'PASSED';
+    }
+
+    let assessments = (plainData.user_assessments && plainData.user_assessments.length) ? plainData.user_assessments : null;
+    if(assessments) {
+      let mains_assessment = plainData.user_assessments.filter(row => row.assessment_id == pdfData.mains.assessment_id);
+      // no of questions in psychometry 
+      let psychometric = mains_assessment[0].assessment_configuration.skill_distributions.filter(row => row.skill_id == PSYCHOMETRIC_SKILL_ID);
+      // console.log("the psychometric obj ", psychometric);
+      if(psychometric && psychometric.length) {
+        // console.log("the numbers ",parseInt(psychometric[0].no_of_questions), parseInt(PSYCHOMETRIC_ANSWER_MAX_VALUE))
+        pdfData.psychometricTotalMarks  = (parseInt(psychometric[0].no_of_questions)*parseInt(PSYCHOMETRIC_ANSWER_MAX_VALUE));
+        pdfData.psychometricScore       = pdfData.mains.skill_scores.Psychometric;
+        pdfData.mains.skill_total.push(pdfData.psychometricTotalMarks);
+        if(pdfData.mains && pdfData.mains.skill_scores && pdfData.mains.skill_scores.Psychometric) {
+          delete pdfData.mains.skill_scores.Psychometric;
+        }
+        pdfData.mains.skill_scores.Psychometric = pdfData.psychometricScore;
+      }
+      // console.log("mains Assessments", mains_assessment);
+      pdfData.demo = [];
+      pdfData.demo_scores = 0;
+      if(mains_assessment && mains_assessment[0].demovideo_detail && mains_assessment[0].demovideo_detail.scores_raw !="") {
+        let demo_scores = mains_assessment[0].demovideo_detail.scores;
+        interview_subject_id = mains_assessment[0].demovideo_detail.subject_id;
+        demo_scores.map(row => { 
+          let total     = row.total;
+          delete row.total;
+          let obj       = {};
+          obj.title     = capitalizeWords(Object.keys(row)[0].replace("_"," "));
+          obj.score     = Object.values(row)[0];
+          obj.total     = total;
+          pdfData.demo.push(obj);
+        } );
+      }
+    }
+    pdfData.demo_result_img      = pdfData.demo_scores < 6 ? failed_img_url : passed_img_url ;
+    pdfData.demo_result     = pdfData.demo_scores < 6 ? 'FAILED' : 'PASSED' ;
+    // Mains Skills
+    pdfData.skills = [];
+    Object.keys(pdfData.mains.skill_scores).map((title,index) => { 
+      let obj = {};
+      obj.title = (title == 'Core Skill') ? (title + ' - ' + pdfData.mains_subjects[0]) : title;
+      obj.score = pdfData.mains.skill_scores[title];
+      obj.total = pdfData.mains.skill_total[index];
+      pdfData.skills.push(obj);
+    });
+
+    // get users school level and subjects
+    [err, schoolData] = await to(schools.findOne({  where: {id: userData.interview.school_id }, attributes: ['name','email','hr_email']  }));
+    if(err || !schoolData) return ReE(res, err, 422);
+    pdfData.schools = schoolData.name; 
+
+    [err, subjectData] = await to(subjects.findOne({ where: {id: interview_subject_id }, attributes: ['name']  }));
+    if(err || !subjectData) return ReE(res, err, 422);
+    pdfData.subjects = subjectData.name;
+
+    [err, levelData] = await to(levels.findOne({ where: {id: userData.interview.recommended_level }, attributes: ['name'] }));
+    if(err || !levelData) return ReE(res, err, 422);
+    pdfData.levels = levelData.name;
+
   }
-  await generateFeedbackPdf(pdfData);
 
-  return ReS(res, {data: userData}, 200);
+  // Generate pdf
+  let pdf_path = await generateFeedbackPdf(pdfData, req.params.user_id);
+  
+  
+  //send mail to school hr
+  let subject = "Interview Feedback";
+  let email_to = schoolData.hr_email || schoolData.email;
+  console.log("the pdf path is ",pdf_path);
+  if(pdf_path && email_to) {
+    await sendMailToHr(subject, email_to, pdf_path);
+  }
+  
+  return ReS(res, {data: [pdfData,plainData] }, 200);
 } catch (err) {
   return ReE(res, err, 422)  ;
 }
@@ -1760,52 +1882,32 @@ try {
 }
 module.exports.userInterviewFeedback = userInterviewFeedback;
 
-const generateFeedbackPdf = async (pdfData) => {
+const generateFeedbackPdf = async (pdfData, user_id) => {
+  let err, userData;
   try {
     let localPath = __dirname + `/../..`;
-    // const filePathName = path.resolve(__dirname, 'htmltopdf.ejs');
-    //     const htmlString = fs.readFileSync(filePathName).toString();
-    //     let  options = { format: 'Letter' };
-    
     let html = fs.readFileSync(`${localPath}/views/interview-feedback-pdf.ejs`).toString();
     const ejsData = ejs.render(html, pdfData);
     // console.log(`The HTML is ${html}`);
     var options = {
       // Export options
-      "directory": `${localPath}/public/files`,       // The directory the file gets written into if not using .toFile(filename, callback). default: '/tmp'
-      // "height": "11.7in",        // allowed units: mm, cm, in, px
-      // "width": "9.3in",            // allowed units: mm, cm, in, px
       "width": "732px",
       "height" : "1000px",
-      // "format": "A4",        // allowed units: A3, A4, A5, Legal, Letter, Tabloid
-
-      // "orientation": "portrait", // portrait or landscape
       // Page options
       "border": "0",             // default is 0, units: mm, cm, in, px
     };
-    
-    pdf.create(ejsData, options).toFile(`${localPath}/public/files/interview_feedback.pdf`, function(err, res) {
+    let pdf_path = `${localPath}/public/files/interview_feedback-${user_id}.pdf`;
+    await pdf.create(ejsData, options).toFile(pdf_path, function(err, res) {
       if (err) return console.log(err);
       console.log(res); // { filename: '/app/businesscard.pdf' }
     });
-
-    // await htmlToPdf.convertHTMLFile(html, `${localPath}/public/files/interview_feedback.pdf`,
-    // function (error, success) {
-    //    if (error) {
-    //         console.log('Oh noes! Errorz!');
-    //         console.log(error);
-    //     } else {
-    //         console.log('Woot! Success!');
-    //         console.log(success);
-    //     }
-    //   }
-    // );
+    return pdf_path;
   } catch (err) {
     TE(err);
   }
 };
 
-const sendMailToHr = async (subject, email_to) => {
+const sendMailToHr = async (subject, email_to, pdf_path) => {
   parameters = { name: 'HrName' };
   let html = await ejs.render(
     fs.readFileSync(__dirname + `/../../views/interview.ejs`).toString(),
@@ -1816,8 +1918,8 @@ const sendMailToHr = async (subject, email_to) => {
     try {
       let mailObject = { to: email_to , subject: subject, html: html, attachments: [
         {
-          filename: 'sample.pdf',
-          path: __dirname + `/../../public/assets/sample.pdf`,
+          filename: _.last(pdf_path.split("/")),
+          path: pdf_path,
           contentType: 'application/pdf'
         }
       ]};
@@ -1965,8 +2067,6 @@ const getSingleInterestedSchoolId = async (user_id) => {
 
 const getInterviewerDetails = async (user_id, schoolId) => {
   let err, userData, schoolData;
-  // let interestedSchoolId = await getSingleInterestedSchoolId(user_id);
-  schoolId = schoolId ? schoolId : await getSingleInterestedSchoolId(user_id);
   [err, schoolData] = await to(schools.findAll({ 
     where: { id: schoolId }, 
     attributes: ['id', 'name', 'address'],
@@ -2007,14 +2107,17 @@ module.exports.setUserInterview = async (req, res) => {
     levelData.map(ele => { levelMap[ele.name] = ele.id; } );
     let payload = req.body;
     payload.user_id = req.params.user_id;
-    let [id, interviewerName, interviewLocation]   = await getInterviewerDetails(req.params.user_id);
+    let schoolId = await getSingleInterestedSchoolId(req.params.user_id);
+    let [id, interviewerName, interviewLocation]   = await getInterviewerDetails(req.params.user_id, schoolId);
     payload.interviewer_id  = (payload.interview_slot) ? payload.interview_slot : id;
     payload.interviewer     = (payload.interviewer) ? payload.interviewer : interviewerName;
     payload.exam_location   = (payload.exam_location) ? payload.exam_location : interviewLocation;
+    payload.school_id       = schoolId;
     // console.log("the generated payload ", payload);
     if(payload.recommended_level && payload.recommended_level != '') {
       payload.recommended_level = levelMap[payload.recommended_level];
     }
+    console.log( "the palaod ",payload);
     [err, interviewData] = await to(user_interviews.update(payload, {where : {user_id: req.params.user_id} }));
     if(err) return ReE(res, err, 422);
 
