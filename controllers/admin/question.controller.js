@@ -288,6 +288,7 @@ const updateQuestion = async function (req, res) {
       if(payload.is_psychometric) {
         payload.correct_answer = '0';
         payload.score_type = 1;
+        console.log(payload);
         [err, questionData] = await to(psy_questions.update(payload, { where: { id: req.params.question_id } }));
       }
 
