@@ -648,7 +648,7 @@ const generateOtp = async function (req, res) {
         
         var subject = "LMS Connect OTP";
         let response = await mailer.send(payload.email, subject, html);
-        console.log("test", response);
+        console.log("test",payload.otp, response);
         success = otpCache.set(payload.email, payload.otp, 300 );
         success = await redis.set(payload.email, payload.otp);
         await redis.expire(payload.email, 300);
@@ -767,6 +767,10 @@ const verifyOtp = async function (req, res) {
       if (userData == null) {
         let uuiD = await authService.getUUID();
         userPayload.uuid = uuiD;
+        if(userPayload.email && userPayload.email.includes('@vgos.org')) {
+          userPayload.user_type = "TEACHER";
+        }
+        console.log(userPayload);
         [err, userData] = await to(users.create(userPayload));
         if(err) {
           return ReE(
