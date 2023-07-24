@@ -15,6 +15,11 @@ module.exports = (sequelize, DataTypes) => {
     first_name         : { type: DataTypes.STRING, allowNull: true, defaultValue: "" },
     middle_name        : { type: DataTypes.STRING, allowNull: true, fieldName: 'middleName', defaultValue: "" },
     last_name          : { type: DataTypes.STRING, allowNull: true, as: 'lastName', defaultValue: "" },
+    full_name          : { type: DataTypes.VIRTUAL, 
+                           get() {
+                           return this.getDataValue('first_name') + ' '+ this.getDataValue('middle_name') +' ' + this.getDataValue('last_name');
+                          }
+                         },
     email              : { type: DataTypes.STRING, allowNull: true, defaultValue: "" },
     user_type          : { type: DataTypes.ENUM, allowNull: false, defaultValue: "JOB_SEEKER", values: ["TEACHER", "JOB_SEEKER"] },
     is_email_verified  : { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false, as: 'isEmailVerified' },

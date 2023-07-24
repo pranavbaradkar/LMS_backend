@@ -31,3 +31,32 @@ exports.send = function (to, subject, html)
     return ReE(res, err, 422);
   }
 };
+
+/* 
+mailObject = {
+  to: 'send@to.address',
+  from: 'from@mail.address',
+  subject: 'mail subject',
+  html: 'HTML message body',
+  attachments: [
+      {
+        filename: 'my-pdf.pdf',
+        path: fs.readFileSync('my-pdf.pdf'),
+        contentType: 'application/pdf',
+      },
+    ],
+}
+*/
+exports.sendWithAttachment = async function (mailObject)
+{
+	// send mail with defined transport mailObject
+  // visit https://nodemailer.com/ for more options
+  try {
+    mailObject.from = lmsFrom;
+    console.log("Sending mail from ", mailObject.attachments);
+    await transporter.sendMail(mailObject);
+  } catch (err) {
+    console.log("mail err.................................", err);
+    return ReE(res, err, 422);
+  }
+};

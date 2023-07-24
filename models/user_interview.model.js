@@ -5,6 +5,7 @@ module.exports = (sequelize, DataTypes) => {
     user_id          : { type: DataTypes.INTEGER, allowNull: false },
     recommended_level: { type: DataTypes.INTEGER, allowNull: true },
     interviewer_id   : { type: DataTypes.INTEGER, allowNull: true, defaultValue: null },
+    school_id        : { type: DataTypes.INTEGER, allowNull: true, defaultValue: null },
     mode             : { type: DataTypes.STRING, allowNull: true, defaultValue: null },
     exam_location    : { type: DataTypes.STRING, allowNull: true, defaultValue: null },
     room_no          : { type: DataTypes.STRING, allowNull: true, defaultValue: null },

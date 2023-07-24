@@ -2,6 +2,7 @@ const {to} = require('await-to-js');
 const pe = require('parse-error');
 const axios = require('axios');
 const csv = require('csv');
+var _ = require('underscore');
 var AWS = require('aws-sdk');
 const { createLogger, format, transports } = require("winston");
 
@@ -195,6 +196,11 @@ module.exports.snakeToCamel = (str) => {
       });
 }
 
+module.exports.capitalizeWords =  (input) => {
+    return _.map(input.split(" "), function(word) {
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    }).join(" ");
+}
 module.exports.getFilterObject = (req, key, finalObj) => {
     if(req.query.filter && req.query.filter[key]) {
         let filter = {}

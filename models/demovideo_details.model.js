@@ -8,6 +8,7 @@ module.exports = (sequelize, DataTypes) => {
     grade_id         : { type: DataTypes.INTEGER, allowNull: true },
     video_link       : { type: DataTypes.STRING, allowNull: true },
     total_score      : { type: DataTypes.INTEGER, allowNull: true },
+    scores_raw       : { type: DataTypes.VIRTUAL, get(){ return this.getDataValue('scores'); } },
     scores           : { type: DataTypes.JSONB, allowNull: true, 
                         get: function() {  
                         let value = this.getDataValue('scores');

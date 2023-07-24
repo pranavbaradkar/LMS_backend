@@ -1055,7 +1055,7 @@ const addToLoQuestion = async (req, res, excelObj, loBankData) => {
       excelRow++;
   });
 
-  // console.log("question options ",questionOptionsPayload);
+  // console.log("question options ",JSON.stringify(questionOptionsPayload));
   
   // return ReE(res, "err", 422);
   [err, qOptionsData] = await to(question_options.bulkCreate(questionOptionsPayload));

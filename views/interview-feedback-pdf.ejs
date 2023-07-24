@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Browser</title>
+</head>
+
+<body style="width: 732px; margin: 0 auto;">
+        
+  <table style="width:100%; background-color: #E7E9EA; padding: 24px; padding-bottom: 2px;">
+    <tr>
+      <td style="width:75%;">
+        <div style="font-size: 24px; font-weight: 300;">Smart Staff Selection</div>
+        <div style="font-size: 47px; font-style: normal; font-weight: 700; line-height: 0.9;">User Report</div>
+      </td>
+      <td><img style="width: 192px; height: 53px;" src="https://smartstaff.staging.hubblehox.ai/img/logo.abdba3ff.svg"></td>
+    </tr>
+  </table>
+  <!-- user data -->
+  <table style="width:100%; background-color: #F1F2F2; padding: 14px 24px 0;">
+    <tr>
+      <td rowspan="2" style="width: 480px;color: #3D366A; font-size: 26px; font-weight: 700;">USER DATA</td>
+      <td style="width: 120px;text-align: center;">status</td>
+    </tr>
+    <tr>
+        <td width="120">
+          <img style="width:120px" src="<%= user_result_img %>" />
+        </td>
+    </tr>
+    </table>
+    <table style="width:100%; background-color: #F1F2F2; padding: 0 24px 14px; border-bottom: 2px solid #C7C8CA;">
+    <tr>
+      <td style="padding-top: 14px; font-size: 18px;">Name: <%= name %></td>
+      <td style="padding-top: 14px; font-size: 18px;">Subject: <%= subjects %></td>
+    </tr>
+    <tr>
+      <td style="padding-top: 14px; font-size: 18px;">Email: <%= email %></td>
+      <td style="padding-top: 14px; font-size: 18px;">Level: <%= levels %></td>
+    </tr>
+    <tr>
+      <td colspan="2" style="padding-top: 14px; font-size: 18px;">School name: <%= schools %></td>  
+    </tr>
+  </table>
+  <!-- screening -->
+  <table style="width:100%; background-color: #F1F2F2; padding: 14px 24px 0;">
+    <tr>
+      <td rowspan="2" style="width:380px; color: #3D366A; font-size: 26px; font-weight: 700;">SCREENING</td>
+      <td style="width: 120px;text-align: center;">score</td>
+      <td style="width: 120px;text-align: center;">status</td>
+    </tr>
+    <tr>
+      <td>
+        <div style="font-size: 20px; line-height: 24px; border-radius: 6px; background: #fff; padding:6px 8px 2px; text-align: center;">
+          <%= screening.total_scored %>/<%= screening.total %>
+        </div>
+      </td>
+      <td>
+        <img style="width:120px;margin-top:5px" src="<%= screening_result_img %>"/>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2" style="font-size: 18px; padding-top: 8px;"><%= screening.assessment.name %></td>
+    </tr>
+  </table> 
+  <!-- screening subject scores -->
+  <table style="width:100%; background-color: #F1F2F2; padding: 0 24px 14px; border-bottom: 2px solid #C7C8CA;">
+    <% var keys = Object.keys(screening.skill_scores); %>
+        <% for (var i = 0; i < keys.length; i += 2) { %>
+        <tr>
+        <td width="350">
+            <div style="width: 310px; font-size: 15px; border-radius: 6px; background: #fff; padding: 6px 8px;margin-top: 4px;"> <%= keys[i] %> <span style="float:right"><%= screening.skill_scores[keys[i]] %>/<%= screening.skill_total[i] %></span> </div>
+        </td>
+        <% if (i + 1 < keys.length) { %>
+            <td width="350">
+                <div style="float:right; width: 310px; font-size: 15px; border-radius: 6px; background: #fff; padding: 6px 8px;margin-top: 4px;"> <%= keys[i + 1] %> <span style="float:right"><%= screening.skill_scores[keys[i + 1]] %>/<%= screening.skill_total[i + 1] %></span> </div>
+            </td>
+        <% } %>
+        </tr>
+    <% } %>
+  </table>
+  <!-- mains -->
+  <table style="width:100%; background-color: #F1F2F2; padding: 14px 24px 0;">
+    <tr>
+      <td rowspan="2" style="width:380px; color: #3D366A; font-size: 26px; font-weight: 700;">MAINS</td>
+      <td style="width: 120px;text-align: center;">score</td>
+      <td style="width: 120px;text-align: center;">status</td>
+    </tr>
+    <tr>
+      <td>
+        <div style="font-size: 20px; line-height: 24px; border-radius: 6px; background: #fff; padding:6px 8px 2px; text-align: center;">
+          <%= mains.total_scored %>/<%= mains.total %>
+        </div>
+      </td>
+      <td>
+        <img style="width:120px;margin-top:5px" src="<%= mains_result_img %>"/>
+      </td>
+    </tr>
+  </table>
+  <!-- mains Scores -->
+  <table style="width:100%; background-color: #F1F2F2; padding: 0 24px 14px; border-bottom: 2px solid #C7C8CA;">
+    <tr>
+      <td colspan="2" style="font-size: 18px; padding-top: 8px;"><%= mains.assessment.name %></td>
+    </tr>
+    <% for (var i = 0; i < skills.length; i += 2) { %>
+        <tr>
+        <td width="350">
+            <div style="width: 310px; font-size: 15px; border-radius: 6px; background: #fff; padding: 6px 8px;margin-top: 4px;"> <%= skills[i].title %> <span style="float:right"><%= skills[i].score %>/<%= skills[i].total %></span> </div>
+        </td>
+        <% if (i + 1 < skills.length) { %>
+            <td width="350">
+                <div style="float:right; width: 310px; font-size: 15px; border-radius: 6px; background: #fff; padding: 6px 8px;margin-top: 4px;"> <%= skills[i + 1].title %> <span style="float:right"><%= skills[i + 1].score %>/<%= skills[i + 1].total %></span> </div>
+            </td>
+        <% } %>
+        </tr>
+    <% } %>
+  </table>
+  <!-- demo video -->
+  <table style="width:100%; background-color: #F1F2F2; padding: 14px 24px 0;">
+    <tr>      
+        <td rowspan="2" style="width:380px;color: #3D366A; font-size: 26px; font-weight: 700;">DEMO TOTAL SCORE</td>
+        <td style="width: 120px;text-align: center;">score</td>
+        <td style="width: 120px;text-align: center;">status</td>
+      </tr>
+      <tr>
+        <td>
+          <div style="font-size: 20px; line-height: 24px; border-radius: 6px; background: #fff; padding:6px 8px 2px; text-align: center;">
+            <%= mains.total_scored %>/<%= mains.total %>
+          </div>
+        </td>
+        <td>
+          <img style="width:120px;margin-top:5px" src="<%= demo_result_img %>"/>
+        </td>
+    </tr>
+  </table>
+  <!-- Demo Video Scores -->
+  <table style="width:100%; background-color: #F1F2F2; padding: 0 24px 14px; border-bottom: 2px solid #C7C8CA;">
+    <% for (var i = 0; i < demo.length; i += 3) { %>
+        <tr>
+            <td width="120">
+            <div style="margin-right: 8px; font-size: 18px; line-height: 20px;"><%= demo[i].title %></div>
+            </td>
+            <td>
+            <div style="width: 70px; font-size: 18px; border-radius: 6px; background: #fff; padding: 6px 8px; text-align: center;"><%= demo[i].score %>/<%= demo[i].total %></div>
+            </td>
+            <td width="50">
+            </td>
+        <% if (i + 1 < skills.length) { %>
+            <td width="120">
+              <div style="margin-right: 8px; font-size: 18px; line-height: 20px;"><%= demo[i +1].title %></div>
+            </td>
+            <td>
+              <div style="width: 70px; font-size: 18px; border-radius: 6px; background: #fff; padding: 6px 8px; text-align: center;"><%= demo[i+1].score %>/<%= demo[i+1].total %></div>
+            </td>
+            <td width="50">
+            </td>
+        <% } %>
+        <% if (i + 2 < skills.length) { %>
+            <td width="120">
+              <div style="margin-right: 8px; font-size: 18px; line-height: 20px;"><%= demo[i+2].title %></div>
+            </td>
+            <td>
+              <div style="width: 70px; font-size: 18px; border-radius: 6px; background: #fff; padding: 6px 8px; text-align: center;"><%= demo[i+2].score %>/<%= demo[i+2].total %></div>
+            </td>
+        <% } %>
+        </tr>
+    <% } %>
+  </table>
+  <!-- interview -->
+  <table style="width:100%; background-color: #F1F2F2; padding: 12px 24px 0;">
+    <tr>
+      <td colspan="2" style="text-align: center;">status</td>
+    </tr>
+  </table>
+  <table style="width:100%; background-color: #F1F2F2; padding: 0 24px 24px; border-bottom: 2px solid #C7C8CA;">
+    <tr>
+      <td style="width: 100px; color: #3D366A; font-size: 26px; font-weight: 700;">INTERVIEW</td>
+      <td style="width: 120px; text-align: center;">
+        <img style="height:33px;margin-top:0px" src="<%= interview_result_img %>"/>
+      </td>
+      <td style="width: 140px;"> </td>
+    </tr>
+  </table>
+  <footer style="background: #317FC1; padding: 8px;">
+    <table style="width:100%; display: flex; flex-direction: column; text-align: center;">
+      <tr>
+        <td style="color: #FFF; font-size: 20px; font-weight: 700;">HUBBLEHOX TECHNOLOGIES PVT. LTD.</td>
+      </tr>
+      <tr>
+        <td style="color: #FFF; font-size: 12px;">D-402, Lotus Corporate Park, Ram Mandir Road, Goregaon (E), Mumbai 400 063.</td>
+      </tr>
+    </table>
+  </footer>
+</body>
+</html>
+ 
