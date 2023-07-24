@@ -37,7 +37,6 @@ users.hasOne(model.user_teaching_interests, { foreignKey: 'user_id', as:'teachin
 users.hasOne(model.user_interviews, { foreignKey: 'user_id', as:'interview' });
 demovideo_details.belongsTo(model.users,  { foreignKey: 'user_id' });
 users.hasMany(model.demovideo_details, { foreignKey: 'user_id', as:'demo_video' });
-
 user_recommendations.belongsTo(model.users, { foreignKey: 'user_id' });
 
 user_assessments.belongsTo(model.professional_infos, {foreignKey: 'user_id', targetKey: 'user_id' });
@@ -2102,6 +2101,15 @@ module.exports.setUserInterview = async (req, res) => {
     return ReE(res, "user id required in params", 422);
   }
   try {
+    // check recommendation_status before setting up interview
+    [err, recommendData] =  await to(user_recommendations.findOne({
+      where: { user_id: req.params.user_id}
+    }));
+    // console.log("the recommendation by ai ", JSON.parse(JSON.stringify(recommendData)));
+    if(recommendData && (recommendData.ai_recommendation == null || recommendData.recommendation_status == 'DISAGREE')) {
+      return ReE(res, "The user is not recommended for interview", 422);
+    }
+
     let levelMap = {};
     [err, levelData] = await to(levels.findAll({attributes:['id', 'name']}));
     levelData.map(ele => { levelMap[ele.name] = ele.id; } );
@@ -2144,7 +2152,7 @@ module.exports.setUserInterview = async (req, res) => {
 }
 
 module.exports.updateRecommendStatus = async (req, res) => {
-  let err, statusData;
+  let err, recommendData, interviewData, interviewFeedbackData;
   let payload = req.body;
   if (_.isEmpty(req.params.user_id) || _.isUndefined(req.params.user_id)) {
     return ReE(res, "user id required in params", 422);
@@ -2153,12 +2161,21 @@ module.exports.updateRecommendStatus = async (req, res) => {
     return ReE(res, "recommendation_status is required in payload", 422);
   } 
   try {
-    [err,statusData] = await to(user_recommendations.update(payload, { 
+    [err,recommendData] = await to(user_recommendations.findOne({ 
       where: { user_id: req.params.user_id } 
     }));
     if(err) return ReE(res, err, 422);
+    if(recommendData) {
+      recommendData.recommendation_status = payload.recommendation_status;
+      recommendData.save();
+      if(recommendData.ai_recommendation != null && payload.recommendation_status == 'DISAGREE') {
+        [err, interviewData] = await to(user_interviews.destroy({ where: { user_id: req.params.user_id }  }));
+        [err, interviewFeedbackData] = await to(user_interview_feedbacks.destroy({ where: { user_id: req.params.user_id }  }));
+      }
+    }
 
-    return ReS(res, {data: statusData}, 200);
+    return ReS(res, {data: recommendData}, 200);
+
   } catch (err) {
     return ReE(res, err, 422);
   }
