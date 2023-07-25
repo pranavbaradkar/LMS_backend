@@ -19,3 +19,28 @@ module.exports.dashboardReport = async(req, res) => {
   return ReE(res, err, 422);
   }
 }
+
+module.exports.assessmentAnalytics = async(req, res) => {
+  let reportData;
+  try {
+    reportData = {"users_attended_assessment":24,"users_in_progress":50,"user_cleared_assessment":100,"user_failed_assessment":10,"success_rate_difficulty":[{"difficulty":"Easy","count":300},{"difficulty":"Medium","count":400},{"difficulty":"Hard","count":500}],"pass_rate_grades":[{"grade":"Grade 1","pass_rate":50},{"grade":"Grade 2","pass_rate":20},{"grade":"Grade 3","pass_rate":10},{"grade":"Grade 4","pass_rate":60},{"grade":"Grade 5","pass_rate":40},{"grade":"Grade 6","pass_rate":30},{"grade":"Grade 7","pass_rate":40},{"grade":"Grade 8","pass_rate":70},{"grade":"Grade 9","pass_rate":20},{"grade":"Grade 10","pass_rate":10},{"grade":"Grade 11","pass_rate":20},{"grade":"Grade 12","pass_rate":30}],"blooms_taxonomy":[{"taxonomy":"Understand","avg_marks":50},{"taxonomy":"Analyze","avg_marks":20},{"taxonomy":"Apply","avg_marks":10}],"average_scores":[{"subject":"IQ","percentile":50},{"subject":"EQ","percentile":95},{"subject":"Pedagogy","percentile":30},{"subject":"Digital Literacy","percentile":40},{"subject":"Communication Skills","percentile":55},{"subject":"Psychometric","percentile":70},{"subject":"Hard Skills","percentile":80},{"subject":"Core Skill","percentile":30}]};
+    return ReS(res, {data: reportData}, 200);
+
+  } catch (err) {
+  return ReE(res, err, 422);
+  }
+}
+
+module.exports.assessmentUserAnalytics = async(req, res) => {
+  let reportData;
+  try {
+    reportData = {"count":288,"rows":[{"name":"Dhrumil White","screening_time":"50 mins 32 secs","screening_score":30,"screening_score_total":40,"mains_score":120,"mains_score_total":150,"status":"cleared"},{"name":"Devon Black","screening_time":"50 mins 32 secs","screening_score":31,"screening_score_total":40,"mains_score":110,"mains_score_total":150,"status":"cleared"}]};
+    // [err, reportData] = await to(user_recommendations.findAndCountAll({
+    //   attributes: ['screening_score', 'screening_score_total', 'mains_score', 'mains_score_total', 'status']
+    // }))
+    return ReS(res, {data: reportData}, 200);
+
+  } catch (err) {
+  return ReE(res, err, 422);
+  }
+}

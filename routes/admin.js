@@ -19,6 +19,8 @@ require("../middleware/admin-auth")(adminPassport);
 
 // ********************* DASHBOARD REPORT ROUTES **************************
 router.get("/dashboard/reports", adminPassport.authenticate("jwt", { session: false }), ReportController.dashboardReport);
+router.get("/assessment/reports", adminPassport.authenticate("jwt", { session: false }), ReportController.assessmentAnalytics);
+router.get("/assessment/users/reports", adminPassport.authenticate("jwt", { session: false }), ReportController.assessmentUserAnalytics);
 
 // ********************* ADMIN ROUTES **************************
 router.get("/", adminPassport.authenticate("jwt", { session: false }), AdminController.get); // R
