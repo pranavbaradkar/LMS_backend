@@ -14,7 +14,11 @@ const  UserController = require("../controllers/admin/user.controller");
 const  CampaignController = require("../controllers/admin/campaign.controller");
 const  RoleController = require("../controllers/admin/role.controller");
 const  MetaController = require("../controllers/meta.controller");
+const  ReportController = require("../controllers/admin/report.controller");
 require("../middleware/admin-auth")(adminPassport);
+
+// ********************* DASHBOARD REPORT ROUTES **************************
+router.get("/dashboard/reports", adminPassport.authenticate("jwt", { session: false }), ReportController.dashboardReport);
 
 // ********************* ADMIN ROUTES **************************
 router.get("/", adminPassport.authenticate("jwt", { session: false }), AdminController.get); // R
