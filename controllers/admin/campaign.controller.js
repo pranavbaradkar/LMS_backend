@@ -153,10 +153,21 @@ const getAllUserCampaigns = async function (req, res) {
  [err, usercount] = await to(users.count({}));
   console.log(usercount);
   let userObj = {};
-  console.log(req.user);
+
+
+  console.log(req.user.role);
+
   if(req.user.role_type == 'USER') {
     userObj = { user_id: req.user.id };
+
+    if(req.user.role && req.user.role.permission) {
+      let permission = JSON.parse(req.user.role.permission);
+      if(permission.campaigns && permission.campaigns.panel && permission.campaigns.panel.is_admin) {
+        userObj = {};
+      }
+    }
   }
+
   try {
     [err, campaignData] = await to(campaigns.findAll({ 
       where: userObj,

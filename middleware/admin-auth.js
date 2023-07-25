@@ -1,5 +1,5 @@
 const { ExtractJwt, Strategy } = require('passport-jwt');
-const { admins }      = require('../models');
+const { admins, roles }      = require('../models');
 const { CONFIG }        = require('../config/config');
 const {to}          = require('../services/util.service');
 
@@ -10,7 +10,8 @@ module.exports = function(passport){
     passport.use(new Strategy(opts, async function(jwt_payload, done) {
         let err, user;
         [err, user] = await to(admins.findByPk(jwt_payload.user_id));
-
+        [err, userRole] = await to(roles.findByPk(user.role_id));
+        user.role = userRole;
         if(err) {
             return done(err, false);
         }
