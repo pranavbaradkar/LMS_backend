@@ -147,6 +147,36 @@ const updateCampaignMeta = async function(insertData, campaign_id, table) {
   }
 }
 
+const getCampaingDropdown = async (req,res) => {
+  let err, campaignData;
+
+  [err, usercount] = await to(users.count({}));
+  let userObj = {};
+
+  if(req.user.role_type == 'USER') {
+    userObj = { user_id: req.user.id };
+    if(req.user.role && req.user.role.permission) {
+      let permission = JSON.parse(req.user.role.permission);
+      if(permission.campaigns && permission.campaigns.panel && permission.campaigns.panel.is_admin) {
+        userObj = {};
+      }
+    }
+  }
+
+  try {
+    [err, campaignData] = await to(campaigns.findAll({ 
+      where: userObj,
+      attributes: ['id', 'name']
+    }));
+    if(err) TE(err);
+
+    return ReS(res, {data: campaignData} , 422);
+  } catch (err) {
+    return ReE(res, err, 422);
+  }
+}
+module.exports.getCampaingDropdown = getCampaingDropdown;
+
 const getAllUserCampaigns = async function (req, res) {
   let err, campaignData;
 

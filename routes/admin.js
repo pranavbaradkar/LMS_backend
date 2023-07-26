@@ -117,7 +117,7 @@ router.put("/user/:user_id/recommend/status",adminPassport.authenticate("jwt", {
 // ********************* CAMPAIGN **************************
 router.post("/campaigns", adminPassport.authenticate("jwt", { session: false }), CampaignController.createCampaigns);
 router.get("/campaigns", adminPassport.authenticate("jwt", { session: false }), CampaignController.getAllUserCampaigns);
-
+router.get("/campaigns/dropdown", adminPassport.authenticate("jwt", { session: false }), CampaignController.getCampaingDropdown);
 
 router.get("/campaigns/dashboard", adminPassport.authenticate("jwt", { session: false }), DashboardController.getCampaignDashboard);
 router.post("/campaigns/assessments", adminPassport.authenticate("jwt", { session: false }), CampaignController.getCampaignAssessment);
