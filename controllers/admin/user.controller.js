@@ -38,6 +38,7 @@ users.hasOne(model.user_interviews, { foreignKey: 'user_id', as:'interview' });
 demovideo_details.belongsTo(model.users,  { foreignKey: 'user_id' });
 users.hasMany(model.demovideo_details, { foreignKey: 'user_id', as:'demo_video' });
 user_recommendations.belongsTo(model.users, { foreignKey: 'user_id' });
+user_recommendations.belongsTo(user_interviews, {foreignKey: "user_id", targetKey:'user_id' });
 
 user_assessments.belongsTo(model.professional_infos, {foreignKey: 'user_id', targetKey: 'user_id' });
 
@@ -2045,7 +2046,7 @@ const getInterviewDate = () => {
   return formattedDate;
 }
 
-const getSingleInterestedSchoolId = async (user_id) => {
+const getInterestedSchoolIds = async (user_id) => {
   let err, userData;
   if(!user_id) return TE('user_id should not be null');
   [err, userData] = await to(users.findOne({
@@ -2059,24 +2060,28 @@ const getSingleInterestedSchoolId = async (user_id) => {
   if(userData) {
     userSchoolIds = userData.teaching_interests.school_ids ? userData.teaching_interests.school_ids : userSchoolIds;
   };
-  let schoolId = _.sample(userSchoolIds);
-  console.log(`Selected ${schoolId} from an array of ${userSchoolIds}`);
-  return schoolId;
+  return userSchoolIds;
 }
 
-const getInterviewerDetails = async (user_id, schoolId) => {
-  let err, userData, schoolData;
+const getSingleInterestedSchoolId = async (user_id) => {
+  let userSchoolIds = await getInterestedSchoolIds(user_id);
+  return _.sample(userSchoolIds);
+}
+
+const getInterviewerDetails = async (schoolIds) => {
+  let err, schoolData;
   [err, schoolData] = await to(schools.findAll({ 
-    where: { id: schoolId }, 
+    where: { id: { [Op.in] :schoolIds} }, 
     attributes: ['id', 'name', 'address'],
     include: [
       { 
         model: interviewers, 
         where: { interview_slot: null },
-        attributes: ['id', 'name', 'interview_slot'] 
+        attributes: ['id', 'name', 'interview_slot', 'school_id'] 
       }
     ]
   }));
+  // console.log("searching for empty slots in schools->interviewers in schoolIds: ", schoolIds);
   // console.log(JSON.parse(JSON.stringify(schoolData)));
   if(schoolData[0]) {
     let interviewer = _.sample(schoolData[0].interviewers);
@@ -2085,13 +2090,14 @@ const getInterviewerDetails = async (user_id, schoolId) => {
     return [
       interviewer.id,
       interviewer.name,
-      `${schoolData[0].name}, ${schoolData[0].address}`
+      `${schoolData[0].name}, ${schoolData[0].address}`,
+      interviewer.school_id
     ];
     
   }
   else { 
     //TODO: set a default interviwer
-    return TE(`School data for school_id ${schoolId} not found`);
+    return TE(`Empty slot for interviewer not found for schoolIds`, schoolIds);
    }
 }
 
@@ -2103,20 +2109,28 @@ module.exports.setUserInterview = async (req, res) => {
   try {
     // check recommendation_status before setting up interview
     [err, recommendData] =  await to(user_recommendations.findOne({
-      where: { user_id: req.params.user_id}
+      where: { user_id: req.params.user_id},
+      include:[
+        { model: user_interviews, required: false}
+      ]
     }));
+    if(err) return ReE(res, err, 422);
     // console.log("the recommendation by ai ", JSON.parse(JSON.stringify(recommendData)));
     if(recommendData && (recommendData.ai_recommendation == null || recommendData.recommendation_status == 'DISAGREE')) {
       return ReE(res, "The user is not recommended for interview", 422);
     }
-
+    if(recommendData && recommendData.user_interview) {
+      return ReS(res, {data: recommendData.user_interview }, 200);
+    }
+    
     let levelMap = {};
     [err, levelData] = await to(levels.findAll({attributes:['id', 'name']}));
     levelData.map(ele => { levelMap[ele.name] = ele.id; } );
     let payload = req.body;
     payload.user_id = req.params.user_id;
-    let schoolId = await getSingleInterestedSchoolId(req.params.user_id);
-    let [id, interviewerName, interviewLocation]   = await getInterviewerDetails(req.params.user_id, schoolId);
+    // let schoolId = await getSingleInterestedSchoolId(req.params.user_id);
+    let schoolIds = await getInterestedSchoolIds(req.params.user_id);
+    let [id, interviewerName, interviewLocation, schoolId]   = await getInterviewerDetails(schoolIds);
     payload.interviewer_id  = (payload.interview_slot) ? payload.interview_slot : id;
     payload.interviewer     = (payload.interviewer) ? payload.interviewer : interviewerName;
     payload.exam_location   = (payload.exam_location) ? payload.exam_location : interviewLocation;
@@ -2125,7 +2139,7 @@ module.exports.setUserInterview = async (req, res) => {
     if(payload.recommended_level && payload.recommended_level != '') {
       payload.recommended_level = levelMap[payload.recommended_level];
     }
-    console.log( "the palaod ",payload);
+    // console.log( "the palaod ",payload);
     [err, interviewData] = await to(user_interviews.update(payload, {where : {user_id: req.params.user_id} }));
     if(err) return ReE(res, err, 422);
 
@@ -2152,7 +2166,7 @@ module.exports.setUserInterview = async (req, res) => {
 }
 
 module.exports.updateRecommendStatus = async (req, res) => {
-  let err, recommendData, interviewData, interviewFeedbackData;
+  let err, recommendData, interviewData, interviewFeedbackData,userInterviewData,interviewersData;
   let payload = req.body;
   if (_.isEmpty(req.params.user_id) || _.isUndefined(req.params.user_id)) {
     return ReE(res, "user id required in params", 422);
@@ -2167,15 +2181,28 @@ module.exports.updateRecommendStatus = async (req, res) => {
     if(err) return ReE(res, err, 422);
     if(recommendData) {
       recommendData.recommendation_status = payload.recommendation_status;
+      recommendData.status = payload.recommendation_status == 'AGREE' ? 'PENDING' : 'PENDING';
       recommendData.save();
       if(recommendData.ai_recommendation != null && payload.recommendation_status == 'DISAGREE') {
+        // set status in recommendataion 
+        recommendData.status = 'NOT_SELECTED';
+        recommendData.save();
+        // delete interview slot
+        [err, userInterviewData] = await to(user_interviews.findOne({
+          where: {user_id: req.params.user_id}, 
+          attributes: ['user_id', 'interviewer_id']
+        }));
+        if(userInterviewData){
+          [err, interviewersData] = await to(interviewers.update({interview_slot: null },
+            {where: { id: userInterviewData.interviewer_id } }));
+        }
         [err, interviewData] = await to(user_interviews.destroy({ where: { user_id: req.params.user_id }  }));
         [err, interviewFeedbackData] = await to(user_interview_feedbacks.destroy({ where: { user_id: req.params.user_id }  }));
+        // console.log('User Interview Data:', JSON.stringify(userInterviewData));
       }
     }
 
     return ReS(res, {data: recommendData}, 200);
-
   } catch (err) {
     return ReE(res, err, 422);
   }
