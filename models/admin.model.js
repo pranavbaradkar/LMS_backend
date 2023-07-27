@@ -18,7 +18,7 @@ module.exports = (sequelize, DataTypes) => {
     status     : { type: DataTypes.ENUM("ACTIVE", "INACTIVE", "PENDING", "BLOCKED"), allowNull: false, defaultValue: "ACTIVE" },
     is_deleted : { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     deleted_at : { type: DataTypes.DATE, allowNull: true, defaultValue: null },
-    school_ids : { type: DataTypes.JSONB, allowNull: true ,defaultValue: null},
+    school_ids : { type: DataTypes.JSONB, allowNull: true},
   },{
     timestamps: true,
     paranoid: true,
