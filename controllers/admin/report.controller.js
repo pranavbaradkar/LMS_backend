@@ -39,7 +39,7 @@ module.exports.assessmentAnalytics = async(req, res) => {
 module.exports.assessmentUserAnalytics = async(req, res) => {
   let reportData;
   try {
-    reportData = {"count":288,"rows":[{"name":"Dhrumil White","screening_time":"50 mins 32 secs","screening_score":30,"screening_score_total":40,"mains_score":120,"mains_score_total":150,"status":"cleared"},{"name":"Devon Black","screening_time":"50 mins 32 secs","screening_score":31,"screening_score_total":40,"mains_score":110,"mains_score_total":150,"status":"cleared"}]};
+    reportData = {"count":288,"rows":[{"name":"Dhrumil White","email":"dhrumil@gmail.com","assessment_score":30,"assessment_score_total":40,"time_taken":"50 mins 56 secs","status":"cleared"},{"name":"Devon Black","email":"devon@gmail.com","assessment_score":31,"assessment_score_total":40,"time_taken":"40 mins 56 secs","status":"cleared"}]};
     // [err, reportData] = await to(user_recommendations.findAndCountAll({
     //   attributes: ['screening_score', 'screening_score_total', 'mains_score', 'mains_score_total', 'status']
     // }))
