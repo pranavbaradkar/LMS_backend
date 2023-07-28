@@ -1,21 +1,3 @@
-// 'use strict';
-
-// module.exports = {
-//   async up(queryInterface, Sequelize) {
-//     return [
-//       queryInterface.addColumn("admins", "school_ids", {
-//         type: 'jsonb USING CAST("school_ids" as jsonb)',
-//         allowNull: true
-//       })
-//     ];
-//   },
-
-//   async down (queryInterface, Sequelize) {
-//     return [
-//       queryInterface.removeColumn('admins', 'school_ids'),
-//     ]
-//   }
-// }
 'use strict';
 
 module.exports = {
