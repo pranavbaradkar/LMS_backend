@@ -136,7 +136,7 @@ const getAllRoleUsers = async function (req, res) {
       {where: {role_type:'USER', is_deleted:false},
       include: [
         { model: roles, attributes: ['id', 'name'] },
-        // {model: schools, attributes:['id','name']}
+        // { model: schools, attributes:['id','name']}
       ],
       order: [
         ['id', 'DESC'],
@@ -167,23 +167,22 @@ const getAllRoleUsers = async function (req, res) {
     //   })
     // }
     if (userData) {
-      await Promise.all(
-        userData.map(async (ele) => {
+      let data = userData.map(async (ele) => {
+          let obj = {...ele.get({plain: true})};
           if (ele.school_ids !== null) {
             [err, findSchools] = await to(
               schools.findAll({
                 where: { id: { [Op.in]: ele.school_ids } },
                 attributes: ['name'],
-                raw: true,
+                raw: true
               })
             );
             if (err) return ReE(res, err, 422);
-            ele.school_ids = findSchools.map((school) => school.name); 
+            obj.school_name = findSchools.map((school) => school.name); 
           }
-          return ele;
-        })
-      );
-      userData = userData;
+          return obj;
+        });
+      userData = await Promise.all(data);
     }
     
     if (err) return ReE(res, err, 422);
