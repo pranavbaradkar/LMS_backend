@@ -9,7 +9,7 @@ require("../middleware/admin-auth")(adminPassport);
 const MetaController 	= require('../controllers/meta.controller');
 
 //********* Meta Router **********
-router.get('/:table', adminPassport.authenticate("jwt", { session: false }), MetaController.getMeta);
+router.get('/:table', MetaController.getMeta);
 router.get('/:table/:id', MetaController.getSingleMeta);
 
 module.exports = router;

@@ -59,7 +59,11 @@ grade_subjects.belongsTo(subjects, { foreignKey: 'subject_id' });
 
 // update meta data
 const getMeta = async function (req, res) {
-  let reqUser = req.user
+  let adminId = null;
+  if(req.query && req.query.admin_id) {
+    adminId = req.query.admin_id;
+    delete req.query.admin_id;
+  }
   let err, response, findAdmin;
   let tableName = req.params.table;
   let queryParams = {};
@@ -209,15 +213,20 @@ const getMeta = async function (req, res) {
       paginateData = getFilterObject(req, 'brand_id', paginateData);
       paginateData = getFilterObject(req, 'cluster_id', paginateData);
 
-      [err, findAdmin] = await to(admins.findOne({ where: { id: reqUser.id } , attributes: ['school_ids'],raw:true}));
-      let schoolIdsArray = findAdmin.school_ids.map(ele => ele.id)
-      let ni = {
-                 id: {
-                 [Op.in]: schoolIdsArray
-                 }
+      if(adminId) {
+        [err, findAdmin] = await to(admins.findOne({ where: { id: adminId } , attributes: ['school_ids'], raw:true}));
+        let schoolIdsArray = findAdmin && findAdmin.school_ids ? findAdmin.school_ids : [];
+        if(schoolIdsArray.length > 0) {
+          let ni = {
+            id: {
+              [Op.in]: schoolIdsArray
+            }
+          }
+          paginateData.where = ni
         }
-      paginateData.where = ni
-  
+      }
+
+      
       let boardObj = {
         model: model.school_boards,
         attributes: ['board_id'],
