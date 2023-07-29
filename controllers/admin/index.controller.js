@@ -1,4 +1,4 @@
-const { admins, users, roles } = require("../../models");
+const { admins, users, roles, schools } = require("../../models");
 const { to, ReE, ReS, toSnakeCase } = require('../../services/util.service');
 const validator = require('validator');
 var Sequelize = require("sequelize");
@@ -6,6 +6,7 @@ const Op = Sequelize.Op;
 var _ = require('underscore');
 
 admins.belongsTo(roles, { foreignKey: 'role_id' });
+admins.belongsTo(schools, { foreignKey: 'school_ids' });
 
 const create = async function (req, res) {
   let body = req.body;
@@ -135,8 +136,56 @@ const getAllRoleUsers = async function (req, res) {
       {where: {role_type:'USER', is_deleted:false},
       include: [
         { model: roles, attributes: ['id', 'name'] },
+        // {model: schools, attributes:['id','name']}
       ],
+      order: [
+        ['id', 'DESC'],
+    ],
     }));
+    // console.log("...................",pi);
+    // if(userData){
+    //   let pi =  userData.map(async (ele,index) =>{
+    //     // console.log("''''''''''''''''''''''''",ele);
+    //   if(ele.school_ids !== null){
+    //     // console.log("......../////////////////////......",ele.school_ids);
+    //     [err, findSchools] = await to(schools.findAll({
+    //      where:{id: {[Op.in]: ele.school_ids}},
+    //      attributes: ['name'],
+    //      raw:true
+    //     }));
+    //     if (err) return ReE(res, err, 422);
+    //     console.log("/////////////////////",findSchools);
+
+
+    //     // if(findSchools.length > 0){
+    //       // var ni = findSchools.map(ele => ele.name)
+    //       // console.log("....................",ni);
+    //     ele.school_ids = findSchools
+    //     // }
+    //   }
+    //   return ele
+    //   })
+    // }
+    if (userData) {
+      await Promise.all(
+        userData.map(async (ele) => {
+          if (ele.school_ids !== null) {
+            [err, findSchools] = await to(
+              schools.findAll({
+                where: { id: { [Op.in]: ele.school_ids } },
+                attributes: ['name'],
+                raw: true,
+              })
+            );
+            if (err) return ReE(res, err, 422);
+            ele.school_ids = findSchools.map((school) => school.name); 
+          }
+          return ele;
+        })
+      );
+      userData = userData;
+    }
+    
     if (err) return ReE(res, err, 422);
     if (userData && userData.length > 0) {
       return ReS(res, { data: userData }, 200);
@@ -162,6 +211,20 @@ const getRoleUser = async function (req, res) {
       ],
      }));
     if (err) return ReE(res, err, 422);
+
+     if(roleUserData &&roleUserData.school_ids){
+       [err, findSchools] = await to(schools.findAll({
+        where:{id: {[Op.in]: roleUserData.school_ids}},
+        attributes: ['name']
+       }));
+       if (err) return ReE(res, err, 422);
+       if(findSchools.length > 0){
+         var ni = findSchools.map(ele => ele.name)
+         roleUserData.school_ids = ni
+       }
+       if (err) return ReE(res, err, 422);
+     }
+
     if (roleUserData !== null) {
       return ReS(res, { data: roleUserData }, 200);
     } else {
