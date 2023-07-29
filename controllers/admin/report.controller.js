@@ -1,24 +1,200 @@
-const { interviewers, roles,subjects, boards, schools, levels, user_teaching_interests, users, demovideo_details, user_interviews, user_interview_feedbacks, user_assessments, assessment_results, academics, professional_infos, custom_attributes, school_inventories, user_recommendations, assessment_configurations } = require("../../models");
-const model = require('../../models');
+const { campaigns,campaign_schools, campaign_assessments,assessment_configurations,user_assessment_logs, users, demovideo_details, levels, user_interviews, user_interview_feedbacks, user_assessments, assessment_results,  user_recommendations } = require("../../models");
+const { sequelize } = require('../../models');
 const authService = require("../../services/auth.service");
 const { to, ReE, ReS, capitalizeWords, toSnakeCase, paginate, snakeToCamel, requestQueryObject, randomHash, getUUID } = require('../../services/util.service');
 var _ = require('underscore');
 var Sequelize = require("sequelize");
 const Op = Sequelize.Op;
+const moment = require('moment');
 
 const PSYCHOMETRIC_SKILL_ID = process.env.PSYCHOMETRIC_SKILL_ID || 48;
 const PSYCHOMETRIC_ANSWER_MAX_VALUE = process.env.PSYCHOMETRIC_ANSWER_MAX_VALUE || 4;
 
+users.hasOne(user_recommendations, {foreignKey: 'user_id'});
+users.hasOne(user_interview_feedbacks, {foreignKey: 'user_id'});
+campaign_assessments.hasMany(user_assessments, { foreignKey: "assessment_id", sourceKey: "assessment_id" });
+user_assessments.belongsTo(campaign_assessments, { foreignKey: 'assessment_id', targetKey: 'assessment_id'});
+campaign_assessments.belongsTo(campaign_schools, { foreignKey: 'campaign_id', targetKey: 'campaign_id'});
+assessment_configurations.belongsTo(user_assessments, { foreignKey: "assessment_id", sourceKey: "assessment_id" });
+user_assessments.hasOne(user_assessment_logs, { foreignKey: "assessment_id", sourceKey: "assessment_id" });
+assessment_configurations.belongsTo(levels, {foreignKey: 'level_id' });
+demovideo_details.belongsTo(user_recommendations, {foreignKey: 'user_id', targetKey:'user_id'});
+
 module.exports.dashboardReport = async(req, res) => {
-  let reportData;
+  let err, userData, reportData;
+  
   try {
-    if(req.query && req.query.user_type=='TEACHER') { 
-      reportData = {"total_sign_up":400,"screening_cleared":900,"mains_cleared":300,"demo_cleared":500,"interview_cleared":100,"conversion":[{"offer_selection":"YES","count":47},{"offer_selection":"NO","count":56},{"offer_selection":"MAYBE","count":156}],"interview":[{"level":"Foundational","demo_video_count":1000,"interview_count":500},{"level":"Preparatory","demo_video_count":1000,"interview_count":500},{"level":"Middle","demo_video_count":1000,"interview_count":500},{"level":"Secondary","demo_video_count":1000,"interview_count":500},{"level":"Sr. Secondary","demo_video_count":1000,"interview_count":500}],"success":[{"level":"Foundational","screening_count":1000,"mains_count":500},{"level":"Preparatory","screening_count":1000,"mains_count":500},{"level":"Middle","screening_count":1000,"mains_count":500},{"level":"Secondary","screening_count":1000,"mains_count":500},{"level":"Sr. Secondary","screening_count":1000,"mains_count":500}],"users":[{"level":"Foundational","screening_count":1000,"mains_count":500},{"level":"Preparatory","screening_count":1000,"mains_count":500},{"level":"Middle","screening_count":1000,"mains_count":500},{"level":"Secondary","screening_count":1000,"mains_count":500},{"level":"Sr. Secondary","screening_count":1000,"mains_count":500}],"time_to_answer":[{"level":"Foundational","screening_count":1000,"mains_count":500},{"level":"Preparatory","screening_count":1000,"mains_count":500},{"level":"Middle","screening_count":1000,"mains_count":500},{"level":"Secondary","screening_count":1000,"mains_count":500},{"level":"Sr. Secondary","screening_count":1000,"mains_count":500}],"platform":[{"platform":"Web App","count":500},{"platform":"Mobile App","count":700},{"platform":"IOS","count":400}]};
+    const currentDate = moment();
+    // Calculate the start_time of the last seven days
+    // FIXME: change the date back to 7 days insted of 365
+    const startOfLastSevenDays = moment(currentDate).subtract(365, 'days').startOf('day');
+    // Calculate the end_time of the last seven days (end of today)
+    const endOfLastSevenDays = moment(currentDate).endOf('day');
+    
+    let filter = {};
+    let startDate = req.query.start_date || startOfLastSevenDays.format('YYYY-MM-DD');
+    let endDate = req.query.end_date || endOfLastSevenDays.format('YYYY-MM-DD');
+    filter.where = { created_at: { [Op.between]: [startDate, endDate] } };
+    
+    filter.attributes = ['id', 'user_type'];
+    let user_assessments_filter = { 
+      model: user_assessments, attributes: ['id','assessment_id', 'status', 'type'],
+      include: [
+        { 
+          paranoid: false,
+          model: assessment_configurations, attributes:['id','level_id', 'assessment_type'],
+          include: [ { model: levels, attributes:['id', 'name'] } ]
+        },
+        {
+          model: user_assessment_logs, attributes: ['assessment_id','elapsed_time']
+        }
+      ]
+    };
+    filter.include = [
+      { model: assessment_results, attributes: ['assessment_id', 'type', 'result'] },
+      user_assessments_filter,
+      { model: demovideo_details, as: 'demo_video', attributes: ['status']},
+      { model: user_recommendations, attributes: ['status']},
+      { model: user_interview_feedbacks, attributes: ['offer_selection']}
+    ];
+    filter.order = [['id', 'desc']];
+    if(req.query.user_type) {
+      filter.where.user_type = req.query.user_type;
     }
-    else {
-      reportData = {"total_sign_up":5200,"screening_cleared":4800,"mains_cleared":2400,"demo_cleared":1000,"interview_cleared":500,"conversion":[{"offer_selection":"YES","count":47},{"offer_selection":"NO","count":56},{"offer_selection":"MAYBE","count":156}],"interview":[{"level":"Foundational","demo_video_count":1000,"interview_count":500},{"level":"Preparatory","demo_video_count":1000,"interview_count":500},{"level":"Middle","demo_video_count":1000,"interview_count":500},{"level":"Secondary","demo_video_count":1000,"interview_count":500},{"level":"Sr. Secondary","demo_video_count":1000,"interview_count":500}],"success":[{"level":"Foundational","screening_count":1000,"mains_count":500},{"level":"Preparatory","screening_count":1000,"mains_count":500},{"level":"Middle","screening_count":1000,"mains_count":500},{"level":"Secondary","screening_count":1000,"mains_count":500},{"level":"Sr. Secondary","screening_count":1000,"mains_count":500}],"users":[{"level":"Foundational","screening_count":1000,"mains_count":500},{"level":"Preparatory","screening_count":1000,"mains_count":500},{"level":"Middle","screening_count":1000,"mains_count":500},{"level":"Secondary","screening_count":1000,"mains_count":500},{"level":"Sr. Secondary","screening_count":1000,"mains_count":500}],"time_to_answer":[{"level":"Foundational","screening_count":1000,"mains_count":500},{"level":"Preparatory","screening_count":1000,"mains_count":500},{"level":"Middle","screening_count":1000,"mains_count":500},{"level":"Secondary","screening_count":1000,"mains_count":500},{"level":"Sr. Secondary","screening_count":1000,"mains_count":500}],"platform":[{"platform":"Web App","count":500},{"platform":"Mobile App","count":700},{"platform":"IOS","count":400}]};
+    if(req.query.campaign_ids || req.query.school_ids) {
+      filter.include = filter.include.map(ele => {
+        // console.log("the model in filter now is ", ele.model);
+        // if(ele.model == 'user_assessments')
+        //   ele.required = true;  
+        ele.required = true;
+        return ele;
+      } ); 
+
+      let user_assessment_filter_include = { 
+        required: true,
+        model: campaign_assessments, attributes: ['campaign_id', 'assessment_id'],
+        where: { deleted_at: null }
+        // include
+      };
+      if(req.query.campaign_ids && req.query.campaign_ids != -1){
+        let campaign_where = { [Op.in]: (req.query.campaign_ids).split(",") };
+        user_assessment_filter_include.where.campaign_id = campaign_where;
+      }
+      if(req.query.school_ids && req.query.school_ids != -1){
+        // TE("Am I here?");
+        user_assessment_filter_include.include = {
+          required: true, where: { deleted_at : null },
+          model: campaign_schools
+        };
+        let school_where = { [Op.in]: (req.query.school_ids).split(",") };
+        user_assessment_filter_include.include.where.school_id = school_where;
+      }
+
+      user_assessments_filter.include.push(user_assessment_filter_include);
     }
-    return ReS(res, {data: reportData}, 200);
+    // console.log("the filter",JSON.stringify(filter));
+    // console.log("the filter user_assessment ",filter.include[1]);
+    // console.log("the filter user_assessment > campaign_assessment ",filter.include[1].include[0]);
+    [err, userData] = await to(users.findAndCountAll(filter));
+    if(err) return ReE(res, err, 422);
+
+    let report                    = {};
+    report.total_sign_up          = 0;
+    report.screening_cleared      = 0;
+    report.mains_cleared          = 0;
+    report.demo_cleared           = 0;
+    report.interview_cleared      = 0;
+    report.platform               = [{"platform":"Web App","count":500},{"platform":"Mobile App","count":700},{"platform":"IOS","count":400}];
+    report.conversion             = [];
+    let offer_selection_yes       = 0;
+    let offer_selection_no        = 0;
+    let offer_selection_maybe     = 0;
+    let success_rate              = [];
+    let allLevels                 = ["Pre-Primary","Foundational","Preparatory","Middle","Secondary","Senior Secondary"];
+    let sr                        = {}; // success rate for mains/screening
+    let idsr                      = {}; // interview demo success rate
+    let usr                       = {}; // user appeared for mains/screening
+    let et                        = {}; // elapsed time for mains/screening
+    allLevels.forEach(lev => { 
+      sr[lev]   = { "level":lev, "SCREENING": 0, "MAINS": 0};
+      usr[lev]  = { "level":lev, "SCREENING": 0, "MAINS": 0 }; // {"level":lev, "screening_count": 0, "mains_count": 0 }
+      idsr[lev] = { "level": lev,"demo_video_count":0,"interview_count":0}; 
+      et[lev]   = { "level":lev, "SCREENING": [], "MAINS": []};
+    } );
+    
+    userData.rows.forEach((row, index) => {
+      report.total_sign_up++;
+      let obj = row.get({plain: true});
+      if(obj && obj.assessment_results) {
+        obj.assessment_results.forEach(elem => {
+          if(elem == 'SCREENING' && elem.result == 'PASSED') { report.screening_cleared++; }
+          if(elem == 'MAINS' && elem.result == 'PASSED') { report.mains_cleared++; }
+        });
+      }
+      if(obj && obj.user_interview_feedback && obj.user_interview_feedback.offer_selection) {
+        if(obj.user_interview_feedback.offer_selection == 'YES') { offer_selection_yes++; }
+        if(obj.user_interview_feedback.offer_selection == 'NO') { offer_selection_no++; }
+        if(obj.user_interview_feedback.offer_selection == 'MAYBE') { offer_selection_maybe++; }
+      }
+
+      //================================ level based data
+      if(obj && obj.user_assessments) {
+        obj.user_assessments.forEach(ua => {
+          if(ua.assessment_configuration) {
+            let aConfig   = ua.assessment_configuration;
+            let type      = aConfig.assessment_type;
+            let result    = ua.status;
+            let level     = aConfig.level.name;
+            // console.log("assessmentconfig id",ua.assessment_id, level, type, result);
+            // let type_count= type.toLowerCase()+_+'total';
+            usr[level][type]++;
+            sr[level][type] += (result == 'PASSED') ? 1 : 0;
+            // sr[level][type]++;
+            if(obj && obj.demo_video) {
+              obj.demo_video.forEach(elem => {
+                if(elem.status == 'RECOMMENDED') { idsr[level].demo_video_count++; }
+              });
+            }
+            if(obj && obj.user_recommendation && obj.user_recommendation.status && obj.user_recommendation.status == 'SELECTED') {
+              idsr[level].interview_count++;
+            }
+            if(ua.user_assessment_log && ua.user_assessment_log.elapsed_time) {
+              let c = ua.user_assessment_log.elapsed_time;
+              et[level][type].push(c);
+            }
+          }
+        });
+      }
+    });
+    report.conversion.push({"offer_selection":"YES","count":offer_selection_yes});
+    report.conversion.push({"offer_selection":"NO","count":offer_selection_no});
+    report.conversion.push({"offer_selection":"MAYBE","count":offer_selection_maybe});
+    report.interview      = Object.values(idsr);
+
+    // console.log("the passed scr/mains", sr);
+    // console.log("the appeared scr/mains ", usr);
+    // console.log("the interview/demo success rate", idsr);
+    // console.log("the interview/demo success rate", et);
+    
+    report.success          = [];
+    report.users            = [];
+    report.time_to_answer   = [];
+    Object.keys(sr).forEach(lev => {
+      let screeningTotal    = usr[lev]['SCREENING'];
+      let screeningRate     = (screeningTotal >0) ? ((sr[lev]['SCREENING']/screeningTotal)*100).toFixed(2) : 0;
+      let mainsTotal        = usr[lev]['MAINS'];
+      let mainsRate         = (mainsTotal > 0) ? ((sr[lev]['MAINS']/mainsTotal)*100).toFixed(2) : 0;
+      report.success.push({level: lev, screening_count: screeningRate, mains_count: mainsRate });
+      report.users.push({level: lev, screening_count: screeningTotal, mains_count: mainsTotal });
+
+      let totalScreeningTme = et[lev]['SCREENING'].reduce((total, val) => total+val,0);
+      console.log("total screening time ", lev, totalScreeningTme);
+      let avgScreeningTime  = (et[lev]['SCREENING'].length > 0) ? ((totalScreeningTme)/et[lev]['SCREENING'].length).toFixed(0) : 0;
+      report.time_to_answer.push({level: lev, screening_count: avgScreeningTime});
+    });
+
+    // return ReS(res, {data: { report: report, user_data: userData}}, 200);
+    return ReS(res, {data: report}, 200);
 
   } catch (err) {
   return ReE(res, err, 422);
