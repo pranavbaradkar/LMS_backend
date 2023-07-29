@@ -211,21 +211,22 @@ const getRoleUser = async function (req, res) {
      }));
     if (err) return ReE(res, err, 422);
 
-     if(roleUserData &&roleUserData.school_ids){
+     let result = roleUserData.get({plain: true});
+     if(result &&result.school_ids){
        [err, findSchools] = await to(schools.findAll({
-        where:{id: {[Op.in]: roleUserData.school_ids}},
+        where:{id: {[Op.in]: result.school_ids}},
         attributes: ['name']
        }));
        if (err) return ReE(res, err, 422);
        if(findSchools.length > 0){
          var ni = findSchools.map(ele => ele.name)
-         roleUserData.school_ids = ni
+         result.school_name = ni
        }
        if (err) return ReE(res, err, 422);
      }
 
-    if (roleUserData !== null) {
-      return ReS(res, { data: roleUserData }, 200);
+    if (result !== null) {
+      return ReS(res, { data: result }, 200);
     } else {
       return ReE(res, "No role data found", 404);
     }
