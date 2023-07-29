@@ -1521,7 +1521,9 @@ const getUserDetails = async (req, res)=> {
             { 
               model: user_interview_feedbacks, 
               as: 'interview_feedback',
-              attributes: ["about_candidate","candidate_past","ctc_current","ctc_expected","teaching_grades","teaching_boards","confidence_score","appearence_score","interview_notes","overall_rating","offer_selection"],
+              attributes: ["about_candidate","candidate_past","ctc_current","ctc_expected","teaching_grades","teaching_boards","confidence_score","appearence_score","interview_notes","overall_rating","offer_selection","position_applied",
+              "position_selected", "total_experience","relevant_experience","job_knowledge","communication_skills",
+            "interpersonal_and_team_skills","analytical_skills", "leadership_skills", "hod_name","hod_designation","personality_and_attitude", "notice_period"],
               require: false,
             },
 
@@ -1945,7 +1947,9 @@ const getUserInterview = async (req, res) => {
       // attributes: ['id', 'user_id', 'assessment_id', 'interviewer'],
       include: [ 
         { model: user_interview_feedbacks, as: 'interview_feedback', 
-        attributes:["about_candidate","candidate_past","ctc_current", "ctc_expected","teaching_grades","teaching_boards","confidence_score","appearence_score","interview_notes","overall_rating","offer_selection"],
+        attributes:["about_candidate","candidate_past","ctc_current", "ctc_expected","teaching_grades","teaching_boards","confidence_score","appearence_score","interview_notes","overall_rating","offer_selection","position_applied",
+        "position_selected", "total_experience","relevant_experience","job_knowledge","communication_skills",
+      "interpersonal_and_team_skills","analytical_skills", "leadership_skills", "hod_name","hod_designation","personality_and_attitude", "notice_period"]
         // where: { assessment_id: req.params.assessment_id }
        }
        
@@ -1972,7 +1976,9 @@ module.exports.getAllUserInterview = async (req, res) => {
         },
         { 
           model: user_interview_feedbacks, as: 'interview_feedback', 
-          attributes:["about_candidate","candidate_past","ctc_current", "ctc_expected","teaching_grades","teaching_boards","confidence_score","appearence_score","interview_notes","overall_rating","offer_selection"],
+          attributes:["about_candidate","candidate_past","ctc_current", "ctc_expected","teaching_grades","teaching_boards","confidence_score","appearence_score","interview_notes","overall_rating","offer_selection","position_applied",
+          "position_selected", "total_experience","relevant_experience","job_knowledge","communication_skills",
+        "interpersonal_and_team_skills","analytical_skills", "leadership_skills", "hod_name","hod_designation","personality_and_attitude", "notice_period"],
           // where: { assessment_id: req.params.assessment_id }
         },
         { 

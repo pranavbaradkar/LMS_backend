@@ -1,5 +1,5 @@
 const model = require('../models');
-const { clusters, brands, levels, grades, subjects, level_grades, grade_subjects, subject_skills, cities, countries, schools, states } = require("../models");
+const { clusters, brands, levels, grades, subjects, level_grades, grade_subjects, subject_skills, cities, countries, schools, states ,admins } = require("../models");
 const { to, ReE, ReS, paginate, requestQueryObject, getFilterObject, getFilterObjectWithKey }  = require('../services/util.service');
 const { masterTableMapping }  = require('../config/constant');
 const { Op } = require('sequelize');
@@ -59,7 +59,8 @@ grade_subjects.belongsTo(subjects, { foreignKey: 'subject_id' });
 
 // update meta data
 const getMeta = async function (req, res) {
-  let err, response;
+  let reqUser = req.user
+  let err, response, findAdmin;
   let tableName = req.params.table;
   let queryParams = {};
   let orData = [];
@@ -208,6 +209,15 @@ const getMeta = async function (req, res) {
       paginateData = getFilterObject(req, 'brand_id', paginateData);
       paginateData = getFilterObject(req, 'cluster_id', paginateData);
 
+      [err, findAdmin] = await to(admins.findOne({ where: { id: reqUser.id } , attributes: ['school_ids'],raw:true}));
+      let schoolIdsArray = findAdmin.school_ids.map(ele => ele.id)
+      let ni = {
+                 id: {
+                 [Op.in]: schoolIdsArray
+                 }
+        }
+      paginateData.where = ni
+  
       let boardObj = {
         model: model.school_boards,
         attributes: ['board_id'],
@@ -308,8 +318,9 @@ const getMeta = async function (req, res) {
 
     //console.log(req.params.table);
 
+    console.log("test1................",paginateData);
 
-    console.log(JSON.stringify(paginateData.where));
+    console.log("test................",JSON.stringify(paginateData.where));
 
     [err, response] = await to(model[table].findAndCountAll(paginateData));
     
@@ -350,8 +361,8 @@ const getMeta = async function (req, res) {
         return dataObj;
       })
     }
-
     if(table == 'schools') {
+      // console.log("test ...........................");
       response.rows = response.rows.map((ele) => {
         const dataObj = ele.get({ plain:true });
 

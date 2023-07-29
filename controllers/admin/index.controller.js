@@ -88,11 +88,12 @@ const update = async function (req, res) {
 module.exports.update = update;
 
 const createRoleUsers = async function (req, res) {
-  let payloadBody = req.body;
-  let payload = {};
-  for (const val in payloadBody) {
-    payload[toSnakeCase(val)] = payloadBody[val];
+  let payload = req.body;
+  // let payload = {};
+  for (const val in payload) {
+    payload[toSnakeCase(val)] = payload[val];
   }
+  // payload.school_ids = payload.school_ids
   if (!payload.first) {
     return ReE(res, "Please enter an first name", 422);
   } else if (!payload.title) {

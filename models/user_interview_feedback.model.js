@@ -15,6 +15,21 @@ module.exports = (sequelize, DataTypes) => {
     overall_rating          : { type: DataTypes.INTEGER, allowNull: true, defaultValue: null },
     interview_notes         : { type: DataTypes.TEXT, allowNull: true, defaultValue: null },
     offer_selection         : { type: DataTypes.ENUM('YES','NO', 'MAYBE'), allowNull: true, defaultValue: null },
+
+    position_applied                    : { type: DataTypes.STRING, allowNull: true, defaultValue: null },
+    position_selected                   : { type: DataTypes.STRING, allowNull: true, defaultValue: null },
+    total_experience                    : { type: DataTypes.STRING, allowNull: true, defaultValue: null },
+    relevant_experience                 : { type: DataTypes.STRING, allowNull: true, defaultValue: null },
+    job_knowledge                       : { type: DataTypes.TEXT, allowNull: true, defaultValue: null },
+    communication_skills                : { type: DataTypes.TEXT, allowNull: true, defaultValue: null },
+    interpersonal_and_team_skills       : { type: DataTypes.TEXT, allowNull: true, defaultValue: null },
+    analytical_skills                   : { type: DataTypes.TEXT, allowNull: true, defaultValue: null },
+    leadership_skills                   : { type: DataTypes.TEXT, allowNull: true, defaultValue: null },
+    hod_name                            : { type: DataTypes.STRING, allowNull: true, defaultValue: null },
+    hod_designation                     : { type: DataTypes.STRING, allowNull: true, defaultValue: null },
+    personality_and_attitude            : { type: DataTypes.TEXT, allowNull: true, defaultValue: null },
+    notice_period                       : { type: DataTypes.STRING, allowNull: true, defaultValue: null },
+    
     deleted_at              : { type: DataTypes.DATE, allowNull: true, defaultValue: null }
   },{
     underscored: true,
