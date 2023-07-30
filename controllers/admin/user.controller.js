@@ -1,4 +1,4 @@
-const { interviewers, roles,subjects, boards, schools, levels, user_teaching_interests, users, demovideo_details, user_interviews, user_interview_feedbacks, user_assessments, assessment_results, academics, professional_infos, custom_attributes, school_inventories, user_recommendations, assessment_configurations } = require("../../models");
+const { interviewers, roles,subjects, boards, schools, levels, user_teaching_interests, users, demovideo_details, user_interviews, user_interview_feedbacks, user_assessments, assessment_results, academics, professional_infos, custom_attributes, school_inventories, user_recommendations, assessment_configurations , admins} = require("../../models");
 const model = require('../../models');
 const authService = require("../../services/auth.service");
 const { to, ReE, ReS, capitalizeWords, toSnakeCase, paginate, snakeToCamel, requestQueryObject, randomHash, getUUID } = require('../../services/util.service');
@@ -22,6 +22,7 @@ schools.hasMany(interviewers,{ foreignKey: 'school_id'});
 user_interviews.hasOne(user_interview_feedbacks, { foreignKey: 'user_id', sourceKey: 'user_id',  as: 'interview_feedback' });
 user_interview_feedbacks.belongsTo(user_interviews , { foreignKey: 'user_id', targetKey: 'user_id'} );
 user_interviews.belongsTo(user_teaching_interests, {foreignKey: 'user_id', targetKey: 'user_id', as:'teaching_interests'});
+user_recommendations.belongsTo(user_teaching_interests, { foreignKey: 'user_id', targetKey: 'user_id', as: 'teaching_interests' });
 user_interviews.belongsTo(users, {foreignKey: 'user_id'});
 user_interviews.belongsTo(interviewers, {sourceKey: "interviewer_id" });
 
@@ -31,6 +32,7 @@ assessment_configurations.belongsTo(levels, { foreignKey: 'level_id' });
 model.users.hasMany(model.user_assessments, {foreignKey: 'user_id', targetKey: 'user_id'});
 user_assessments.belongsTo(model.users, { foreignKey: 'user_id' });
 user_assessments.belongsTo(demovideo_details,  { foreignKey: 'user_id', targetKey: 'user_id' });
+user_teaching_interests.belongsTo(model.user_recommendations, { foreignKey: 'user_id' });
 
 user_teaching_interests.belongsTo(model.users, { foreignKey: 'user_id' });
 users.hasOne(model.user_teaching_interests, { foreignKey: 'user_id', as:'teaching_interests' });
@@ -1570,7 +1572,8 @@ module.exports.getUserDetails = getUserDetails;
 
 const getUserRecommendation = async (req, res) => {
 try {
-  let err, userData;
+  let err, userData, findAdmin;
+  let reqUser = req.user
   try {
     let queryParams = {};
     let orData = [];
@@ -1612,6 +1615,9 @@ try {
 
     let userAttributes = ['first_name', 'email','phone_no', 'user_type'];
     let userDetails = { 
+      model: user_teaching_interests, 
+      as: 'teaching_interests', 
+       attributes: ['id', 'level_ids', 'school_ids', 'subject_ids', 'board_ids'],
       model: users, 
       as: 'user',
       where: userFilter,
@@ -1653,7 +1659,11 @@ try {
 
     console.log(paginateData);
 
-    [err, userData] = await to(user_recommendations.findAndCountAll(paginateData));
+    [err, userData] = await to(user_recommendations.findAndCountAll({paginateData,
+      include:[
+        {
+          model: user_teaching_interests, as: 'teaching_interests', attributes: ['subject_ids', 'level_ids', 'school_ids']
+        },]}));
     if (err) return ReE(res, err, 422);
     
     if (userData) {
@@ -1670,7 +1680,24 @@ try {
         }
          return obj;
       })
-      return ReS(res, { data: userData }, 200);
+      // let findAdmin;
+      // [err, findAdmin] = await to(admins.findOne({ where: { id: reqUser.id } , attributes: ['school_ids'], raw:true}));
+      // if(err) return ReE(res, err, 422);
+      // var schoolIdsArray = findAdmin && findAdmin.school_ids ? findAdmin.school_ids : [];
+      // console.log(";;;;;;;;;;;;;;;;;;",userData.rows );
+      
+      // var finalData = userData.rows.filter((ele) => {
+      //   console.log("............",ele.teaching_interests.school_ids);
+      //   // return ele.teaching_interests &&
+      //   //   ele.teaching_interests.school_ids &&
+      //   //   ele.teaching_interests.school_ids.some((schoolId) => schoolIdsArray.includes(schoolId));
+      // });
+      // console.log(";;;;;;;;;;;;;;;;;;",finalData);
+      // if (finalData.length > 0) {
+      //    return ReS(res, {data: finalData}, 200);
+      // }else{
+        // } 
+          return ReS(res, { data: userData }, 200);
     } else {
       return ReE(res, "No user data found", 404);
     }
@@ -1966,9 +1993,13 @@ module.exports.getUserInterview = getUserInterview;
 
 module.exports.getAllUserInterview = async (req, res) => {
   let err, interviewData;
+  let reqUser = req.user
+  
   try {
     [err, interviewData] = await to(user_interviews.findAll({ 
-      // where: { user_id: req.params.user_id},
+      // where: { school_id: {
+      //   [Op.or]: schoolIdsArray // .map(schoolId => ({ school_id: schoolId }))
+      // }},
       attributes: ['id', 'user_id', "recommended_level","interviewer_id","mode","exam_location","room_no","status","interview_notes","interview_remark"],
       include: [ 
         {
@@ -2027,7 +2058,22 @@ module.exports.getAllUserInterview = async (req, res) => {
       return row;
     });
 
-    return ReS(res, {data: resultData}, 200);
+      [err, findAdmin] = await to(admins.findOne({ where: { id: reqUser.id } , attributes: ['school_ids'], raw:true}));
+      if(err) return ReE(res, err, 422);
+      var schoolIdsArray = findAdmin && findAdmin.school_ids ? findAdmin.school_ids : [];
+
+      var finalData = resultData.filter((ele) => {
+        return ele.teaching_interests &&
+          ele.teaching_interests.school_ids &&
+          ele.teaching_interests.school_ids.some((schoolId) => schoolIdsArray.includes(schoolId));
+      });
+
+      if (finalData.length > 0) {
+         return ReS(res, {data: finalData}, 200);
+      }else{
+        return ReS(res, {data: resultData}, 200);
+      }
+
   } catch (err) {
     return ReE(res, err, 422);
   } 
