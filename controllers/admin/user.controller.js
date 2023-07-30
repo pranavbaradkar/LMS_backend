@@ -1689,8 +1689,8 @@ const getUserRecommendation = async (req, res) => {
           ele.user.teaching_interests.school_ids.some((schoolId) => schoolIdsArray.includes(schoolId));
         }) : [];
       
-        if (finalData.length > 0 && schoolIdsArray.length > 0) {
-          return ReS(res, {data: {count: finalData.length , rows : finalData }}, 200);
+        if (schoolIdsArray.length > 0) {
+          return ReS(res, {data: { count: finalData.length, rows : finalData }}, 200);
         }else{
           return ReS(res, { data: userData }, 200);
         } 
@@ -2069,8 +2069,8 @@ module.exports.getAllUserInterview = async (req, res) => {
           ele.teaching_interests.school_ids.some((schoolId) => schoolIdsArray.includes(schoolId));
       });
 
-      if (finalData.length > 0 && schoolIdsArray.length > 0) {
-         return ReS(res, {data: finalData}, 200);
+      if (schoolIdsArray.length > 0) {
+        return ReS(res, {data: finalData}, 200);
       } else {
         return ReS(res, {data: resultData}, 200);
       }
