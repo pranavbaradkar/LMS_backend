@@ -1,4 +1,4 @@
-const { clusters, levels, user_assessments,  campaigns, schools, users, campaign_assessments, assessments, assessment_configurations, campaign_levels } = require("../../models");
+const { clusters, levels, admins, user_assessments,  campaigns, schools, users, campaign_assessments, assessments, assessment_configurations, campaign_levels } = require("../../models");
 const model = require('../../models');
 var Sequelize = require("sequelize");
 const authService = require("../../services/auth.service");
@@ -47,9 +47,17 @@ const createCampaigns = async function (req, res) {
       payload.start_time =  startDateTime.format('YYYY-MM-DD HH:mm:ss');
 
       //user assign school and cluster
+
+      [err, findAdmin] = await to(admins.findOne({ where: { id: payload.user_id } , attributes: ['school_ids'], raw:true}));
+
+      let whereData = { cluster_id: { [Op.in]: payload.cluster_ids } };
+      if(findAdmin && findAdmin.school_ids ) {
+        whereData.id = { [Op.in]: findAdmin.school_ids };
+      }
+
       let clusterData = [];
       if(payload.cluster_ids && payload.cluster_ids.length > 0) {
-        [err, schoolsResponse] = await to(schools.findAll({ where: { cluster_id: { [Op.in]: payload.cluster_ids } }, attributes: ['id', 'cluster_id'], raw: true }));
+        [err, schoolsResponse] = await to(schools.findAll({ where: whereData, attributes: ['id', 'cluster_id'], raw: true }));
         if(schoolsResponse) {
           clusterData = schoolsResponse;
         }

@@ -213,19 +213,6 @@ const getMeta = async function (req, res) {
       paginateData = getFilterObject(req, 'brand_id', paginateData);
       paginateData = getFilterObject(req, 'cluster_id', paginateData);
 
-      if(adminId) {
-        [err, findAdmin] = await to(admins.findOne({ where: { id: adminId } , attributes: ['school_ids'], raw:true}));
-        let schoolIdsArray = findAdmin && findAdmin.school_ids ? findAdmin.school_ids : [];
-        if(schoolIdsArray.length > 0) {
-          let ni = {
-            id: {
-              [Op.in]: schoolIdsArray
-            }
-          }
-          paginateData.where = ni
-        }
-      }
-
       
       let boardObj = {
         model: model.school_boards,
@@ -279,6 +266,11 @@ const getMeta = async function (req, res) {
       if(req.query.filter && req.query.filter.subject_id) {
         subjectObjFilter.where = { ...getFilterObjectWithKey(req, 'subject_id') };
       }
+
+      console.log(paginateData , paginateData.include);
+      if(paginateData.include === undefined) {
+        paginateData.include = [];
+      }
       paginateData.include = [...paginateData.include, ...[
         {
           model: model.school_grades,
@@ -296,6 +288,20 @@ const getMeta = async function (req, res) {
         subjectObj,
         subjectObjFilter
       ]]
+
+      if(adminId) {
+        [err, findAdmin] = await to(admins.findOne({ where: { id: adminId } , attributes: ['school_ids'], raw:true}));
+        let schoolIdsArray = findAdmin && findAdmin.school_ids ? findAdmin.school_ids : [];
+        if(schoolIdsArray.length > 0) {
+          let ni = {
+            id: {
+              [Op.in]: schoolIdsArray
+            }
+          }
+          paginateData.where = {...paginateData.where, ...ni}
+        }
+        console.log(schoolIdsArray);
+      }
     }
 
     if(table == 'subjects') {
@@ -327,11 +333,36 @@ const getMeta = async function (req, res) {
 
     //console.log(req.params.table);
 
+
+    if(table == 'clusters' && adminId) {
+
+      [err, findAdmin] = await to(admins.findOne({ where: { id: adminId } , attributes: ['school_ids'], raw:true}));
+      let schoolIdsArray = findAdmin && findAdmin.school_ids ? findAdmin.school_ids : [];
+      [err, clustersExist] = await to(schools.findAll({ where: { id: {[Op.in]: schoolIdsArray } } , attributes: ['cluster_id'], raw: true}));
+      console.log(clustersExist);
+
+      if(clustersExist.length > 0) {
+        let ni = {
+          id: {
+            [Op.in]: [...new Set(clustersExist.map(ele => {
+              return ele.cluster_id;
+            }))]
+          }
+        }
+        paginateData.where = {...paginateData.where, ...ni}
+      }
+      console.log(schoolIdsArray);
+
+      console.log("paginateData.where", paginateData.where);
+    }
+
     console.log("test1................",paginateData);
 
-    console.log("test................",JSON.stringify(paginateData.where));
+    console.log("test................",JSON.stringify(paginateData.where), JSON.stringify(paginateData.where.id));
 
     [err, response] = await to(model[table].findAndCountAll(paginateData));
+
+    
     
     if(response == null) {
       return ReS(res, {data: {count: 0, rows: []}}, 200);
