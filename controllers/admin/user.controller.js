@@ -22,7 +22,7 @@ schools.hasMany(interviewers,{ foreignKey: 'school_id'});
 user_interviews.hasOne(user_interview_feedbacks, { foreignKey: 'user_id', sourceKey: 'user_id',  as: 'interview_feedback' });
 user_interview_feedbacks.belongsTo(user_interviews , { foreignKey: 'user_id', targetKey: 'user_id'} );
 user_interviews.belongsTo(user_teaching_interests, {foreignKey: 'user_id', targetKey: 'user_id', as:'teaching_interests'});
-user_recommendations.belongsTo(user_teaching_interests, { foreignKey: 'user_id', targetKey: 'user_id', as: 'teaching_interests' });
+//user_recommendations.belongsTo(user_teaching_interests, { foreignKey: 'user_id', targetKey: 'user_id', as: 'teaching_interests' });
 user_interviews.belongsTo(users, {foreignKey: 'user_id'});
 user_interviews.belongsTo(interviewers, {sourceKey: "interviewer_id" });
 
@@ -32,7 +32,7 @@ assessment_configurations.belongsTo(levels, { foreignKey: 'level_id' });
 model.users.hasMany(model.user_assessments, {foreignKey: 'user_id', targetKey: 'user_id'});
 user_assessments.belongsTo(model.users, { foreignKey: 'user_id' });
 user_assessments.belongsTo(demovideo_details,  { foreignKey: 'user_id', targetKey: 'user_id' });
-user_teaching_interests.belongsTo(model.user_recommendations, { foreignKey: 'user_id' });
+// user_teaching_interests.belongsTo(model.user_recommendations, { foreignKey: 'user_id' });
 
 user_teaching_interests.belongsTo(model.users, { foreignKey: 'user_id' });
 users.hasOne(model.user_teaching_interests, { foreignKey: 'user_id', as:'teaching_interests' });
@@ -1571,144 +1571,141 @@ const getUserDetails = async (req, res)=> {
 module.exports.getUserDetails = getUserDetails;
 
 const getUserRecommendation = async (req, res) => {
-try {
-  let err, userData, findAdmin;
-  let reqUser = req.user
   try {
-    let queryParams = {};
-    let orData = [];
-    console.log(req.query);
-
-    if(req.query && req.query.filter) {
-      Object.keys(req.query.filter).forEach(ele => {
-        let excludeKey = ['user_type'];
-        if(excludeKey.indexOf(ele) == -1) {
-          queryParams[ele] = req.query.filter[ele].toUpperCase();
-        }
-      })
-    }
-
-    let searchArray = ['email', 'phone_no']
-    if(req.query && req.query.search) {
-      searchArray.forEach(ele => {
-        let obj = {};
-        obj[ele] = { [Op.iLike]: `%${req.query.search}%`};
-        orData.push(obj);
-      })
-    }
-
-    if(orData.length > 0) {
-      queryParams = {...queryParams,...{[Op.or]: orData}}
-    } else {
-      queryParams = {...queryParams }
-    }
-
-   // user_type
-    let paginateData = {...requestQueryObject(req.query, queryParams)};
-    console.log(paginateData);
-
-    let userFilter = {}
-    if(req.query && req.query.filter && req.query.filter.user_type) {
-      userFilter.user_type = req.query.filter.user_type;
-    }
-
-
-    let userAttributes = ['first_name', 'email','phone_no', 'user_type'];
-    let userDetails = { 
-      model: user_teaching_interests, 
-      as: 'teaching_interests', 
-       attributes: ['id', 'level_ids', 'school_ids', 'subject_ids', 'board_ids'],
-      model: users, 
-      as: 'user',
-      where: userFilter,
-      attributes: userAttributes,
-      include: [{ 
-        model: user_assessments, 
-        require: false,
-        attributes: ['assessment_id', 'user_id', 'status', 'type'],
-        include: [
-          {
-            model: assessment_configurations,
-            require: false,
-            attributes: ['level_id'],
-            include: [{
-              model: levels,
-              attributes: ['name'],
-              require: false
-            }]
+    let err, userData, findAdmin;
+    let reqUser = req.user;
+    try {
+      let queryParams = {};
+      let orData = [];
+      console.log(req.query);
+  
+      if(req.query && req.query.filter) {
+        Object.keys(req.query.filter).forEach(ele => {
+          let excludeKey = ['user_type'];
+          if(excludeKey.indexOf(ele) == -1) {
+            queryParams[ele] = req.query.filter[ele].toUpperCase();
           }
-        ],
-        where: { status: { [Op.in] : ['FINISHED', 'PASSED', 'FAILED'] }, type: 'MAINS' }
-      }]
-    };
-
-    paginateData.order = [[`updated_at`, 'desc']];
-     if(req.query && req.query.orderBy && userAttributes.indexOf(req.query.orderBy) >= 0) {
-
-      let sortBy = req.query && req.query.sortBy ? req.query.sortBy : 'desc';
-      paginateData.order = [[{model : users}, `${req.query.orderBy}`, sortBy]];
-      // userDetails.separate = false;
-      // delete paginateData.order;
-    }
-
-    paginateData.include = [
-      userDetails
-    ];
-
-    paginateData.distinct = true;
-
-    console.log(paginateData);
-
-    [err, userData] = await to(user_recommendations.findAndCountAll({paginateData,
-      include:[
+        })
+      }
+  
+      let searchArray = ['email', 'phone_no']
+      if(req.query && req.query.search) {
+        searchArray.forEach(ele => {
+          let obj = {};
+          obj[ele] = { [Op.iLike]: `%${req.query.search}%`};
+          orData.push(obj);
+        })
+      }
+  
+      if(orData.length > 0) {
+        queryParams = {...queryParams,...{[Op.or]: orData}}
+      } else {
+        queryParams = {...queryParams }
+      }
+  
+     // user_type
+      let paginateData = {...requestQueryObject(req.query, queryParams)};
+      console.log(paginateData);
+  
+      let userFilter = {}
+      if(req.query && req.query.filter && req.query.filter.user_type) {
+        userFilter.user_type = req.query.filter.user_type;
+      }
+  
+  
+      let userAttributes = ['first_name', 'email','phone_no', 'user_type'];
+      let userDetails = { 
+        model: users, 
+        as: 'user',
+        where: userFilter,
+        attributes: userAttributes,
+        include: [{ 
+          model: user_assessments, 
+          require: false,
+          attributes: ['assessment_id', 'user_id', 'status', 'type'],
+          include: [
+            {
+              model: assessment_configurations,
+              require: false,
+              attributes: ['level_id'],
+              include: [{
+                model: levels,
+                attributes: ['name'],
+                require: false
+              }]
+            }
+          ],
+          where: { status: { [Op.in] : ['FINISHED', 'PASSED', 'FAILED'] }, type: 'MAINS' }
+        },
         {
-          model: user_teaching_interests, as: 'teaching_interests', attributes: ['subject_ids', 'level_ids', 'school_ids']
-        },]}));
-    if (err) return ReE(res, err, 422);
+          model: user_teaching_interests, as: 'teaching_interests', 
+          attributes: ['subject_ids', 'level_ids', 'school_ids'],
+          require: false
+        }]
+      };
+  
+      paginateData.order = [[`updated_at`, 'desc']];
+       if(req.query && req.query.orderBy && userAttributes.indexOf(req.query.orderBy) >= 0) {
+  
+        let sortBy = req.query && req.query.sortBy ? req.query.sortBy : 'desc';
+        paginateData.order = [[{model : users}, `${req.query.orderBy}`, sortBy]];
+        // userDetails.separate = false;
+        // delete paginateData.order;
+      }
+  
+      paginateData.include = [
+        userDetails
+      ];
+  
+      paginateData.distinct = true;
+  
     
-    if (userData) {
-      userData.rows = userData.rows.map(ele => {
-        let obj = ele.get({plain: true})
-        //console.log(obj);
-        if(obj.user && obj.user.user_assessments) {
-       
-         let levels = obj.user.user_assessments.map(e => {
-          //console.log(JSON.stringify(obj.user.user_assessments));
-            return e.assessment_configuration ? e.assessment_configuration.level.name  : null;
-          });
-         obj.levels = [...new Set(levels)];
-        }
-         return obj;
-      })
-      // let findAdmin;
-      // [err, findAdmin] = await to(admins.findOne({ where: { id: reqUser.id } , attributes: ['school_ids'], raw:true}));
-      // if(err) return ReE(res, err, 422);
-      // var schoolIdsArray = findAdmin && findAdmin.school_ids ? findAdmin.school_ids : [];
-      // console.log(";;;;;;;;;;;;;;;;;;",userData.rows );
+  
+      [err, userData] = await to(user_recommendations.findAndCountAll(paginateData));
+      if (err) return ReE(res, err, 422);
+      if (userData) {
+        userData.rows = userData.rows.length > 0 ? userData.rows.map(ele => {
+          let obj = ele.get({plain: true})
+          //console.log(obj);
+          if(obj.user && obj.user.user_assessments) {
+         
+           let levels = obj.user.user_assessments.map(e => {
+            //console.log(JSON.stringify(obj.user.user_assessments));
+              return e.assessment_configuration ? e.assessment_configuration.level.name  : null;
+            });
+           obj.levels = [...new Set(levels)];
+          }
+
+          return obj;
+        }) : [];
+         // let findAdmin;
+        [err, findAdmin] = await to(admins.findOne({ where: { id: reqUser.id } , attributes: ['school_ids'], raw:true}));
+        if(err) return ReE(res, err, 422);
+        var schoolIdsArray = findAdmin && findAdmin.school_ids ? findAdmin.school_ids : [];
+        var finalData = userData.rows.length > 0 ? userData.rows.filter((ele) => {
+          console.log("............",ele);
+          return ele && ele.user && ele.user.teaching_interests &&
+          ele.user.teaching_interests.school_ids &&
+          ele.user.teaching_interests.school_ids.some((schoolId) => schoolIdsArray.includes(schoolId));
+        }) : [];
       
-      // var finalData = userData.rows.filter((ele) => {
-      //   console.log("............",ele.teaching_interests.school_ids);
-      //   // return ele.teaching_interests &&
-      //   //   ele.teaching_interests.school_ids &&
-      //   //   ele.teaching_interests.school_ids.some((schoolId) => schoolIdsArray.includes(schoolId));
-      // });
-      // console.log(";;;;;;;;;;;;;;;;;;",finalData);
-      // if (finalData.length > 0) {
-      //    return ReS(res, {data: finalData}, 200);
-      // }else{
-        // } 
+        if (finalData.length > 0 && schoolIdsArray.length > 0) {
+          return ReS(res, {data: {count: finalData.length , rows : finalData }}, 200);
+        }else{
           return ReS(res, { data: userData }, 200);
-    } else {
-      return ReE(res, "No user data found", 404);
+        } 
+       
+      } else {
+        return ReE(res, "No user data found", 404);
+      }
+    } catch (err) {
+      console.log(err);
+      return ReE(res, err, 422);
     }
   } catch (err) {
-    console.log(err);
     return ReE(res, err, 422);
   }
-} catch (err) {
-  return ReE(res, err, 422);
-}
-}
+  }
 module.exports.getUserRecommendation = getUserRecommendation;
 
 const userInterviewFeedback = async (req, res) => {
@@ -2059,18 +2056,22 @@ module.exports.getAllUserInterview = async (req, res) => {
     });
 
       [err, findAdmin] = await to(admins.findOne({ where: { id: reqUser.id } , attributes: ['school_ids'], raw:true}));
-      if(err) return ReE(res, err, 422);
       var schoolIdsArray = findAdmin && findAdmin.school_ids ? findAdmin.school_ids : [];
 
       var finalData = resultData.filter((ele) => {
+
+        // console.log("testst", ele.teaching_interests &&
+        //   ele.teaching_interests.school_ids &&
+        //   ele.teaching_interests.school_ids.some((schoolId) => schoolIdsArray.includes(schoolId)));
+
         return ele.teaching_interests &&
           ele.teaching_interests.school_ids &&
           ele.teaching_interests.school_ids.some((schoolId) => schoolIdsArray.includes(schoolId));
       });
 
-      if (finalData.length > 0) {
+      if (finalData.length > 0 && schoolIdsArray.length > 0) {
          return ReS(res, {data: finalData}, 200);
-      }else{
+      } else {
         return ReS(res, {data: resultData}, 200);
       }
 
