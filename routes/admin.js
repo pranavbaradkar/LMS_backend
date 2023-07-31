@@ -20,7 +20,11 @@ require("../middleware/admin-auth")(adminPassport);
 // ********************* DASHBOARD REPORT ROUTES **************************
 router.get("/dashboard/reports", adminPassport.authenticate("jwt", { session: false }), ReportController.dashboardReport);
 router.get("/assessment/reports", adminPassport.authenticate("jwt", { session: false }), ReportController.assessmentAnalytics);
-router.get("/assessment/users/reports", adminPassport.authenticate("jwt", { session: false }), ReportController.assessmentUserAnalytics);
+
+router.get("/assessment/:assessment_id/users/reports", adminPassport.authenticate("jwt", { session: false }), ReportController.assessmentUserAnalytics);
+router.get("/campaigns/dropdown", adminPassport.authenticate("jwt", { session: false }), CampaignController.getCampaingDropdown);
+router.get("/schools/dropdown", adminPassport.authenticate("jwt", { session: false }), ReportController.getSchoolDropdown);
+// router.get("/assessment/reports/temp", adminPassport.authenticate("jwt", { session: false }), ReportController.temporary);
 
 // ********************* ADMIN ROUTES **************************
 router.get("/", adminPassport.authenticate("jwt", { session: false }), AdminController.get); // R
@@ -117,7 +121,6 @@ router.put("/user/:user_id/recommend/status",adminPassport.authenticate("jwt", {
 // ********************* CAMPAIGN **************************
 router.post("/campaigns", adminPassport.authenticate("jwt", { session: false }), CampaignController.createCampaigns);
 router.get("/campaigns", adminPassport.authenticate("jwt", { session: false }), CampaignController.getAllUserCampaigns);
-router.get("/campaigns/dropdown", adminPassport.authenticate("jwt", { session: false }), CampaignController.getCampaingDropdown);
 
 router.get("/campaigns/dashboard", adminPassport.authenticate("jwt", { session: false }), DashboardController.getCampaignDashboard);
 router.post("/campaigns/assessments", adminPassport.authenticate("jwt", { session: false }), CampaignController.getCampaignAssessment);

@@ -178,7 +178,7 @@ const getCampaingDropdown = async (req,res) => {
     }));
     if(err) TE(err);
 
-    return ReS(res, {data: campaignData} , 422);
+    return ReS(res, {data: campaignData} , 200);
   } catch (err) {
     return ReE(res, err, 422);
   }
