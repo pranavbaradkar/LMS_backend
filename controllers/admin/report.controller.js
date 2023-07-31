@@ -1,4 +1,4 @@
-const { questions,assessment_questions, user_assessment_responses,campaign_schools, campaign_assessments,assessment_configurations,user_assessment_logs, users, demovideo_details, levels, assessments, user_interview_feedbacks, user_assessments, assessment_results,  user_recommendations } = require("../../models");
+const { questions,assessment_questions, user_assessment_responses,campaign_schools, schools, campaign_assessments,assessment_configurations,user_assessment_logs, users, demovideo_details, levels, assessments, user_interview_feedbacks, user_assessments, assessment_results,  user_recommendations } = require("../../models");
 const { to, ReE, ReS, capitalizeWords, toSnakeCase, paginate, snakeToCamel, requestQueryObject, randomHash, getUUID } = require('../../services/util.service');
 const { getFullName, secondsToMinutesAndSeconds } = require('../../services/report.service');
 var _ = require('underscore');
