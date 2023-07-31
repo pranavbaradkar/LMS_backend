@@ -247,10 +247,12 @@ const getAllUserCampaigns = async function (req, res) {
         }
       }
 
-      campaignData = campaignData.filter((ele) => {
-        let row = ele.get({plain: true});
-        return row.school_ids && row.school_ids.some((schoolId) => schoolIdsArray.includes(schoolId));
-      });
+      if(schoolIdsArray.length > 0){
+        campaignData = campaignData.filter((ele) => {
+          let row = ele.get({plain: true});
+          return row.school_ids && row.school_ids.some((schoolId) => schoolIdsArray.includes(schoolId));
+        });
+      }
 
       campaignData.forEach(ele => {
         ele = ele.get({plain: true});
