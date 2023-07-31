@@ -283,8 +283,8 @@ module.exports.assessmentUserAnalytics = async(req, res) => {
       }
     });
 
-    return ReS(res, {data: userData}, 200);
-    // return ReS(res, {data: {count: userData.count, rows:finalData}}, 200);
+    // return ReS(res, {data: userData}, 200);
+    return ReS(res, {data: {count: userData.count, rows:finalData}}, 200);
 
   } catch (err) {
   return ReE(res, err, 422);
