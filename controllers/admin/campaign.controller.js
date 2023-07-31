@@ -247,7 +247,7 @@ const getAllUserCampaigns = async function (req, res) {
         }
       }
 
-      if(schoolIdsArray.length > 0){
+      if(req.user.role_type == 'USER') {
         campaignData = campaignData.filter((ele) => {
           let row = ele.get({plain: true});
           return row.school_ids && row.school_ids.some((schoolId) => schoolIdsArray.includes(schoolId));
