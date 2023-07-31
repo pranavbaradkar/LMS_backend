@@ -1,4 +1,4 @@
-const { campaigns,campaign_schools, campaign_assessments,assessment_configurations,user_assessment_logs, users, demovideo_details, levels, user_interviews, user_interview_feedbacks, user_assessments, assessment_results,  user_recommendations } = require("../../models");
+const { campaigns,campaign_schools, campaign_assessments,assessment_configurations,user_assessment_logs, users, demovideo_details, levels, user_interviews, user_interview_feedbacks, user_assessments, assessment_results,  user_recommendations, schools} = require("../../models");
 const { sequelize } = require('../../models');
 const authService = require("../../services/auth.service");
 const { to, ReE, ReS, capitalizeWords, toSnakeCase, paginate, snakeToCamel, requestQueryObject, randomHash, getUUID } = require('../../services/util.service');
@@ -19,6 +19,18 @@ assessment_configurations.belongsTo(user_assessments, { foreignKey: "assessment_
 user_assessments.hasOne(user_assessment_logs, { foreignKey: "assessment_id", sourceKey: "assessment_id" });
 assessment_configurations.belongsTo(levels, {foreignKey: 'level_id' });
 demovideo_details.belongsTo(user_recommendations, {foreignKey: 'user_id', targetKey:'user_id'});
+
+module.exports.getSchoolDropdown = async (req, res) => {
+  let err, schoolData;
+  try {
+    [err, schoolData] = await to(schools.findAll({
+      attributes:['id','name']
+    }));
+    return ReS(res, {data: schoolData}, 200);
+  } catch (err) {
+    return ReE(res,err,422);
+  }
+};
 
 module.exports.dashboardReport = async(req, res) => {
   let err, userData, reportData;
