@@ -237,6 +237,21 @@ const getAllUserCampaigns = async function (req, res) {
       let expiredCampaign = [];
 
       let currentDate = moment.utc();
+
+      var schoolIdsArray = [];
+      if(req.user.role && req.user.role.permission) {
+        let permission = JSON.parse(req.user.role.permission);
+        if(permission.campaigns && permission.campaigns.panel && permission.campaigns.panel.is_admin) {
+          [err, findAdmin] = await to(admins.findOne({ where: { id: req.user.id } , attributes: ['school_ids'], raw:true}));
+          schoolIdsArray = findAdmin && findAdmin.school_ids ? findAdmin.school_ids : [];
+        }
+      }
+
+      campaignData = campaignData.filter((ele) => {
+        let row = ele.get({plain: true});
+        return row.school_ids && row.school_ids.some((schoolId) => schoolIdsArray.includes(schoolId));
+      });
+
       campaignData.forEach(ele => {
         ele = ele.get({plain: true});
 
@@ -273,6 +288,7 @@ const getAllUserCampaigns = async function (req, res) {
         ele.assessed = i;
         // console.log(ele);        
       });
+
       console.log(liveCampaign);
       return ReS(res, { data: {
         live_campaign: liveCampaign,

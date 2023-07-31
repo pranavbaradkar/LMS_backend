@@ -270,9 +270,33 @@ const getAllUsers = async function (req, res) {
       queryParams = {...queryParams }
     }
 
+   
    // user_type
     let paginateData = {...requestQueryObject(req.query, queryParams)};
     console.log(paginateData);
+
+
+    [err, findAdmin] = await to(admins.findOne({ where: { id: req.user.id } , attributes: ['school_ids'], raw:true}));
+    schoolIdsArray = findAdmin && findAdmin.school_ids ? findAdmin.school_ids : [];
+    if(schoolIdsArray.length > 0) {
+      let dat =  schoolIdsArray.map (ele => {
+        return { school_ids: {
+            [Op.contains]: [ele],
+          }
+        }
+      });
+      paginateData.include = [{ 
+        model: user_teaching_interests, 
+        as: 'teaching_interests', 
+        where: {
+          [Op.or] : dat
+        },
+        attributes:["school_ids"],
+      }];
+    }
+    
+
+
     [err, userData] = await to(users.findAndCountAll(paginateData));
     if (err) return ReE(res, err, 422);
     
@@ -1689,8 +1713,8 @@ const getUserRecommendation = async (req, res) => {
           ele.user.teaching_interests.school_ids.some((schoolId) => schoolIdsArray.includes(schoolId));
         }) : [];
       
-        if (finalData.length > 0 && schoolIdsArray.length > 0) {
-          return ReS(res, {data: {count: finalData.length , rows : finalData }}, 200);
+        if (schoolIdsArray.length > 0) {
+          return ReS(res, {data: { count: finalData.length, rows : finalData }}, 200);
         }else{
           return ReS(res, { data: userData }, 200);
         } 
@@ -2069,8 +2093,8 @@ module.exports.getAllUserInterview = async (req, res) => {
           ele.teaching_interests.school_ids.some((schoolId) => schoolIdsArray.includes(schoolId));
       });
 
-      if (finalData.length > 0 && schoolIdsArray.length > 0) {
-         return ReS(res, {data: finalData}, 200);
+      if (schoolIdsArray.length > 0) {
+        return ReS(res, {data: finalData}, 200);
       } else {
         return ReS(res, {data: resultData}, 200);
       }
