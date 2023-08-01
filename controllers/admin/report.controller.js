@@ -314,7 +314,7 @@ const assessmentAnalytics = async(req, res) => {
     let finalData = await usersAppeared(req, res);
     finalData.blooms_taxonomy = await bloomsMarksChart(req, res);
     finalData.pass_rate_grades = await passRateGradeChart(req, res);
-    finalData.success_rate_difficulty = passRateDifficultyChart(req, res);
+    finalData.success_rate_difficulty = await passRateDifficultyChart(req, res);
     finalData.average_scores = [{"subject":"IQ","percentile":50},{"subject":"EQ","percentile":95},{"subject":"Pedagogy","percentile":30},{"subject":"Digital Literacy","percentile":40},{"subject":"Communication Skills","percentile":55},{"subject":"Psychometric","percentile":70},{"subject":"Hard Skills","percentile":80},{"subject":"Core Skill","percentile":30}];
     finalData.dropout_rate = [{"grade":"Grade 1","rate":30},{"grade":"Grade 2","rate":10},{"grade":"Grade 3","rate":50},{"grade":"Grade 4","rate":20},{"grade":"Grade 5","rate":30},{"grade":"Grade 6","rate":40},{"grade":"Grade 7","rate":10},{"grade":"Grade 8","rate":20},{"grade":"Grade 9","rate":10},{"grade":"Grade 10","rate":50},{"grade":"Grade 11","rate":60},{"grade":"Grade 12","rate":10}];
     finalData.assessment_status = [{"status":"Cleared","count":90},{"status":"In Progress","count":70},{"status":"Not Cleared","count":10}];
