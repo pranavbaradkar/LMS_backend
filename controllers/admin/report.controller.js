@@ -328,7 +328,7 @@ const usersAppeared = async (req, res) => {
   let err, reportData;
   try {
     let conditions = {};
-    conditions.where = { status : { [Op.in]: ['PASSED','FAILED', 'FINISHED']}}
+    conditions.where = { status : { [Op.in]: ['PASSED','FAILED', 'FINISHED']}, assessment_id: req.query.assessment_id}
     conditions.group = ['status'];
     conditions.attributes = ['status',[Sequelize.fn("COUNT", Sequelize.col("id")), "user_count"]] ;
     [err, reportData] = await to(user_assessments.findAll(conditions));
@@ -375,7 +375,7 @@ const passRateDifficultyChart = async (req, res) => {
     let conditions = {};
     conditions.attributes = ['difficulty_level', [Sequelize.fn('COUNT', Sequelize.col('user_id')) ,'count'] ];
     conditions.group      = ['difficulty_level'];
-    conditions.where      = { difficulty_level: { [Op.ne]: null }};
+    conditions.where      = { difficulty_level: { [Op.ne]: null }, assessment_id: req.query.assessment_id};
     [err, reportData] = await to(user_assessment_reports.findAll(conditions));
     if(err) return ReE(res, err, 422);
 
@@ -393,10 +393,12 @@ const passRateGradeChart = async (req, res) => {
     let conditions = {};
     conditions.attributes = ['grade_name','result', [Sequelize.fn('COUNT', Sequelize.col('user_id')) ,'user_count'] ];
     conditions.group      = ['grade_name','result'];
-    conditions.where      = { grade_name: { [Op.ne]: null }};
+    conditions.where      = { grade_name: { [Op.ne]: null }, assessment_id: req.query.assessment_id};
     conditions.order      = [['grade_name', 'asc'], ['result','asc']];
     [err, reportData] = await to(user_assessment_reports.findAll(conditions));
     if(err) return ReE(res, err, 422);
+
+    // return ReS(res, {data: reportData}, 200);
 
     let finalData = [];
     let gradeData = {};
@@ -415,12 +417,11 @@ const passRateGradeChart = async (req, res) => {
     Object.values(gradeData).map(row => {
       let gc = {};
       gc.grade      = row.grade;
-      gc.pass_rate  = ((row.passed/row.total)*100).toFixed(2);
+      gc.pass_rate  = parseInt((row.passed/row.total)*100) || 0;
       finalData.push(gc);
     })
-    // console.log("the grade data", gradeData);
+    // return ReS(res, {data: finalData}, 200);
     return finalData;
-    // return ReS(res, {data: reportData}, 200);
   } catch (err) {
   return ReE(res, err, 422);
   }
@@ -433,7 +434,7 @@ const bloomsMarksChart = async (req, res) => {
     let conditions = {};
     conditions.attributes = ['blooms_taxonomy', 'user_id', [Sequelize.fn('SUM', Sequelize.col('score')) ,'avg_marks'] ];
     conditions.group      = ['blooms_taxonomy', 'user_id'];
-    conditions.where      = { blooms_taxonomy: { [Op.ne]: null }};
+    conditions.where      = { blooms_taxonomy: { [Op.ne]: null }, assessment_id: req.query.assessment_id};
     conditions.order      = [['blooms_taxonomy', 'asc']];
     [err, reportData] = await to(user_assessment_reports.findAll(conditions));
     if(err) return ReE(res, err, 422);
@@ -454,7 +455,7 @@ const bloomsMarksChart = async (req, res) => {
     Object.values(bloomData).map(val => {
       let fd = {};
       fd.taxonomy = val.taxonomy;
-      fd.avg_marks = (val.avg_marks/val.count).toFixed(0);
+      fd.avg_marks = parseInt(val.avg_marks/val.count);
       finalData.push(fd);
     });
     return finalData;
@@ -696,7 +697,7 @@ const generateUserResponseReport = async (req, res) => {
             if(!qMap[qid].is_psycho) {
               if(resp[qid] && qMap[qid].question_type == 'MULTIPLE_CHOICE'){
                 // console.log(`user ${user_id} the answer ${resp[qid]} for question id ${qid} and question `,qMap[qid].correct_answer);
-                let are_same = _.isEqual(qMap[qid].correct_answer.split(",").sort(), resp[qid].sort());
+                let are_same = _.isEqual(qMap[qid].correct_answer.split(",").sort(), resp[qid].split(",").sort());
                 if(are_same) {  pl.is_correct = true; pl.score = 1;  }
               }
               else {
