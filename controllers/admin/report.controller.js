@@ -1,4 +1,4 @@
-const { questions,assessment_questions, user_assessment_responses,campaign_schools, schools, campaign_assessments,assessment_configurations,user_assessment_logs, users, demovideo_details, levels, assessments, user_interview_feedbacks, user_assessments, assessment_results,  user_recommendations } = require("../../models");
+const { questions, psy_questions,psy_question_options, skills, subjects,grades, user_assessment_reports, assessment_questions, user_assessment_responses,campaign_schools, schools, campaign_assessments,assessment_configurations,user_assessment_logs, users, demovideo_details, levels, assessments, user_interview_feedbacks, user_assessments, assessment_results,  user_recommendations } = require("../../models");
 const { to, ReE, ReS, capitalizeWords, toSnakeCase, paginate, snakeToCamel, requestQueryObject, randomHash, getUUID } = require('../../services/util.service');
 const { getFullName, secondsToMinutesAndSeconds } = require('../../services/report.service');
 var _ = require('underscore');
@@ -23,6 +23,10 @@ assessment_configurations.belongsTo(levels, {foreignKey: 'level_id' });
 demovideo_details.belongsTo(user_recommendations, {foreignKey: 'user_id', targetKey:'user_id'});
 assessment_questions.belongsTo(questions, { foreignKey: 'question_id' });
 questions.hasMany(assessment_questions);
+// user_assessment_responses.hasOne(user_assessment_reports, { foreignKey: 'user_id', targetKey: 'user_id'});
+user_assessment_reports.belongsTo(user_assessment_responses, { foreignKey: 'user_id', targetKey: 'user_id'});
+assessment_results.belongsTo(assessments,{ foreignKey:'assessment_id' });
+assessments.hasMany(assessment_results);
 
 module.exports.getSchoolDropdown = async (req, res) => {
   let err, schoolData;
@@ -294,20 +298,20 @@ module.exports.assessmentUserAnalytics = async(req, res) => {
 const assessmentAnalytics = async(req, res) => {
   let err, reportData;
   try {
-    reportData = {"users_attended_assessment":24,"users_in_progress":50,"user_cleared_assessment":100,"user_failed_assessment":10,"success_rate_difficulty":[{"difficulty":"Easy","count":300},{"difficulty":"Medium","count":400},{"difficulty":"Hard","count":500}],"pass_rate_grades":[{"grade":"Grade 1","pass_rate":50},{"grade":"Grade 2","pass_rate":20},{"grade":"Grade 3","pass_rate":10},{"grade":"Grade 4","pass_rate":60},{"grade":"Grade 5","pass_rate":40},{"grade":"Grade 6","pass_rate":30},{"grade":"Grade 7","pass_rate":40},{"grade":"Grade 8","pass_rate":70},{"grade":"Grade 9","pass_rate":20},{"grade":"Grade 10","pass_rate":10},{"grade":"Grade 11","pass_rate":20},{"grade":"Grade 12","pass_rate":30}],"blooms_taxonomy":[{"taxonomy":"Understand","avg_marks":50},{"taxonomy":"Analyze","avg_marks":20},{"taxonomy":"Apply","avg_marks":10}],"average_scores":[{"subject":"IQ","percentile":50},{"subject":"EQ","percentile":95},{"subject":"Pedagogy","percentile":30},{"subject":"Digital Literacy","percentile":40},{"subject":"Communication Skills","percentile":55},{"subject":"Psychometric","percentile":70},{"subject":"Hard Skills","percentile":80},{"subject":"Core Skill","percentile":30}],"dropout_rate":[{"grade":"Grade 1","rate":30},{"grade":"Grade 2","rate":10},{"grade":"Grade 3","rate":50},{"grade":"Grade 4","rate":20},{"grade":"Grade 5","rate":30},{"grade":"Grade 6","rate":40},{"grade":"Grade 7","rate":10},{"grade":"Grade 8","rate":20},{"grade":"Grade 9","rate":10},{"grade":"Grade 10","rate":50},{"grade":"Grade 11","rate":60},{"grade":"Grade 12","rate":10}],"assessment_status":[{"status":"Cleared","count":90},{"status":"In Progress","count":70},{"status":"Not Cleared","count":10}]};
-//     let appeared = await usersAppeared(req, res);
-//     // let userAssessments = await usersAssessment(req, res);
-//     // [err, reportData] = await to();
-//     if(err) return ReE(res, err, 422);
+    // reportData = {"users_attended_assessment":24,"users_in_progress":50,"user_cleared_assessment":100,"user_failed_assessment":10,"success_rate_difficulty":[{"difficulty":"Easy","count":300},{"difficulty":"Medium","count":400},{"difficulty":"Hard","count":500}],"pass_rate_grades":[{"grade":"Grade 1","pass_rate":50},{"grade":"Grade 2","pass_rate":20},{"grade":"Grade 3","pass_rate":10},{"grade":"Grade 4","pass_rate":60},{"grade":"Grade 5","pass_rate":40},{"grade":"Grade 6","pass_rate":30},{"grade":"Grade 7","pass_rate":40},{"grade":"Grade 8","pass_rate":70},{"grade":"Grade 9","pass_rate":20},{"grade":"Grade 10","pass_rate":10},{"grade":"Grade 11","pass_rate":20},{"grade":"Grade 12","pass_rate":30}],"blooms_taxonomy":[{"taxonomy":"Understand","avg_marks":50},{"taxonomy":"Analyze","avg_marks":20},{"taxonomy":"Apply","avg_marks":10}],"average_scores":[{"subject":"IQ","percentile":50},{"subject":"EQ","percentile":95},{"subject":"Pedagogy","percentile":30},{"subject":"Digital Literacy","percentile":40},{"subject":"Communication Skills","percentile":55},{"subject":"Psychometric","percentile":70},{"subject":"Hard Skills","percentile":80},{"subject":"Core Skill","percentile":30}],"dropout_rate":[{"grade":"Grade 1","rate":30},{"grade":"Grade 2","rate":10},{"grade":"Grade 3","rate":50},{"grade":"Grade 4","rate":20},{"grade":"Grade 5","rate":30},{"grade":"Grade 6","rate":40},{"grade":"Grade 7","rate":10},{"grade":"Grade 8","rate":20},{"grade":"Grade 9","rate":10},{"grade":"Grade 10","rate":50},{"grade":"Grade 11","rate":60},{"grade":"Grade 12","rate":10}],"assessment_status":[{"status":"Cleared","count":90},{"status":"In Progress","count":70},{"status":"Not Cleared","count":10}]};
+    // return ReS(res, {data: reportData}, 200);
+    
 
-// // console.log("the user assessments ", JSON.parse(JSON.stringify(userAssessments)));
+    let finalData = usersAppeared(req, res);
+    finalData.blooms_taxonomy = await bloomsMarksChart(req, res);
+    finalData.pass_rate_grades = await passRateGradeChart(req, res);
+    finalData.success_rate_difficulty = passRateDifficultyChart(req, res);
+    finalData.average_scores = [{"subject":"IQ","percentile":50},{"subject":"EQ","percentile":95},{"subject":"Pedagogy","percentile":30},{"subject":"Digital Literacy","percentile":40},{"subject":"Communication Skills","percentile":55},{"subject":"Psychometric","percentile":70},{"subject":"Hard Skills","percentile":80},{"subject":"Core Skill","percentile":30}];
+    finalData.dropout_rate = [{"grade":"Grade 1","rate":30},{"grade":"Grade 2","rate":10},{"grade":"Grade 3","rate":50},{"grade":"Grade 4","rate":20},{"grade":"Grade 5","rate":30},{"grade":"Grade 6","rate":40},{"grade":"Grade 7","rate":10},{"grade":"Grade 8","rate":20},{"grade":"Grade 9","rate":10},{"grade":"Grade 10","rate":50},{"grade":"Grade 11","rate":60},{"grade":"Grade 12","rate":10}];
+    finalData.assessment_status = [{"status":"Cleared","count":90},{"status":"In Progress","count":70},{"status":"Not Cleared","count":10}];
 
-//     let finalData                       = appeared;
-//     // finalData.users_attended_assessment = appeared;
-//     // finalData.users_in_progress = userAssessments;
+    return ReS(res, {data: finalData }, 200);
 
-//     return ReS(res, {data: {final: finalData, temp: reportData}}, 200);
-    return ReS(res, {data: reportData}, 200);
   } catch (err) {
   return ReE(res, err, 422);
   }
@@ -360,58 +364,367 @@ const template = async (req, res) => {
 module.exports.template = template;
 
 
-const passRateChart = async (req, res) => {
+const passRateDifficultyChart = async (req, res) => {
   let err, reportData;
   try {
     let conditions = {};
-    conditions.attributes = ['id', 'user_id', 'assessment_id', 'status' ];
-    [err, reportData] = await to(user_assessments.findAll(conditions));
+    conditions.attributes = ['difficulty_level', [Sequelize.fn('COUNT', Sequelize.col('user_id')) ,'count'] ];
+    conditions.group      = ['difficulty_level'];
+    conditions.where      = { difficulty_level: { [Op.ne]: null }};
+    [err, reportData] = await to(user_assessment_reports.findAll(conditions));
     if(err) return ReE(res, err, 422);
-    return ReS(res, {data: reportData}, 200);
+
+    return reportData;
+    // return ReS(res, {data: reportData}, 200);
   } catch (err) {
   return ReE(res, err, 422);
   }
 }
-module.exports.passRateChart = passRateChart;
+module.exports.passRateDifficultyChart = passRateDifficultyChart;
+
+const passRateGradeChart = async (req, res) => {
+  let err, reportData;
+  try {
+    let conditions = {};
+    conditions.attributes = ['grade_name','result', [Sequelize.fn('COUNT', Sequelize.col('user_id')) ,'user_count'] ];
+    conditions.group      = ['grade_name','result'];
+    conditions.where      = { grade_name: { [Op.ne]: null }};
+    conditions.order      = [['grade_name', 'asc'], ['result','asc']];
+    [err, reportData] = await to(user_assessment_reports.findAll(conditions));
+    if(err) return ReE(res, err, 422);
+
+    let finalData = [];
+    let gradeData = {};
+    if(reportData) {
+      reportData.map(row => {
+        let obj = row.get({plain:true});
+        if(!gradeData[row.grade_name]) { gradeData[row.grade_name] = {}; }
+        if(!gradeData[row.grade_name].count) { gradeData[row.grade_name].count = 0; }
+        if(!gradeData[row.grade_name].total) { gradeData[row.grade_name].total = 0; }
+        gradeData[row.grade_name].grade = row.grade_name;
+        if(row.result == 'PASSED') { gradeData[row.grade_name].passed = parseInt(obj.user_count); }          
+        gradeData[row.grade_name].total += parseInt(obj.user_count);
+      });
+    }
+
+    Object.values(gradeData).map(row => {
+      let gc = {};
+      gc.grade      = row.grade;
+      gc.pass_rate  = ((row.passed/row.total)*100).toFixed(2);
+      finalData.push(gc);
+    })
+    // console.log("the grade data", gradeData);
+    return finalData;
+    // return ReS(res, {data: reportData}, 200);
+  } catch (err) {
+  return ReE(res, err, 422);
+  }
+}
+module.exports.passRateGradeChart = passRateGradeChart;
+
+const bloomsMarksChart = async (req, res) => {
+  let err, reportData;
+  try {
+    let conditions = {};
+    conditions.attributes = ['blooms_taxonomy', 'user_id', [Sequelize.fn('SUM', Sequelize.col('score')) ,'avg_marks'] ];
+    conditions.group      = ['blooms_taxonomy', 'user_id'];
+    conditions.where      = { blooms_taxonomy: { [Op.ne]: null }};
+    conditions.order      = [['blooms_taxonomy', 'asc']];
+    [err, reportData] = await to(user_assessment_reports.findAll(conditions));
+    if(err) return ReE(res, err, 422);
+
+    let finalData = [];
+    let bloomData = {};
+    reportData.map(row => {
+      let obj = row.get({plain: true});
+      if(!bloomData[obj.blooms_taxonomy]) { bloomData[obj.blooms_taxonomy] = {}; }      
+      if(!bloomData[obj.blooms_taxonomy].avg_marks) { bloomData[obj.blooms_taxonomy].avg_marks = 0; }
+      if(!bloomData[obj.blooms_taxonomy].count) { bloomData[obj.blooms_taxonomy].count = 0; }
+      bloomData[obj.blooms_taxonomy].taxonomy = obj.blooms_taxonomy;
+      bloomData[obj.blooms_taxonomy].avg_marks += parseInt(obj.avg_marks);
+      bloomData[obj.blooms_taxonomy].count++;
+    });
+    console.log("the avg bloom data initialized ", bloomData);
+
+    Object.values(bloomData).map(val => {
+      let fd = {};
+      fd.taxonomy = val.taxonomy;
+      fd.avg_marks = (val.avg_marks/val.count).toFixed(0);
+      finalData.push(fd);
+    });
+    return finalData;
+    // return ReS(res, {data: reportData}, 200);
+  } catch (err) {
+  return ReE(res, err, 422);
+  }
+}
+module.exports.bloomsMarksChart = bloomsMarksChart;
+
+const avgSkillScoreChart = async (req, res) => {
+  let err, reportData;
+  try {
+    let conditions = {};
+    conditions.attributes = ['difficulty_level', [Sequelize.fn('COUNT', Sequelize.col('user_id')) ,'count'] ];
+    conditions.group      = ['difficulty_level'];
+    conditions.where      = { difficulty_level: { [Op.ne]: null }};
+    [err, reportData] = await to(user_assessment_reports.findAll(conditions));
+    if(err) return ReE(res, err, 422);
+
+    return reportData;
+    // return ReS(res, {data: reportData}, 200);
+  } catch (err) {
+  return ReE(res, err, 422);
+  }
+}
+module.exports.avgSkillScoreChart = avgSkillScoreChart;
 
 //generateAnswersAnalytics
 const temporary = async (req, res) => {
   let err,userAssessmentData,reportData, questionData;
   try {
-    const uaCondition       = {};
-    uaCondition.attributes  = [[Sequelize.fn('DISTINCT', Sequelize.col('assessment_id')) ,'assessment_id']];
-    uaCondition.order       = [['assessment_id', 'ASC']];
-    uaCondition.include     = [
-                                {}
-                              ];
-    [err, userAssessmentData] = await to(user_assessment_responses.findAll(uaCondition));
-    if(err) return ReE(res, err, 422);
-    let assessmentIds = userAssessmentData.map(row => row.assessment_id);
+    // const uaCondition       = {};
+    // uaCondition.attributes  = [[Sequelize.fn('DISTINCT', Sequelize.col('assessment_id')) ,'assessment_id']];
+    // uaCondition.order       = [['assessment_id', 'ASC']];
     
-    // let condition           = {};
-    // condition.where         = { assessment_id: {[Op.in] : assessmentIds }};
-    // condition.order         = [['assessment_id', 'ASC'],['question_id', 'ASC'] ];
-    // // condition.attributes    = [[Sequelize.fn('DISTINCT', Sequelize.col('question_id')) ,'question_id'], 'assessment_id'];
-    // condition.attributes    = ['question_id', 'assessment_id'];
-    // condition.include       = [
-    //                             { model: questions, attributes: ['grade_id', 'blooms_taxonomy', 'skill_id', 'difficulty_level'] }
-    //                           ];
-    // [err, questionData]     = await to(assessment_questions.findAll(
-    //   condition
-    //   // {
-    //   // where: { assessment_id: {[Op.in] : assessmentIds }},
-    //   // order:[['assessment_id', 'ASC'],['question_id', 'ASC'] ],
-    //   // attributes: ['question_id', 'assessment_id'],
-    //   // include:[
-    //   //   { model: questions, attributes: ['grade_id', 'blooms_taxonomy', 'skill_id', 'difficulty_level'] }
-    //   // ]}
-    // ));
-    if(err) return ReE(res, err, 422);
+    
+    let prd = await passRateDifficultyChart(req, res);
+    let prgc = await passRateGradeChart(req, res);
+    let bc = await bloomsMarksChart(req, res);
 
-    return ReS(res, {data: { debug: userAssessmentData, reportData:reportData }}, 200);
+    return ReS(res, {data: { 
+      blooms_taxonomy: bc,
+      pass_rate_grades: prgc, 
+      success_rate_difficulty: prd ,
+    }}, 200);
     // return ReS(res, {data: reportData}, 200);
   } catch (err) {
   return ReE(res, err, 422);
   }
 }
 module.exports.temporary = temporary;
+
+
+
+const generateUserResponseReport = async (req, res) => {
+  let err, assessmentsData,userAssessmentReportsData;
+  try {
+    // ignore these userIds as their report is already built
+    [err, userAssessmentReportsData] = await to(user_assessment_reports.findAll({
+      where: { assessment_id: { [Op.in]: req.query.assessment_id.split(",") } },
+      attributes: [[Sequelize.fn('DISTINCT', Sequelize.col('user_id')) ,'user_id'], 'assessment_id'],
+      group: ["user_id", "assessment_id"]
+    }));
+    if(err) return ReE(res,err, 422);
+    // return ReS(res, { data: userAssessmentReportsData }, 200);
+    let reportedUserIds = [];
+    if(userAssessmentReportsData){
+      userAssessmentReportsData.map(rows => {
+        reportedUserIds.push(rows.user_id);
+      });
+    }
+
+
+    let userAssessmentResponseInclude = {
+      model: user_assessment_responses,
+      where: { assessment_id : { [Op.in]: req.query.assessment_id.split(",") } },
+      attributes: ['id','user_id', 'assessment_id', 'response_json', 'type']
+    };
+    if(reportedUserIds.length) {
+      userAssessmentResponseInclude.where['user_id'] = { [Op.notIn]: reportedUserIds };
+    }
+
+
+    [err, assessmentsData] = await to(assessments.findAll(
+      {
+        where: { id: { [Op.in]: req.query.assessment_id.split(",") } },
+        attributes: ['id','name'],
+        order: [['id', 'ASC'], ['user_assessment_responses','user_id', 'asc']],
+        // limit: 3,
+        include: [
+        {
+          model: assessment_results,
+          // where: { assessment_id : { [Op.in]: req.query.assessment_id.split(",") } },
+          attributes: ['user_id','assessment_id','result', 'percentile', 'skill_scores', 'subject_scores', 'skill_total', 'total', 'total_scored'],
+        },
+        userAssessmentResponseInclude,
+        {
+          model: assessment_questions,
+          attributes: ['question_id'],
+          include: [ 
+          {
+            model: psy_questions,
+            attributes: ["id",'question_type',"skill_id","level_id","grade_id","subject_id","strand_id","sub_strand_id","topic_id","correct_answer","blooms_taxonomy","difficulty_level","complexity_level"],
+            include:[
+              { model: psy_question_options, as: 'options', attributes: ['id','option_key', 'score_value'] },
+              { model: skills, attributes:['id', 'name']},
+              { model: levels, attributes:['id', 'name']}
+            ]
+          },
+          { 
+            model: questions, 
+            attributes: ["id",'question_type',"lo_ids","skill_id","level_id","grade_id","subject_id","strand_id","sub_strand_id","topic_id","correct_answer","blooms_taxonomy","difficulty_level","complexity_level"],
+            include: [
+              {model: subjects, attributes:['id','name']},
+              {model: skills, attributes:['id','name']},
+              {model: levels, attributes:['id','name']},
+              {model: grades, attributes:['id','name']}
+            ]
+          }
+        ],
+        }
+      ]
+      }
+    ));
+    if(err) return ReE(res, err, 422);
+  
+    // return ReS(res, { data: assessmentsData }, 200);
+    
+    let payload = [];
+    let insertedForUserIds = [];
+    assessmentsData.map(ele => {
+      let row = {...ele.get({plain: true})};
+
+      // create question map 
+      let qMap = {};//questionMap
+      row.assessment_questions.map(qele => {
+        let aq          = qele.question || qele.psy_question;
+        aq.is_psycho    = false;
+        if(qele.psy_question) {
+          aq            = qele.psy_question;
+          aq.is_psycho  = true;
+        }
+        aq.question_id = aq.id;
+        delete aq.id;
+        qMap[aq.question_id] = aq;
+      });//row.assessment_questions.map
+      // console.log("the question map",JSON.parse(JSON.stringify(qMap)));
+      console.log("the question map count",Object.keys(qMap).length);
+
+      // create users assessment result
+      let userMap = {};
+      row.assessment_results.map(ele => {
+        let code = `${ele.user_id}-${ele.assessment_id}`;
+        userMap[code] = {
+          result          : ele.result,
+          percentile      : ele.percentile,
+          skill_scores    : ele.skill_scores,
+          subject_scores  : ele.subject_scores,//JSON.parse(JSON.stringify(ele.subject_scores)),
+          skill_total     : ele.skill_total,
+          total           : ele.total,
+          total_scored    : ele.total_scored,
+          };
+      });
+      // console.log("the user map",userMap);
+      console.log("the user map count",Object.keys(userMap).length);
+
+      // populate payload
+      row.user_assessment_responses.forEach((uar, index) => {
+        if(index > 2) return;
+        let user_id = uar.user_id;
+        
+        insertedForUserIds.push(user_id);
+
+        let type = uar.type;
+        let resp = JSON.parse(uar.response_json);
+        Object.keys(resp).map((qid, resp_index) => {
+          let code = `${user_id}-${uar.assessment_id}`;
+          let pl = {};
+          if(resp_index == 5) { 
+            console.log(`5th count Random user:: user_id ${user_id} for response_id ${uar.id} the mapped question for id ${qid} `, qMap[qid]); 
+            console.log(`5th count userMap value `,userMap[code]);
+          }
+          if(qMap[qid]) {
+            pl.user_id            = uar.user_id;
+            pl.question_id        = parseInt(qid);
+            pl.is_correct         = false;
+            pl.score              = 0;
+            pl.assessment_id      = row.id;
+            pl.assessment_type    = type;
+            pl.result             = userMap[code] ? userMap[code].result : 'FINISHED';
+            pl.skill_id           = qMap[qid].skill_id;
+            pl.skill_name         = (qMap[qid].skill) ? qMap[qid].skill.name : null;
+            pl.grade_id           = qMap[qid].grade_id;
+            pl.grade_name         = (qMap[qid].grade) ? qMap[qid].grade.name : null;
+            pl.level_id           = qMap[qid].level_id;
+            pl.level_name         = (qMap[qid].level) ? qMap[qid].level.name : null;
+            pl.question_type      = qMap[qid].question_type;
+            pl.lo_ids             = qMap[qid].lo_ids;
+            pl.subject_id         = qMap[qid].subject_id;
+            pl.subject_name       = (qMap[qid].subject) ? qMap[qid].subject.name : null;
+            pl.strand_id          = qMap[qid].strand_id;
+            pl.sub_strand_id      = qMap[qid].sub_strand_id;
+            pl.topic_id           = qMap[qid].topic_id;
+            pl.correct_answer     = qMap[qid].correct_answer;
+            pl.blooms_taxonomy    = qMap[qid].blooms_taxonomy;
+            pl.difficulty_level   = qMap[qid].difficulty_level;
+            pl.complexity_level   = qMap[qid].complexity_level;
+            pl.total_scored       = userMap[code] ? userMap[code].total_scored : 0;
+            pl.total              = userMap[code] ? userMap[code].total : 0;
+            pl.percentile         = userMap[code] ? userMap[code].percentile : 0;
+            pl.skill_total_        = userMap[code] ? userMap[code].skill_total : 0;
+            pl.skill_scores_     = userMap[code] ? userMap[code].skill_scores : 0;
+            pl.subject_scores_     = userMap[code] ? userMap[code].subject_scores : 0;
+            pl.subject_score      = 0;
+            pl.skill_score        = 0;
+            pl.skill_total        = 0;
+            // console.log(`the user skill scores ${code} response_id ${uar.id} `,userMap[code]);
+
+            let skill_scores  = (userMap[code] && userMap[code].skill_scores) ? userMap[code].skill_scores : {};
+            let skill_total   = (userMap[code] && userMap[code].skill_total) ? userMap[code].skill_total : {};
+            let count = 0;
+            if(skill_scores.Psychometric) { delete  skill_scores.Psychometric; }
+            Object.keys(skill_scores).map(skill => {
+              if(skill == pl.skill_name) { 
+                pl.skill_score    = skill_scores[skill]; 
+                pl.skill_total    = skill_total[count]; 
+              }
+              count++;
+            })
+            let subject_scores = (userMap[code] && userMap[code].subject_scores) ? userMap[code].subject_scores : {};
+            Object.keys(subject_scores).map(sub => {
+              if(sub == pl.subject_name) {
+                pl.subject_score = subject_scores[sub];
+              }
+            });
+            
+
+            if(!qMap[qid].is_psycho) {
+              if(resp[qid] && qMap[qid].question_type == 'MULTIPLE_CHOICE'){
+                // console.log(`user ${user_id} the answer ${resp[qid]} for question id ${qid} and question `,qMap[qid].correct_answer);
+                let are_same = _.isEqual(qMap[qid].correct_answer.split(",").sort(), resp[qid].sort());
+                if(are_same) {  pl.is_correct = true; pl.score = 1;  }
+              }
+              else {
+                if(resp[qid] && resp[qid].toLowerCase() == qMap[qid].correct_answer.toLowerCase()) { 
+                  pl.is_correct = true;
+                  pl.score = 1; 
+                }
+              }
+            }
+            else {
+              // console.log(`user_id ${user_id} the answer ${resp[qid]} for psychometric question id ${qid}`, qMap[qid]);
+              qMap[qid].options.map(op => {
+                if(op.option_key == resp[qid]) { pl.is_correct = (op.score_value > 0);  pl.score = op.score_value;  }
+              })
+            }
+            payload.push(pl);// add the populated object into array of questions for each user's response
+          } // question id found in questionMap and non psychometric
+
+        });
+      });// row.user_assessment_responses.map
+
+    });// assessmentsData.map
+    
+    // return ReS(res, { data: payload }, 200);
+
+    // insert into user_assessment_reports table
+    [err, userAssessmentReportsData] = await to(user_assessment_reports.bulkCreate(payload));
+    if(err) return ReE(res, err, 422);
+    
+    return ReS(res, { data: {reportedUserIdLength: reportedUserIds.length, reportedUserIds:reportedUserIds, inserted_for_ids: insertedForUserIds, payload_length: payload.length, inserted:userAssessmentReportsData} }, 200);
+    // return ReS(res, {data: {payload:assessmentQuestionData, reportData:reportData}}, 200);
+  } catch (err) {
+  return ReE(res, err, 422);
+  }
+}
+module.exports.generateUserResponseReport = generateUserResponseReport;

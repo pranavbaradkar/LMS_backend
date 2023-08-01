@@ -14,6 +14,7 @@ module.exports = (sequelize, DataTypes) => {
     score         : { type: DataTypes.FLOAT, defaultValue : 0 },
     deleted_at    : { type: DataTypes.DATE, allowNull: true, defaultValue: null }
   },{
+    underscored: true,
     timestamps: true,
     paranoid: true,
     createdAt: 'created_at',
