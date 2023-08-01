@@ -19,7 +19,7 @@ user_assessments.belongsTo(assessments, { foreignKey: 'assessment_id'});
 user_assessments.belongsTo(assessment_results, { foreignKey: 'user_id', targetKey: 'user_id'});
 campaign_assessments.belongsTo(campaign_schools, { foreignKey: 'campaign_id', targetKey: 'campaign_id'});
 assessment_configurations.belongsTo(user_assessments, { foreignKey: "assessment_id", sourceKey: "assessment_id" });
-user_assessments.belongsTo(user_assessment_logs, { foreignKey: "user_id", targetKey: "user_id" });
+user_assessments.hasOne(user_assessment_logs, { foreignKey: "user_id", targetKey: "user_id" });
 assessment_configurations.belongsTo(levels, {foreignKey: 'level_id' });
 demovideo_details.belongsTo(user_recommendations, {foreignKey: 'user_id', targetKey:'user_id'});
 assessment_questions.belongsTo(questions, { foreignKey: 'question_id' });
@@ -61,7 +61,7 @@ module.exports.dashboardReport = async(req, res) => {
     let user_assessments_filter = { 
       // required: true,
       model: user_assessments, attributes: ['id','assessment_id', 'status', 'type'],
-      where: { status: {[Op.in]: ['PASSED', 'FAILED', 'FINISHED'] }},
+      // where: { status: {[Op.in]: ['PASSED', 'FAILED', 'FINISHED'] }},
       include: [
         { 
           paranoid: false,
@@ -126,7 +126,7 @@ module.exports.dashboardReport = async(req, res) => {
     [err, userData] = await to(users.findAndCountAll(filter));
     if(err) return ReE(res, err, 422);
 
-    // return ReS(res, {data: userData } );
+    // return ReS(res, {data: { user_data_count: userData.rows.length, db_data: userData} } );
 
     let report                    = {};
     report.total_sign_up          = 0;
@@ -148,7 +148,7 @@ module.exports.dashboardReport = async(req, res) => {
     allLevels.forEach(lev => { 
       sr[lev]   = { "level":lev, "SCREENING": 0, "MAINS": 0};
       usr[lev]  = { "level":lev, "SCREENING": 0, "MAINS": 0 }; // {"level":lev, "screening_count": 0, "mains_count": 0 }
-      idsr[lev] = { "level": lev,"demo_video_count":0,"interview_count":0}; 
+      idsr[lev] = { "level": lev,"demo_video_count":0, "demo_appeared": 0,"interview_count":0, "interview_appeared":0 }; 
       et[lev]   = { "level":lev, "SCREENING": [], "MAINS": []};
     } );
     
@@ -157,12 +157,15 @@ module.exports.dashboardReport = async(req, res) => {
       let obj = row.get({plain: true});
       if(obj && obj.assessment_results) {
         obj.assessment_results.forEach(elem => {
-          if(elem == 'SCREENING' && elem.result == 'PASSED') { report.screening_cleared++; }
-          if(elem == 'MAINS' && elem.result == 'PASSED') { report.mains_cleared++; }
+          if(elem.type == 'SCREENING' && elem.result == 'PASSED') { report.screening_cleared++; }
+          if(elem.type == 'MAINS' && elem.result == 'PASSED') { report.mains_cleared++; }
         });
       }
+      // if(obj && obj.demo_video && obj.demo_video.length) {
+      //   obj.demo_video.map(ele => { if(ele.status == 'RECOMMENDED' ){ report.demo_cleared++; } })
+      // }
       if(obj && obj.user_interview_feedback && obj.user_interview_feedback.offer_selection) {
-        if(obj.user_interview_feedback.offer_selection == 'YES') { offer_selection_yes++; }
+        if(obj.user_interview_feedback.offer_selection == 'YES') { offer_selection_yes++; report.interview_cleared++; }
         if(obj.user_interview_feedback.offer_selection == 'NO') { offer_selection_no++; }
         if(obj.user_interview_feedback.offer_selection == 'MAYBE') { offer_selection_maybe++; }
       }
@@ -191,19 +194,41 @@ module.exports.dashboardReport = async(req, res) => {
         });
         if(obj && obj.demo_video) {
           obj.demo_video.forEach(elem => {
-            if(elem.status == 'RECOMMENDED') { idsr[mainsLevel].demo_video_count++; }
+            if(_.contains(['RECOMMENDED', 'NOT_RECOMMENDED', 'SUBMITTED'], elem.status)) { 
+              idsr[mainsLevel].demo_appeared++;
+              if(elem.status == 'RECOMMENDED') { idsr[mainsLevel].demo_video_count++; report.demo_cleared++; } 
+            }
           });
         }
-        if(obj && obj.user_recommendation && obj.user_recommendation.status && obj.user_recommendation.status == 'SELECTED') {
-          console.log("the interview selected record id",obj.id, mainsLevel, obj.user_recommendation.id);
-          idsr[mainsLevel].interview_count++;
+
+        if(obj && obj.user_recommendation && obj.user_recommendation.status) {
+          if(_.contains(['INTERVIEW', 'SELECTED', 'NOT_SELECTED'], obj.user_recommendation.status)) { 
+            idsr[mainsLevel].interview_appeared++;
+            if(obj.user_recommendation.status == 'SELECTED') {
+              idsr[mainsLevel].interview_count++;
+            }
+          }
         }
       }
     });
     report.conversion.push({"offer_selection":"YES","count":offer_selection_yes});
     report.conversion.push({"offer_selection":"NO","count":offer_selection_no});
     report.conversion.push({"offer_selection":"MAYBE","count":offer_selection_maybe});
-    report.interview      = Object.values(idsr);
+    report.interview      = [];
+    // return ReS(res, {data: idsr});
+    Object.values(idsr).map(ele => {
+      let obj = {};
+      obj.level = ele.level;
+      obj.demo_video_count = 0;
+      if(ele.demo_appeared) {
+        obj.demo_video_count = parseInt((ele.demo_video_count/ele.demo_appeared)*100);
+      }
+      obj.interview_count = 0;
+      if(ele.interview_appeared) {
+        obj.interview_count = parseInt((ele.interview_count/ele.interview_appeared)*100);
+      }
+      report.interview.push(obj);
+    });
 
     // console.log("the passed scr/mains", sr);
     // console.log("the appeared scr/mains ", usr);
@@ -245,14 +270,16 @@ module.exports.assessmentUserAnalytics = async(req, res) => {
     // reportData = {"count":288,"rows":[{"name":"Dhrumil White","email":"dhrumil@gmail.com","assessment_score":30,"assessment_score_total":40,"time_taken":"50 mins 56 secs","status":"cleared"},{"name":"Devon Black","email":"devon@gmail.com","assessment_score":31,"assessment_score_total":40,"time_taken":"40 mins 56 secs","status":"cleared"}]};
 
     let conditions = {};
-    conditions.where = { assessment_id: req.params.assessment_id };
+    conditions.where = { assessment_id: req.params.assessment_id, status : { [Op.in]: ['PASSED','FAILED', 'FINISHED']} };
     if(req.query.status) {
       conditions.where.status = { [Op.in]: req.query.status.split(",") };
     }
-    let include_users = { model: users, attributes:['id', 'profile_pic', 'first_name', 'middle_name', 'last_name', 'email']};
+    let include_users = { required:false, model: users, attributes:['id', 'profile_pic', 'first_name', 'middle_name', 'last_name', 'email']};
     let include_assessment = {
       model: assessments, attributes: ['id', 'name'],
-      where: { id: req.params.assessment_id }, paranoid: false
+      where: { id: req.params.assessment_id }, 
+      required: false,
+      // paranoid: false
     };
     if(req.query.search) {
       include_users.where = { [Op.or] : [
@@ -266,22 +293,27 @@ module.exports.assessmentUserAnalytics = async(req, res) => {
     conditions.include = [
       include_users,
       { 
+        required: false,
         model: user_assessment_logs, attributes: ['id', 'assessment_id', 'user_id', 'elapsed_time'],
         where: { assessment_id: req.params.assessment_id }
       },
       { 
+        required: false,
         model: assessment_results, attributes:  ['id', 'assessment_id', 'user_id', 'total_scored', 'total'],
         where: { assessment_id: req.params.assessment_id }
       },
-      include_assessment
+      // include_assessment
     ];
 
-    [err, userData] = await to(user_assessments.findAndCountAll(conditions));
+    // return ReS(res, {data: conditions });
+    [err, userData] = await to(user_assessments.findAll(conditions));
     if(err) return ReE(res, err, 422);
+
+    // return ReS(res, {data: {count: userData.length, rows:userData}}, 200);
 
     let finalData = [];
     
-    userData.rows.forEach(row =>{
+    userData.forEach(row =>{
       let obj = row.get({plain: true});
       if(obj.user) {
         let fd  = {};
@@ -298,7 +330,7 @@ module.exports.assessmentUserAnalytics = async(req, res) => {
     });
 
     // return ReS(res, {data: userData}, 200);
-    return ReS(res, {data: {count: userData.count, rows:finalData}}, 200);
+    return ReS(res, {data: {count: finalData.length, rows:finalData}}, 200);
 
   } catch (err) {
   return ReE(res, err, 422);
@@ -313,11 +345,13 @@ const assessmentAnalytics = async(req, res) => {
     
 
     let finalData = await usersAppeared(req, res);
+    finalData.average_scores = await avgSkillScoreChart(req, res);
     finalData.blooms_taxonomy = await bloomsMarksChart(req, res);
     finalData.pass_rate_grades = await passRateGradeChart(req, res);
     finalData.success_rate_difficulty = await passRateDifficultyChart(req, res);
-    finalData.average_scores = [{"subject":"IQ","percentile":50},{"subject":"EQ","percentile":95},{"subject":"Pedagogy","percentile":30},{"subject":"Digital Literacy","percentile":40},{"subject":"Communication Skills","percentile":55},{"subject":"Psychometric","percentile":70},{"subject":"Hard Skills","percentile":80},{"subject":"Core Skill","percentile":30}];
-    finalData.dropout_rate = [{"grade":"Grade 1","rate":30},{"grade":"Grade 2","rate":10},{"grade":"Grade 3","rate":50},{"grade":"Grade 4","rate":20},{"grade":"Grade 5","rate":30},{"grade":"Grade 6","rate":40},{"grade":"Grade 7","rate":10},{"grade":"Grade 8","rate":20},{"grade":"Grade 9","rate":10},{"grade":"Grade 10","rate":50},{"grade":"Grade 11","rate":60},{"grade":"Grade 12","rate":10}];
+    // finalData.average_scores = [{"subject":"IQ","percentile":50},{"subject":"EQ","percentile":95},{"subject":"Pedagogy","percentile":30},{"subject":"Digital Literacy","percentile":40},{"subject":"Communication Skills","percentile":55},{"subject":"Psychometric","percentile":70},{"subject":"Hard Skills","percentile":80},{"subject":"Core Skill","percentile":30}];
+    finalData.dropout_rate_ = [{"grade":"Grade 1","rate":30},{"grade":"Grade 2","rate":10},{"grade":"Grade 3","rate":50},{"grade":"Grade 4","rate":20},{"grade":"Grade 5","rate":30},{"grade":"Grade 6","rate":40},{"grade":"Grade 7","rate":10},{"grade":"Grade 8","rate":20},{"grade":"Grade 9","rate":10},{"grade":"Grade 10","rate":50},{"grade":"Grade 11","rate":60},{"grade":"Grade 12","rate":10}];
+    finalData.dropout_rate = await dropoutRateChart(req, res);
     finalData.assessment_status = [{"status":"Cleared","count":90},{"status":"In Progress","count":70},{"status":"Not Cleared","count":10}];
 
     return ReS(res, {data: finalData }, 200);
@@ -328,16 +362,22 @@ const assessmentAnalytics = async(req, res) => {
 }
 module.exports.assessmentAnalytics = assessmentAnalytics;
 
-
 const usersAppeared = async (req, res) => {
   let err, reportData;
   try {
     let conditions = {};
     conditions.where = { status : { [Op.in]: ['PASSED','FAILED', 'FINISHED']}, assessment_id: req.query.assessment_id}
-    conditions.group = ['status'];
-    conditions.attributes = ['status',[Sequelize.fn("COUNT", Sequelize.col("id")), "user_count"]] ;
+    // conditions.group = ['status'];
+    conditions.attributes = [[Sequelize.fn('DISTINCT', Sequelize.col('user_id')) ,'user_id'],'status'];
+    // conditions.include = { 
+    //   required: false,
+    //   model: user_assessment_logs, attributes: ['id', 'assessment_id', 'user_id', 'elapsed_time'],
+    //   where: { assessment_id: req.params.assessment_id }
+    // };
     [err, reportData] = await to(user_assessments.findAll(conditions));
-
+    if(err) return ReE(res, err, 422);
+    // return ReS(res, {data: reportData}, 200);
+    
     let statusList    = {
       'PASSED': 'user_cleared_assessment',
       'FAILED': 'user_failed_assessment',
@@ -349,17 +389,20 @@ const usersAppeared = async (req, res) => {
     if(reportData) {
       reportData.forEach(row => {
         let obj = row.get({plain:true});
-        response.users_attended_assessment += parseInt(obj.user_count);
-        response[statusList[obj.status]]    = parseInt(obj.user_count);
+        // if(!response[statusList[obj.status]]) { response[statusList[obj.status]] = 0; }
+        response[statusList[obj.status]]++;
+        response.users_attended_assessment++;
+        // response.users_attended_assessment += parseInt(obj.user_count);
+        // response[statusList[obj.status]]    = parseInt(obj.user_count);
       });
     }
     return response;
-    // return ReS(res, {data: reportData}, 200);
   } catch (err) {
   return ReE(res, err, 422);
   }
 }
 module.exports.usersAppeared = usersAppeared;
+
 
 const template = async (req, res) => {
   let err, reportData;
@@ -402,8 +445,8 @@ const passRateGradeChart = async (req, res) => {
   let err, reportData;
   try {
     let conditions = {};
-    conditions.attributes = ['grade_name','result', [Sequelize.fn('COUNT', Sequelize.col('user_id')) ,'user_count'] ];
-    conditions.group      = ['grade_name','result'];
+    conditions.attributes = ['grade_name','result', 'user_id', [Sequelize.fn('COUNT', Sequelize.col('user_id')) ,'user_count'] ];
+    conditions.group      = ['grade_name','result', 'user_id'];
     conditions.where      = { grade_name: { [Op.ne]: null }, assessment_id: req.query.assessment_id};
     conditions.order      = [['grade_name', 'asc'], ['result','asc']];
     [err, reportData] = await to(user_assessment_reports.findAll(conditions));
@@ -418,20 +461,22 @@ const passRateGradeChart = async (req, res) => {
         let obj = row.get({plain:true});
         if(!gradeData[row.grade_name]) { gradeData[row.grade_name] = {}; }
         if(!gradeData[row.grade_name].count) { gradeData[row.grade_name].count = 0; }
-        if(!gradeData[row.grade_name].total) { gradeData[row.grade_name].total = 0; }
+        if(!gradeData[row.grade_name].pass_count) { gradeData[row.grade_name].pass_count = 0; }
+        gradeData[row.grade_name].count++;
         gradeData[row.grade_name].grade = row.grade_name;
-        if(row.result == 'PASSED') { gradeData[row.grade_name].passed = parseInt(obj.user_count); }          
-        gradeData[row.grade_name].total += parseInt(obj.user_count);
+        if(row.result == 'PASSED') { 
+          gradeData[row.grade_name].pass_count++;
+        }
       });
     }
-
+    // return ReS(res, {data: gradeData}, 200);
+    
     Object.values(gradeData).map(row => {
       let gc = {};
       gc.grade      = row.grade;
-      gc.pass_rate  = parseInt((row.passed/row.total)*100) || 0;
+      gc.pass_rate  = parseInt((row.pass_count/row.count)*100) || 0;
       finalData.push(gc);
     })
-    // return ReS(res, {data: finalData}, 200);
     return finalData;
   } catch (err) {
   return ReE(res, err, 422);
@@ -461,7 +506,7 @@ const bloomsMarksChart = async (req, res) => {
       bloomData[obj.blooms_taxonomy].avg_marks += parseInt(obj.avg_marks);
       bloomData[obj.blooms_taxonomy].count++;
     });
-    console.log("the avg bloom data initialized ", bloomData);
+    // console.log("the avg bloom data initialized ", bloomData);
 
     Object.values(bloomData).map(val => {
       let fd = {};
@@ -481,19 +526,72 @@ const avgSkillScoreChart = async (req, res) => {
   let err, reportData;
   try {
     let conditions = {};
-    conditions.attributes = ['difficulty_level', [Sequelize.fn('COUNT', Sequelize.col('user_id')) ,'count'] ];
-    conditions.group      = ['difficulty_level'];
-    conditions.where      = { difficulty_level: { [Op.ne]: null }};
+    conditions.attributes = ['skill_name', [Sequelize.fn('AVG', Sequelize.col('skill_score')) ,'avg_marks'] ];
+    conditions.group      = ['skill_name'];
+    conditions.where      = { skill_id: { [Op.ne]: -1 }, assessment_id: req.query.assessment_id};
     [err, reportData] = await to(user_assessment_reports.findAll(conditions));
     if(err) return ReE(res, err, 422);
-
-    return reportData;
     // return ReS(res, {data: reportData}, 200);
+
+    let finalData = [];
+    if(reportData) {
+      let avgData = {};
+      reportData.map(row => {
+        let obj = row.get({plain: true});
+        finalData.push({"subject":obj.skill_name,"percentile":parseInt(obj.avg_marks)});
+      });
+    }
+
+    return finalData;
   } catch (err) {
   return ReE(res, err, 422);
   }
 }
 module.exports.avgSkillScoreChart = avgSkillScoreChart;
+
+const dropoutRateChart = async (req, res) => {
+  let err, reportData;
+  try {
+    let conditions = {};
+    conditions.attributes = ['user_id', 'assessment_id', 'status' ];
+    conditions.where      = { status: 'STARTED' , assessment_id: req.query.assessment_id};
+    conditions.include    = [
+      { 
+        model: assessment_configurations, attributes: ['level_id'],
+        include: [
+          { model: levels, attributes: ['id', 'name']}
+        ]
+      }
+    ];
+    [err, reportData] = await to(user_assessments.findAll(conditions));
+    if(err) return ReE(res, err, 422);
+    // return ReS(res, {data: reportData}, 200);
+
+    let finalData = [];
+    let dData = {};
+    if(reportData) {
+      reportData.map(row => {
+        let obj = row.get({plain: true});
+        let level = obj.assessment_configuration.level.name;
+        if(!dData[level]) { dData[level] = {}; dData[level].count = 0; }
+        dData[level].count++;
+        // finalData.push({"subject":obj.skill_name,"percentile":parseInt(obj.avg_marks)});
+      });
+    }
+    // return ReS(res, {data: dData });
+
+    Object.keys(dData).map(level => {
+      finalData.push({"grade":level,"rate":dData[level].count });
+    });
+
+
+    return finalData;
+  } catch (err) {
+  return ReE(res, err, 422);
+  }
+}
+module.exports.dropoutRateChart = dropoutRateChart;
+
 
 //generateAnswersAnalytics
 const temporary = async (req, res) => {
@@ -503,12 +601,19 @@ const temporary = async (req, res) => {
     // uaCondition.attributes  = [[Sequelize.fn('DISTINCT', Sequelize.col('assessment_id')) ,'assessment_id']];
     // uaCondition.order       = [['assessment_id', 'ASC']];
     
-    
+    let drc = await dropoutRateChart(req, res);
+    let avg = await avgSkillScoreChart(req, res);
     let prd = await passRateDifficultyChart(req, res);
     let prgc = await passRateGradeChart(req, res);
     let bc = await bloomsMarksChart(req, res);
 
+    // finalData.average_scores = [{"subject":"IQ","percentile":50},{"subject":"EQ","percentile":95},{"subject":"Pedagogy","percentile":30},{"subject":"Digital Literacy","percentile":40},{"subject":"Communication Skills","percentile":55},{"subject":"Psychometric","percentile":70},{"subject":"Hard Skills","percentile":80},{"subject":"Core Skill","percentile":30}];
+    // finalData.dropout_rate = [{"grade":"Grade 1","rate":30},{"grade":"Grade 2","rate":10},{"grade":"Grade 3","rate":50},{"grade":"Grade 4","rate":20},{"grade":"Grade 5","rate":30},{"grade":"Grade 6","rate":40},{"grade":"Grade 7","rate":10},{"grade":"Grade 8","rate":20},{"grade":"Grade 9","rate":10},{"grade":"Grade 10","rate":50},{"grade":"Grade 11","rate":60},{"grade":"Grade 12","rate":10}];
+    // finalData.assessment_status = [{"status":"Cleared","count":90},{"status":"In Progress","count":70},{"status":"Not Cleared","count":10}];
+
     return ReS(res, {data: { 
+      dropout: drc,
+      average_scores: avg,
       blooms_taxonomy: bc,
       pass_rate_grades: prgc, 
       success_rate_difficulty: prd ,
@@ -521,7 +626,7 @@ const temporary = async (req, res) => {
 module.exports.temporary = temporary;
 
 
-
+// if stuck at inserting_for_ids check user_assessment_response for data like {"1": "A" ... }
 const generateUserResponseReport = async (req, res) => {
   let err, assessmentsData,userAssessmentReportsData;
   try {
@@ -707,8 +812,8 @@ const generateUserResponseReport = async (req, res) => {
 
             if(!qMap[qid].is_psycho) {
               if(resp[qid] && qMap[qid].question_type == 'MULTIPLE_CHOICE'){
-                // console.log(`user ${user_id} the answer ${resp[qid]} for question id ${qid} and question `,qMap[qid].correct_answer);
-                let are_same = _.isEqual(qMap[qid].correct_answer.split(",").sort(), resp[qid].split(",").sort());
+                console.log(`user ${user_id} the answer ${resp[qid]} for question id ${qid} and question `,qMap[qid].correct_answer);
+                let are_same = _.isEqual(qMap[qid].correct_answer.split(",").sort(), String(resp[qid]).split(",").sort());
                 if(are_same) {  pl.is_correct = true; pl.score = 1;  }
               }
               else {
@@ -738,7 +843,7 @@ const generateUserResponseReport = async (req, res) => {
     [err, userAssessmentReportsData] = await to(user_assessment_reports.bulkCreate(payload));
     if(err) return ReE(res, err, 422);
     
-    return ReS(res, { data: {reportedUserIdLength: reportedUserIds.length, reportedUserIds:reportedUserIds, inserted_for_ids: insertedForUserIds, payload_length: payload.length, inserted:userAssessmentReportsData} }, 200);
+    return ReS(res, { data: {reportedUserIdLength: reportedUserIds.length, reportedUserIds:reportedUserIds, inserting_for_ids: insertedForUserIds, payload_length: payload.length, inserted:userAssessmentReportsData} }, 200);
     // return ReS(res, {data: {payload:assessmentQuestionData, reportData:reportData}}, 200);
   } catch (err) {
   return ReE(res, err, 422);
