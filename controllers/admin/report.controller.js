@@ -83,7 +83,7 @@ module.exports.dashboardReport = async(req, res) => {
     if(req.query.user_type && req.query.user_type !== "ALL") {
       filter.where.user_type = req.query.user_type;
     }
-    if(req.query.campaign_id == 'ALL') { req.query.campaing_id ='-1'; }
+    if(req.query.campaign_id == 'ALL') { req.query.campaign_id ='-1'; }
     if(req.query.school_id == "ALL") { req.query.school_id = '-1';}
     if(req.query.campaign_id || req.query.school_id) {
       filter.include = filter.include.map(ele => {
