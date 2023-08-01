@@ -83,8 +83,9 @@ module.exports.dashboardReport = async(req, res) => {
     if(req.query.user_type && req.query.user_type !== "ALL") {
       filter.where.user_type = req.query.user_type;
     }
-    
-    if((req.query.campaign_id && req.query.campaign_id!="ALL") || (req.query.school_id && req.query.school_id!="ALL")) {
+    if(req.query.campaign_id == 'ALL') { req.query.campaing_id ='-1'; }
+    if(req.query.school_id == "ALL") { req.query.school_id = '-1';}
+    if(req.query.campaign_id || req.query.school_id) {
       filter.include = filter.include.map(ele => {
         // console.log("the model in filter now is ", ele.model);
         // if(ele.model == 'user_assessments')
@@ -310,7 +311,7 @@ const assessmentAnalytics = async(req, res) => {
     // return ReS(res, {data: reportData}, 200);
     
 
-    let finalData = usersAppeared(req, res);
+    let finalData = await usersAppeared(req, res);
     finalData.blooms_taxonomy = await bloomsMarksChart(req, res);
     finalData.pass_rate_grades = await passRateGradeChart(req, res);
     finalData.success_rate_difficulty = passRateDifficultyChart(req, res);
