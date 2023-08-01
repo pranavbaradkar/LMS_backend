@@ -658,9 +658,9 @@ const generateUserResponseReport = async (req, res) => {
             pl.blooms_taxonomy    = qMap[qid].blooms_taxonomy;
             pl.difficulty_level   = qMap[qid].difficulty_level;
             pl.complexity_level   = qMap[qid].complexity_level;
-            pl.total_scored       = userMap[code] ? userMap[code].total_scored : 0;
-            pl.total              = userMap[code] ? userMap[code].total : 0;
-            pl.percentile         = userMap[code] ? userMap[code].percentile : 0;
+            pl.total_scored       = userMap[code] ? (userMap[code].total_scored || 0) : 0;
+            pl.total              = userMap[code] ? (userMap[code].total || 0) : 0;
+            pl.percentile         = userMap[code] ? (userMap[code].percentile || 0) : 0;
             pl.skill_total_        = userMap[code] ? userMap[code].skill_total : 0;
             pl.skill_scores_     = userMap[code] ? userMap[code].skill_scores : 0;
             pl.subject_scores_     = userMap[code] ? userMap[code].subject_scores : 0;
@@ -675,15 +675,15 @@ const generateUserResponseReport = async (req, res) => {
             if(skill_scores.Psychometric) { delete  skill_scores.Psychometric; }
             Object.keys(skill_scores).map(skill => {
               if(skill == pl.skill_name) { 
-                pl.skill_score    = skill_scores[skill]; 
-                pl.skill_total    = skill_total[count]; 
+                pl.skill_score    = skill_scores[skill] || 0; 
+                pl.skill_total    = skill_total[count] || 0; 
               }
               count++;
             })
             let subject_scores = (userMap[code] && userMap[code].subject_scores) ? userMap[code].subject_scores : {};
             Object.keys(subject_scores).map(sub => {
               if(sub == pl.subject_name) {
-                pl.subject_score = subject_scores[sub];
+                pl.subject_score = subject_scores[sub] || 0;
               }
             });
             
