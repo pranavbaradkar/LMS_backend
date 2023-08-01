@@ -209,8 +209,8 @@ module.exports.dashboardReport = async(req, res) => {
       let screeningRate     = (screeningTotal >0) ? ((sr[lev]['SCREENING']/screeningTotal)*100).toFixed(2) : 0;
       let mainsTotal        = usr[lev]['MAINS'];
       let mainsRate         = (mainsTotal > 0) ? ((sr[lev]['MAINS']/mainsTotal)*100).toFixed(2) : 0;
-      report.success.push({level: lev, screening_count: screeningRate, mains_count: mainsRate });
-      report.users.push({level: lev, screening_count: screeningTotal, mains_count: mainsTotal });
+      report.success.push({level: lev, screening_count: String(screeningRate), mains_count: String(mainsRate) });
+      report.users.push({level: lev, screening_count: String(screeningTotal), mains_count: String(mainsTotal) });
 
       let totalScreeningTme = et[lev]['SCREENING'].reduce((total, val) => total+val,0);
       // console.log("total screening time ", lev, totalScreeningTme);
@@ -219,7 +219,7 @@ module.exports.dashboardReport = async(req, res) => {
       let totalMainsTme = et[lev]['MAINS'].reduce((total, val) => total+val,0);
       // console.log("total mains time ", lev, totalMainsTme);
       let avgMainsTime  = (et[lev]['MAINS'].length > 0) ? ((totalMainsTme)/et[lev]['MAINS'].length).toFixed(0) : 0;
-      report.time_to_answer.push({level: lev, screening_count: avgScreeningTime, mains_count: avgMainsTime});
+      report.time_to_answer.push({level: lev, screening_count: String(avgScreeningTime), mains_count: String(avgMainsTime)});
     });
 
     // return ReS(res, {data: { report: report, user_data: userData}}, 200);
