@@ -6,6 +6,7 @@ var Sequelize = require("sequelize");
 const Op = Sequelize.Op;
 
 const moment = require('moment');
+const { report } = require("../../routes/admin");
 
 const PSYCHOMETRIC_SKILL_ID = process.env.PSYCHOMETRIC_SKILL_ID || 48;
 const PSYCHOMETRIC_ANSWER_MAX_VALUE = process.env.PSYCHOMETRIC_ANSWER_MAX_VALUE || 4;
@@ -383,8 +384,14 @@ const passRateDifficultyChart = async (req, res) => {
     [err, reportData] = await to(user_assessment_reports.findAll(conditions));
     if(err) return ReE(res, err, 422);
 
-    return reportData;
     // return ReS(res, {data: reportData}, 200);
+
+    let finalData = [];
+    reportData.map(ele => {
+      let obj = ele.get({plain:true});
+      finalData.push({difficulty_level: obj.difficulty_level, count: parseInt(obj.count) });
+    });
+    return finalData;
   } catch (err) {
   return ReE(res, err, 422);
   }
