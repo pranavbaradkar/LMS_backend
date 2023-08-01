@@ -113,11 +113,15 @@ module.exports.dashboardReport = async(req, res) => {
 
       user_assessments_filter.include.push(user_assessment_filter_include);
     }
+    // return ReS(res, {data: filter});
+
     // console.log("the filter",JSON.stringify(filter));
     // console.log("the filter user_assessment ",filter.include[1]);
     // console.log("the filter user_assessment > campaign_assessment ",filter.include[1].include[0]);
     [err, userData] = await to(users.findAndCountAll(filter));
     if(err) return ReE(res, err, 422);
+
+    // return ReS(res, {data: userData } );
 
     let report                    = {};
     report.total_sign_up          = 0;
@@ -277,6 +281,7 @@ module.exports.assessmentUserAnalytics = async(req, res) => {
       if(obj.user) {
         let fd  = {};
         fd.full_name              = getFullName(obj.user).trim();
+        fd.id                     = obj.user.id;
         fd.email                  = obj.user.email;
         fd.profile_pic            = obj.user.profile_pic;
         fd.assessment_score_total = (obj.assessment_result && obj.assessment_result.total) ? obj.assessment_result.total : 0;
