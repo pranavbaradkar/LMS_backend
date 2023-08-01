@@ -58,6 +58,7 @@ module.exports.dashboardReport = async(req, res) => {
     
     filter.attributes = ['id', 'user_type'];
     let user_assessments_filter = { 
+      // required: true,
       model: user_assessments, attributes: ['id','assessment_id', 'status', 'type'],
       where: { status: {[Op.in]: ['PASSED', 'FAILED', 'FINISHED'] }},
       include: [
@@ -82,12 +83,14 @@ module.exports.dashboardReport = async(req, res) => {
     if(req.query.user_type && req.query.user_type !== "ALL") {
       filter.where.user_type = req.query.user_type;
     }
-    if((req.query.campaign_ids && req.query.campaign_ids!="ALL") || (req.query.school_ids && req.query.school_ids!="ALL")) {
+    
+    if((req.query.campaign_id && req.query.campaign_id!="ALL") || (req.query.school_id && req.query.school_id!="ALL")) {
       filter.include = filter.include.map(ele => {
         // console.log("the model in filter now is ", ele.model);
         // if(ele.model == 'user_assessments')
         //   ele.required = true;  
-        ele.required = true;
+        // ele.required = true;
+        // ele.required = false;
         return ele;
       }); 
 
@@ -97,17 +100,17 @@ module.exports.dashboardReport = async(req, res) => {
         where: { deleted_at: null }
         // include
       };
-      if(req.query.campaign_ids && req.query.campaign_ids != -1){
-        let campaign_where = { [Op.in]: (req.query.campaign_ids).split(",") };
+      if(req.query.campaign_id && req.query.campaign_id != -1){
+        let campaign_where = { [Op.in]: (req.query.campaign_id).split(",") };
         user_assessment_filter_include.where.campaign_id = campaign_where;
       }
-      if(req.query.school_ids && req.query.school_ids != -1){
+      if(req.query.school_id && req.query.school_id != -1){
         // TE("Am I here?");
         user_assessment_filter_include.include = {
           required: true, where: { deleted_at : null },
           model: campaign_schools
         };
-        let school_where = { [Op.in]: (req.query.school_ids).split(",") };
+        let school_where = { [Op.in]: (req.query.school_id).split(",") };
         user_assessment_filter_include.include.where.school_id = school_where;
       }
 
