@@ -381,7 +381,7 @@ const assessmentAnalytics = async(req, res) => {
     finalData.pass_rate_grades = pass_rate_grades.length ? pass_rate_grades : reportData.pass_rate_grades; 
     finalData.success_rate_difficulty = success_rate_difficulty.length ? success_rate_difficulty : reportData.success_rate_difficulty; 
     finalData.dropout_rate = dropout_rate.length ? dropout_rate : reportData.dropout_rate; 
-    finalData.assessment_status = reportData.assessment_results;
+    finalData.assessment_status = reportData.assessment_status;
 
     return ReS(res, {data: finalData }, 200);
 
