@@ -19,7 +19,7 @@ user_assessments.belongsTo(assessments, { foreignKey: 'assessment_id'});
 user_assessments.belongsTo(assessment_results, { foreignKey: 'user_id', targetKey: 'user_id'});
 campaign_assessments.belongsTo(campaign_schools, { foreignKey: 'campaign_id', targetKey: 'campaign_id'});
 assessment_configurations.belongsTo(user_assessments, { foreignKey: "assessment_id", sourceKey: "assessment_id" });
-user_assessments.hasOne(user_assessment_logs, { foreignKey: "user_id", targetKey: "user_id" });
+user_assessments.hasOne(user_assessment_logs, { sourceKey:'user_id',foreignKey: "user_id" });
 assessment_configurations.belongsTo(levels, {foreignKey: 'level_id' });
 demovideo_details.belongsTo(user_recommendations, {foreignKey: 'user_id', targetKey:'user_id'});
 assessment_questions.belongsTo(questions, { foreignKey: 'question_id' });
@@ -257,8 +257,8 @@ module.exports.dashboardReport = async(req, res) => {
       let screeningRate     = (screeningAppeared >0) ? ((sr[lev]['SCREENING']/screeningAppeared)*100).toFixed(2) : 0;
       let mainsAppeared    = sr[lev]['mains_appeared'];
       let mainsRate     = (mainsAppeared >0) ? ((sr[lev]['MAINS']/mainsAppeared)*100).toFixed(2) : 0;
-      // report.success.push({level: lev, screening_count: parseInt(screeningRate), mains_count: parseInt(mainsRate) });
-      report.success.push({level: lev, screening_count: parseInt(screeningAppeared), mains_count: parseInt(mainsAppeared) });
+      report.success.push({level: lev, screening_count: parseInt(screeningRate), mains_count: parseInt(mainsRate) });
+      // report.success.push({level: lev, screening_count: parseInt(screeningAppeared), mains_count: parseInt(mainsAppeared) });
 
       let screeningTotal        = usr[lev]['SCREENING'];
       let mainsTotal        = usr[lev]['MAINS'];
