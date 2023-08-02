@@ -233,13 +233,13 @@ module.exports.dashboardReport = async(req, res) => {
       obj.level = ele.level;
       obj.demo_video_count = 0;
       if(ele.demo_appeared) {
-        // obj.demo_video_count = parseInt((ele.demo_video_count/ele.demo_appeared)*100);
-        obj.demo_video_count = parseInt(ele.demo_appeared);
+        obj.demo_video_count = parseInt((ele.demo_video_count/ele.demo_appeared)*100);
+        // obj.demo_video_count = parseInt(ele.demo_appeared);
       }
       obj.interview_count = 0;
       if(ele.interview_appeared) {
-        // obj.interview_count = parseInt((ele.interview_count/ele.interview_appeared)*100);
-        obj.interview_count = parseInt(ele.interview_appeared);
+        obj.interview_count = parseInt((ele.interview_count/ele.interview_appeared)*100);
+        // obj.interview_count = parseInt(ele.interview_appeared);
       }
       report.interview.push(obj);
     });
