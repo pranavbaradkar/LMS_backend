@@ -145,10 +145,12 @@ module.exports.dashboardReport = async(req, res) => {
     let idsr                      = {}; // interview demo success rate
     let usr                       = {}; // user appeared for mains/screening
     let et                        = {}; // elapsed time for mains/screening
+    let usl                       = {}; // users signup by level
     allLevels.forEach(lev => { 
-      sr[lev]   = { "level":lev, "SCREENING": 0, "MAINS": 0};
-      usr[lev]  = { "level":lev, "SCREENING": 0, "MAINS": 0 }; // {"level":lev, "screening_count": 0, "mains_count": 0 }
+      sr[lev]   = { "level":lev, "SCREENING": 0, 'screening_appeared': 0, "MAINS": 0, "mains_appeared": 0};
       idsr[lev] = { "level": lev,"demo_video_count":0, "demo_appeared": 0,"interview_count":0, "interview_appeared":0 }; 
+      usl[lev]  = { "level": lev,"user_count":0 }; 
+      usr[lev]  = { "level":lev, "SCREENING": 0, "MAINS": 0 }; // {"level":lev, "screening_count": 0, "mains_count": 0 }
       et[lev]   = { "level":lev, "SCREENING": [], "MAINS": []};
     } );
     
@@ -185,7 +187,9 @@ module.exports.dashboardReport = async(req, res) => {
             // let type_count= type.toLowerCase()+_+'total';
             usr[level][type]++;
             sr[level][type] += (result == 'PASSED') ? 1 : 0;
-            // sr[level][type]++;
+            let appeared = `${type.toLowerCase()}_appeared`; // screening_appeared / mains_appeared
+            sr[level][appeared]++;
+            usl[level]['user_count']++;
             if(ua.user_assessment_log && ua.user_assessment_log.elapsed_time) {
               let c = ua.user_assessment_log.elapsed_time;
               et[level][type].push(c);
@@ -214,18 +218,28 @@ module.exports.dashboardReport = async(req, res) => {
     report.conversion.push({"offer_selection":"YES","count":offer_selection_yes});
     report.conversion.push({"offer_selection":"NO","count":offer_selection_no});
     report.conversion.push({"offer_selection":"MAYBE","count":offer_selection_maybe});
-    report.interview      = [];
+    report.interview        = [];
     // return ReS(res, {data: idsr});
+    // return ReS(res, {data: usl});
+    report.signup_by_level  = Object.values(usl);
+    // TODO: remove from here this map after frontend changes
+    report.platform         = [];
+    report.signup_by_level.map(ele => {
+      report.platform.push({platform: ele.level,count: ele.user_count});
+    });
+    // TODO: remove till here this map after frontend changes
     Object.values(idsr).map(ele => {
       let obj = {};
       obj.level = ele.level;
       obj.demo_video_count = 0;
       if(ele.demo_appeared) {
-        obj.demo_video_count = parseInt((ele.demo_video_count/ele.demo_appeared)*100);
+        // obj.demo_video_count = parseInt((ele.demo_video_count/ele.demo_appeared)*100);
+        obj.demo_video_count = parseInt(ele.demo_appeared);
       }
       obj.interview_count = 0;
       if(ele.interview_appeared) {
-        obj.interview_count = parseInt((ele.interview_count/ele.interview_appeared)*100);
+        // obj.interview_count = parseInt((ele.interview_count/ele.interview_appeared)*100);
+        obj.interview_count = parseInt(ele.interview_appeared);
       }
       report.interview.push(obj);
     });
@@ -234,16 +248,21 @@ module.exports.dashboardReport = async(req, res) => {
     // console.log("the appeared scr/mains ", usr);
     // console.log("the interview/demo success rate", idsr);
     // console.log("the interview/demo success rate", et);
-    
+    // return ReS(res, {data: sr});
     report.success          = [];
     report.users            = [];
     report.time_to_answer   = [];
     Object.keys(sr).forEach(lev => {
-      let screeningTotal    = usr[lev]['SCREENING'];
-      let screeningRate     = (screeningTotal >0) ? ((sr[lev]['SCREENING']/screeningTotal)*100).toFixed(2) : 0;
+      let screeningAppeared    = sr[lev]['screening_appeared'];
+      let screeningRate     = (screeningAppeared >0) ? ((sr[lev]['SCREENING']/screeningAppeared)*100).toFixed(2) : 0;
+      let mainsAppeared    = sr[lev]['mains_appeared'];
+      let mainsRate     = (mainsAppeared >0) ? ((sr[lev]['MAINS']/mainsAppeared)*100).toFixed(2) : 0;
+      // report.success.push({level: lev, screening_count: parseInt(screeningRate), mains_count: parseInt(mainsRate) });
+      report.success.push({level: lev, screening_count: parseInt(screeningAppeared), mains_count: parseInt(mainsAppeared) });
+
+      let screeningTotal        = usr[lev]['SCREENING'];
       let mainsTotal        = usr[lev]['MAINS'];
-      let mainsRate         = (mainsTotal > 0) ? ((sr[lev]['MAINS']/mainsTotal)*100).toFixed(2) : 0;
-      report.success.push({level: lev, screening_count: parseInt(screeningRate), mains_count: parseInt(mainsRate) });
+      // let mainsRate         = (mainsTotal > 0) ? ((sr[lev]['MAINS']/mainsTotal)*100).toFixed(2) : 0;
       report.users.push({level: lev, screening_count: parseInt(screeningTotal), mains_count: parseInt(mainsTotal) });
 
       let totalScreeningTme = et[lev]['SCREENING'].reduce((total, val) => total+val,0);
